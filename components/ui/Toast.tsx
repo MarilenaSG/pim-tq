@@ -73,7 +73,7 @@ function ToastItemComponent({
   item: ToastItem
   onDismiss: (id: string) => void
 }) {
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const s = variantStyle[item.variant]
 
   useEffect(() => {
