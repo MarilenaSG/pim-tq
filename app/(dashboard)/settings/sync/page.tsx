@@ -1,32 +1,31 @@
+import { Suspense } from 'react'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui'
 import { SyncPanel } from './SyncPanel'
+import { getShopifyStatus } from './actions'
 import type { SyncLog } from '@/types'
 
-async function getSyncData(): Promise<{
-  lastMetabaseSync: SyncLog | null
-  recentLogs: SyncLog[]
-}> {
+async function getSyncData() {
   const supabase = createServerClient()
 
-  const { data: logs } = await supabase
-    .from('sync_log')
-    .select('*')
-    .order('started_at', { ascending: false })
-    .limit(10)
+  const [logsResult, shopifyStatus] = await Promise.all([
+    supabase
+      .from('sync_log')
+      .select('*')
+      .order('started_at', { ascending: false })
+      .limit(10),
+    getShopifyStatus(),
+  ])
 
-  if (!logs) return { lastMetabaseSync: null, recentLogs: [] }
+  const logs = (logsResult.data ?? []) as SyncLog[]
+  const lastMetabaseSync = logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null
+  const lastShopifySync  = logs.find(l => l.source === 'shopify'  && l.status !== 'running') ?? null
 
-  const lastMetabaseSync = (logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null) as SyncLog | null
-
-  return {
-    lastMetabaseSync,
-    recentLogs: logs as SyncLog[],
-  }
+  return { logs, lastMetabaseSync, lastShopifySync, shopifyStatus }
 }
 
 export default async function SyncPage() {
-  const { lastMetabaseSync, recentLogs } = await getSyncData()
+  const { logs, lastMetabaseSync, lastShopifySync, shopifyStatus } = await getSyncData()
 
   return (
     <div className="p-8 max-w-4xl">
@@ -36,10 +35,15 @@ export default async function SyncPage() {
         subtitle="Importa datos de Metabase y Shopify hacia el PIM"
       />
 
-      <SyncPanel
-        lastMetabaseSync={lastMetabaseSync}
-        recentLogs={recentLogs}
-      />
+      <Suspense>
+        <SyncPanel
+          lastMetabaseSync={lastMetabaseSync}
+          lastShopifySync={lastShopifySync}
+          recentLogs={logs}
+          shopifyConnected={shopifyStatus.connected}
+          shopifyShop={shopifyStatus.shop}
+        />
+      </Suspense>
     </div>
   )
 }

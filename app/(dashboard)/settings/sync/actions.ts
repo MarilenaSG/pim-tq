@@ -2,47 +2,67 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { syncMetabase } from '@/lib/metabase'
+import { syncShopify, getStoredShopifyToken, getConnectedShop } from '@/lib/shopify'
 
 export interface SyncActionResult {
   ok: boolean
   modelsUpserted?: number
   variantsUpserted?: number
   imagesUpserted?: number
+  shopifyDataUpserted?: number
+  productsProcessed?: number
+  skippedNoMatch?: number
   errors?: string[]
   error?: string
 }
 
-export async function triggerMetabaseSync(): Promise<SyncActionResult> {
-  const supabase = createServiceClient()
+export interface ShopifyStatus {
+  connected: boolean
+  shop: string | null
+}
 
+async function withSyncLog(
+  supabase: ReturnType<typeof createServiceClient>,
+  source: 'metabase' | 'shopify',
+  fn: () => Promise<SyncActionResult>
+): Promise<SyncActionResult> {
   const { data: logEntry } = await supabase
     .from('sync_log')
-    .insert({
-      source:       'metabase',
-      status:       'running',
-      triggered_by: 'manual',
-      started_at:   new Date().toISOString(),
-    })
+    .insert({ source, status: 'running', triggered_by: 'manual', started_at: new Date().toISOString() })
     .select('id')
     .single()
-
   const logId = logEntry?.id
 
   try {
-    const result = await syncMetabase()
+    const result = await fn()
+    const records =
+      (result.modelsUpserted ?? 0) + (result.variantsUpserted ?? 0) +
+      (result.shopifyDataUpserted ?? 0) + (result.imagesUpserted ?? 0)
 
     if (logId) {
-      await supabase
-        .from('sync_log')
-        .update({
-          status:          result.errors.length > 0 ? 'error' : 'success',
-          records_updated: result.recordsUpdated,
-          error_message:   result.errors.length > 0 ? result.errors.join('\n') : null,
-          finished_at:     new Date().toISOString(),
-        })
-        .eq('id', logId)
+      await supabase.from('sync_log').update({
+        status:          result.ok ? 'success' : 'error',
+        records_updated: records,
+        error_message:   result.errors?.length ? result.errors.join('\n') : result.error ?? null,
+        finished_at:     new Date().toISOString(),
+      }).eq('id', logId)
     }
+    return result
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (logId) {
+      await supabase.from('sync_log').update({
+        status: 'error', error_message: message, finished_at: new Date().toISOString(),
+      }).eq('id', logId)
+    }
+    return { ok: false, error: message }
+  }
+}
 
+export async function triggerMetabaseSync(): Promise<SyncActionResult> {
+  const supabase = createServiceClient()
+  return withSyncLog(supabase, 'metabase', async () => {
+    const result = await syncMetabase()
     return {
       ok:               result.errors.length === 0,
       modelsUpserted:   result.modelsUpserted,
@@ -50,20 +70,32 @@ export async function triggerMetabaseSync(): Promise<SyncActionResult> {
       imagesUpserted:   result.imagesUpserted,
       errors:           result.errors,
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+  })
+}
 
-    if (logId) {
-      await supabase
-        .from('sync_log')
-        .update({
-          status:        'error',
-          error_message: message,
-          finished_at:   new Date().toISOString(),
-        })
-        .eq('id', logId)
+export async function triggerShopifySync(): Promise<SyncActionResult> {
+  const supabase = createServiceClient()
+  return withSyncLog(supabase, 'shopify', async () => {
+    const result = await syncShopify()
+    return {
+      ok:                  result.errors.length === 0,
+      shopifyDataUpserted: result.shopifyDataUpserted,
+      imagesUpserted:      result.imagesUpserted,
+      productsProcessed:   result.productsProcessed,
+      skippedNoMatch:      result.skippedNoMatch,
+      errors:              result.errors,
     }
+  })
+}
 
-    return { ok: false, error: message }
+export async function getShopifyStatus(): Promise<ShopifyStatus> {
+  try {
+    const [token, shop] = await Promise.all([
+      getStoredShopifyToken(),
+      getConnectedShop(),
+    ])
+    return { connected: !!token, shop }
+  } catch {
+    return { connected: false, shop: null }
   }
 }
