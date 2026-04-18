@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ReactNode } from 'react'
+import { ToastProvider } from '@/components/ui'
 
 const navSections = [
   {
@@ -28,6 +29,7 @@ const navSections = [
       { href: '/settings/fields', label: 'Campos custom', icon: '≡' },
       { href: '/settings/pricing', label: 'Reglas de precio', icon: '⊞' },
       { href: '/help', label: 'Ayuda', icon: '?' },
+      { href: '/test', label: 'Design system', icon: '◐' },
     ],
   },
 ]
@@ -73,13 +75,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-white/10">
-          <div className="text-xs text-white/30">v0.1 · Sesión 1</div>
+          <div className="text-xs text-white/30">v0.2 · Sesión 2</div>
         </div>
       </aside>
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </main>
     </div>
   )
