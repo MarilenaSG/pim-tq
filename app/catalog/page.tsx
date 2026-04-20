@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createServerClient } from '@/lib/supabase/server'
 import { CatalogGrid } from './CatalogGrid'
 
@@ -125,13 +126,24 @@ export default async function CatalogPage({
   return (
     <div className="min-h-screen" style={{ background: '#f4f1ee' }}>
       {/* Header */}
-      <header style={{ background: '#00557f' }} className="px-4 py-5 sticky top-0 z-20 shadow-md">
+      <header style={{ background: '#00557f' }} className="px-4 py-4 sticky top-0 z-20 shadow-md">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold tracking-widest uppercase text-white/50">Te Quiero Joyerías</p>
-            <h1 className="text-lg font-bold text-white leading-tight" style={{ fontFamily: 'Georgia, serif' }}>
-              Catálogo de producto
-            </h1>
+          <div className="flex items-center gap-3">
+            <Image
+              src="/brand/icon_cream.png"
+              alt="Te Quiero Joyerías"
+              width={36}
+              height={36}
+              className="shrink-0 opacity-90"
+            />
+            <div>
+              <p className="text-[10px] font-semibold tracking-widest uppercase text-white/50 leading-none mb-1">
+                Te Quiero Joyerías
+              </p>
+              <h1 className="text-lg font-bold text-white leading-none">
+                Catálogo de producto
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-white/40">{products.length} modelos</span>

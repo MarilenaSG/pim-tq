@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  const { data: logEntry } = await supabase
+  const { data: logEntry, error: logInsertErr } = await supabase
     .from('sync_log')
     .insert({
       source:       'shopify',
@@ -23,7 +23,14 @@ export async function POST(req: NextRequest) {
     .select('id')
     .single()
 
-  const logId = logEntry?.id
+  if (logInsertErr || !logEntry) {
+    return NextResponse.json(
+      { error: `Error creando sync_log: ${logInsertErr?.message}` },
+      { status: 500 }
+    )
+  }
+
+  const logId = logEntry.id
 
   try {
     const result = await syncShopify()
@@ -32,7 +39,7 @@ export async function POST(req: NextRequest) {
       .from('sync_log')
       .update({
         status:          result.errors.length > 0 ? 'error' : 'success',
-        records_updated: result.shopifyDataUpserted + result.imagesUpserted,
+        records_updated: (result.shopifyDataUpserted ?? 0) + (result.imagesUpserted ?? 0),
         error_message:   result.errors.length > 0 ? result.errors.join('\n') : null,
         finished_at:     new Date().toISOString(),
       })
@@ -42,16 +49,14 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
 
-    if (logId) {
-      await supabase
-        .from('sync_log')
-        .update({
-          status:        'error',
-          error_message: message,
-          finished_at:   new Date().toISOString(),
-        })
-        .eq('id', logId)
-    }
+    await supabase
+      .from('sync_log')
+      .update({
+        status:        'error',
+        error_message: message,
+        finished_at:   new Date().toISOString(),
+      })
+      .eq('id', logId)
 
     return NextResponse.json({ error: message }, { status: 500 })
   }

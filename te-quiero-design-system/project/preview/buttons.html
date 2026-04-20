@@ -1,0 +1,27 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>html,body{margin:0;background:var(--tq-bg);padding:24px;font-family:var(--tq-font-body);color:var(--tq-snorkel)}
+.row{display:flex;gap:14px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.btn{font-family:var(--tq-font-body);font-weight:600;font-size:14px;letter-spacing:.02em;padding:12px 22px;border-radius:8px;border:none;cursor:pointer;transition:.2s}
+.primary{background:#0099f2;color:#fff}
+.primary:hover{background:#0086d9}
+.dark{background:#00557f;color:#e8e3df}
+.outline{background:transparent;color:#00557f;box-shadow:inset 0 0 0 1.5px #00557f}
+.outline:hover{background:#00557f;color:#e8e3df}
+.ghost{background:transparent;color:#00557f;padding-left:4px;padding-right:4px}
+.ghost::after{content:" →"}
+.pill{border-radius:999px;padding:10px 20px}
+.small{font-size:12px;padding:8px 14px}
+</style></head><body>
+<div class="row">
+  <button class="btn primary">Comprar ahora</button>
+  <button class="btn dark">Ver colección</button>
+  <button class="btn outline">Añadir al carrito</button>
+  <button class="btn ghost">Saber más</button>
+</div>
+<div class="row">
+  <button class="btn primary pill">Reservar en tienda</button>
+  <button class="btn outline pill small">Nuevo</button>
+  <button class="btn primary small">Tallas</button>
+</div>
+</body></html>

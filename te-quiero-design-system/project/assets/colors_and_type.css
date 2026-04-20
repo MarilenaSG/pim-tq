@@ -1,0 +1,252 @@
+/* Te Quiero — Colors & Type
+ * ------------------------------------------------------------
+ * Source: TeQuiero_ManualIdentidadVisual_v4
+ * Fonts:  Poppins (body) · Zodiak (display, titular)
+ * Palette: Snorkel Blue, Sky Blue, White Alyssum (warm cream), Gold
+ * ------------------------------------------------------------
+ */
+
+/* ---------- Fonts ---------- */
+@font-face {
+  font-family: 'Poppins'; src: url('fonts/Poppins-Light.ttf') format('truetype');
+  font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins'; src: url('fonts/Poppins-Regular.ttf') format('truetype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins'; src: url('fonts/Poppins-Italic.ttf') format('truetype');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins'; src: url('fonts/Poppins-Medium.ttf') format('truetype');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins'; src: url('fonts/Poppins-SemiBold.ttf') format('truetype');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins'; src: url('fonts/Poppins-Bold.ttf') format('truetype');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins'; src: url('fonts/Poppins-BoldItalic.ttf') format('truetype');
+  font-weight: 700; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins'; src: url('fonts/Poppins-ExtraBold.ttf') format('truetype');
+  font-weight: 800; font-style: normal; font-display: swap;
+}
+
+@font-face {
+  font-family: 'Zodiak'; src: url('fonts/Zodiak-Regular.otf') format('opentype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Zodiak'; src: url('fonts/Zodiak-Italic.otf') format('opentype');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Zodiak'; src: url('fonts/Zodiak-Black.otf') format('opentype');
+  font-weight: 900; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Zodiak'; src: url('fonts/Zodiak-BlackItalic.otf') format('opentype');
+  font-weight: 900; font-style: italic; font-display: swap;
+}
+/* Variable axis (wght 400–900) — use when possible */
+@font-face {
+  font-family: 'Zodiak Variable'; src: url('fonts/Zodiak-Variable.ttf') format('truetype-variations');
+  font-weight: 400 900; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Zodiak Variable'; src: url('fonts/Zodiak-VariableItalic.ttf') format('truetype-variations');
+  font-weight: 400 900; font-style: italic; font-display: swap;
+}
+
+/* ---------- Design Tokens ---------- */
+:root {
+  /* Brand colors — from manual page 21 */
+  --tq-snorkel:        #00557f;  /* PANTONE 19-4049 TCX · Primary dark */
+  --tq-sky:            #0099f2;  /* PANTONE 2193 C     · Primary bright */
+  --tq-alyssum:        #e8e3df;  /* PANTONE 11-1001 TCX · Warm cream (background) */
+  --tq-gold:           #c8a164;  /* PANTONE 7562 C     · Jewelry accent */
+
+  /* Ink / neutrals */
+  --tq-ink:            #1d1d1b;
+  --tq-gray-400:       #b2b2b2;
+  --tq-gray-300:       #c6c6c6;
+  --tq-white:          #ffffff;
+  --tq-black:          #000000;
+
+  /* Semantic foreground / background */
+  --tq-fg:             var(--tq-snorkel);
+  --tq-fg-muted:       color-mix(in srgb, var(--tq-snorkel) 70%, #fff);
+  --tq-fg-subtle:      color-mix(in srgb, var(--tq-snorkel) 45%, #fff);
+  --tq-fg-inverse:     var(--tq-alyssum);
+
+  --tq-bg:             var(--tq-alyssum);
+  --tq-bg-elevated:    #f4f1ee;  /* slightly lighter cream */
+  --tq-bg-pure:        var(--tq-white);
+  --tq-bg-inverse:     var(--tq-snorkel);
+
+  --tq-border:         color-mix(in srgb, var(--tq-snorkel) 15%, transparent);
+  --tq-border-strong:  color-mix(in srgb, var(--tq-snorkel) 40%, transparent);
+
+  --tq-accent:         var(--tq-sky);
+  --tq-accent-hover:   #0086d9;
+  --tq-accent-fg:      var(--tq-white);
+
+  /* Radii — soft, friendly, not pillowy */
+  --tq-radius-sm:      6px;
+  --tq-radius-md:      10px;
+  --tq-radius-lg:      16px;
+  --tq-radius-xl:      24px;
+  --tq-radius-pill:    999px;
+
+  /* Spacing (8-pt scale) */
+  --tq-space-1:        4px;
+  --tq-space-2:        8px;
+  --tq-space-3:        12px;
+  --tq-space-4:        16px;
+  --tq-space-5:        24px;
+  --tq-space-6:        32px;
+  --tq-space-7:        48px;
+  --tq-space-8:        64px;
+  --tq-space-9:        96px;
+
+  /* Shadows — soft, low, never dramatic */
+  --tq-shadow-xs:      0 1px 2px rgba(0, 32, 60, 0.06);
+  --tq-shadow-sm:      0 2px 6px rgba(0, 32, 60, 0.08);
+  --tq-shadow-md:      0 8px 20px rgba(0, 32, 60, 0.10);
+  --tq-shadow-lg:      0 20px 40px rgba(0, 32, 60, 0.14);
+
+  /* Motion */
+  --tq-ease:           cubic-bezier(0.4, 0.0, 0.2, 1);
+  --tq-ease-out:       cubic-bezier(0.0, 0.0, 0.2, 1);
+  --tq-duration-fast:  120ms;
+  --tq-duration:       200ms;
+  --tq-duration-slow:  360ms;
+
+  /* Type families */
+  --tq-font-display:   'Zodiak Variable', 'Zodiak', Georgia, 'Times New Roman', serif;
+  --tq-font-body:      'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+
+  /* Type scale (modular, loosely 1.25) */
+  --tq-text-xs:        12px;
+  --tq-text-sm:        14px;
+  --tq-text-base:      16px;
+  --tq-text-md:        18px;
+  --tq-text-lg:        22px;
+  --tq-text-xl:        28px;
+  --tq-text-2xl:       36px;
+  --tq-text-3xl:       48px;
+  --tq-text-4xl:       64px;
+  --tq-text-5xl:       88px;
+}
+
+/* ---------- Semantic elements ---------- */
+body {
+  font-family: var(--tq-font-body);
+  color: var(--tq-fg);
+  background: var(--tq-bg);
+  font-size: var(--tq-text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display — Zodiak (serif, warm, high-contrast). Use for section titles, hero, editorial moments. */
+h1, .tq-h1 {
+  font-family: var(--tq-font-display);
+  font-weight: 700;
+  font-size: var(--tq-text-4xl);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--tq-snorkel);
+  margin: 0 0 var(--tq-space-5);
+}
+h2, .tq-h2 {
+  font-family: var(--tq-font-display);
+  font-weight: 700;
+  font-size: var(--tq-text-3xl);
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+  color: var(--tq-snorkel);
+  margin: 0 0 var(--tq-space-4);
+}
+h3, .tq-h3 {
+  font-family: var(--tq-font-body);
+  font-weight: 700;
+  font-size: var(--tq-text-xl);
+  line-height: 1.25;
+  color: var(--tq-snorkel);
+  margin: 0 0 var(--tq-space-3);
+}
+h4, .tq-h4 {
+  font-family: var(--tq-font-body);
+  font-weight: 600;
+  font-size: var(--tq-text-md);
+  line-height: 1.3;
+  color: var(--tq-snorkel);
+  letter-spacing: 0.01em;
+  margin: 0 0 var(--tq-space-2);
+}
+
+/* Eyebrow / label — Poppins, tight tracking, all caps */
+.tq-eyebrow {
+  font-family: var(--tq-font-body);
+  font-weight: 700;
+  font-size: var(--tq-text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tq-snorkel);
+}
+
+/* Body */
+p, .tq-p {
+  font-family: var(--tq-font-body);
+  font-weight: 400;
+  font-size: var(--tq-text-base);
+  line-height: 1.6;
+  color: var(--tq-snorkel);
+  margin: 0 0 var(--tq-space-4);
+  text-wrap: pretty;
+}
+.tq-lead {
+  font-size: var(--tq-text-md);
+  line-height: 1.55;
+  color: var(--tq-fg-muted);
+}
+.tq-small {
+  font-size: var(--tq-text-sm);
+  color: var(--tq-fg-muted);
+}
+.tq-caption {
+  font-size: var(--tq-text-xs);
+  color: var(--tq-fg-subtle);
+  letter-spacing: 0.02em;
+}
+
+strong, b { font-weight: 700; }
+em, i    { font-style: italic; }
+
+/* Links */
+a {
+  color: var(--tq-sky);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color var(--tq-duration) var(--tq-ease);
+}
+a:hover { color: var(--tq-accent-hover); }
+
+/* Price / numerical treatment — Poppins, tight */
+.tq-price {
+  font-family: var(--tq-font-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}

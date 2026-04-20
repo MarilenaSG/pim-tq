@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>html,body{margin:0;background:var(--tq-bg);font-family:var(--tq-font-body);color:var(--tq-snorkel)}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;background:#e8e3df;border-bottom:1px solid rgba(0,85,127,.12)}
+.links{display:flex;gap:24px;font-size:13px;font-weight:500}
+.links a{color:#00557f;text-decoration:none}
+.links a:hover{color:#0099f2}
+.actions{display:flex;gap:18px;color:#00557f}
+.brand{height:24px}
+.brand svg{height:24px;width:auto}
+.cart{font-size:12px;font-weight:600}
+.badge{display:inline-grid;place-items:center;background:#0099f2;color:#fff;width:18px;height:18px;border-radius:999px;font-size:10px;margin-left:-4px;vertical-align:top}
+</style></head><body>
+<div class="nav">
+  <div class="links">
+    <a>Anillos</a><a>Pendientes</a><a>Colgantes</a><a>Pulseras</a><a>Hombre</a>
+  </div>
+  <div class="brand" id="brand"></div>
+  <div class="actions">
+    <span>🔍</span><span>Cuenta</span><span class="cart">Cesta<span class="badge">2</span></span>
+  </div>
+</div>
+<script>
+fetch('../assets/logo.svg').then(r=>r.text()).then(t=>{
+  const d = document.createElement('div'); d.innerHTML = t;
+  const s = d.querySelector('svg'); s.style.height='24px';s.style.width='auto';
+  s.querySelectorAll('path').forEach(p=>p.setAttribute('fill','#0099f2'));
+  document.getElementById('brand').appendChild(s);
+});
+</script>
+</body></html>

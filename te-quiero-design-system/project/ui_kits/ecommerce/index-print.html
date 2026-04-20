@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Te Quiero — Joyería (Print)</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<style>
+  html, body { margin:0; background:#e8e3df; }
+  button[disabled]{ opacity:.4; cursor:not-allowed }
+
+  /* Each page is a fixed-size "slide" sized to the design width (1440) and
+     a tall-enough viewport so the page fits without scroll when printed. */
+  .page {
+    width: 1440px;
+    background: #e8e3df;
+    break-after: page;
+    page-break-after: always;
+    overflow: hidden;
+    position: relative;
+  }
+  .page:last-child { break-after: auto; page-break-after: auto; }
+
+  .page-label {
+    position: absolute;
+    top: 10px;
+    left: 16px;
+    font-size: 9px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: #0099f2;
+    font-weight: 700;
+    opacity: .6;
+    z-index: 5;
+  }
+
+  /* kill sticky header on print — we want it anchored per page */
+  .print-static-header header { position: static !important; }
+
+  @page {
+    size: 1440px 2040px;   /* custom sheet that fits each view */
+    margin: 0;
+  }
+
+  @media print {
+    html, body { background: #e8e3df; }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .page { box-shadow: none !important; }
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="Core.jsx"></script>
+<script type="text/babel" src="Products.jsx"></script>
+<script type="text/babel" src="Detail.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+
+function Page({ label, children, height }) {
+  return (
+    <section className="page print-static-header" style={{ height: height || 'auto' }}>
+      <div className="page-label">{label}</div>
+      {children}
+    </section>
+  );
+}
+
+function StaticApp() {
+  const noop = () => {};
+  const sampleProduct = PRODUCTS.find(p => p.cat === 'Anillos');
+  const sampleCart = [PRODUCTS[0], PRODUCTS[2], PRODUCTS[4]];
+
+  return (
+    <div>
+      {/* PAGE 1 — Home */}
+      <Page label="01 · Home" height={3200}>
+        <Header cart={sampleCart} onNav={noop} onOpenCart={noop}/>
+        <Hero onNav={noop}/>
+        <CategoryStrip onNav={noop}/>
+        <ProductGrid items={PRODUCTS.slice(0,4)} onOpen={noop} title="Favoritos del mes"/>
+        <PatternBand/>
+        <ProductGrid items={PRODUCTS.slice(4,8)} onOpen={noop} title="Recién llegadas"/>
+        <TrustRow/>
+        <Footer/>
+      </Page>
+
+      {/* PAGE 2 — PLP (Product Listing) */}
+      <Page label="02 · Category · Anillos" height={1600}>
+        <Header cart={sampleCart} onNav={noop} onOpenCart={noop}/>
+        <div style={{ padding:'48px 32px 16px', maxWidth:1440, margin:'0 auto' }}>
+          <div style={{ fontSize:12, letterSpacing:'.14em', textTransform:'uppercase', color:'#0099f2', fontWeight:700, marginBottom:10 }}>Anillos</div>
+          <h1 style={{ fontFamily:'var(--tq-font-display)', fontSize:56, fontWeight:700, color:'#00557f', margin:0 }}>Anillos</h1>
+          <p style={{ color:'#00557f', opacity:.7, marginTop:8 }}>{PRODUCTS.filter(p=>p.cat==='Anillos').length} piezas</p>
+        </div>
+        <ProductGrid items={PRODUCTS} onOpen={noop}/>
+        <Footer/>
+      </Page>
+
+      {/* PAGE 3 — PDP (Product Detail) */}
+      <Page label="03 · Product Detail" height={1500}>
+        <Header cart={sampleCart} onNav={noop} onOpenCart={noop}/>
+        <PDP product={sampleProduct} onBack={noop} onAdd={noop}/>
+        <Footer/>
+      </Page>
+
+      {/* PAGE 4 — Cart (drawer shown as static panel on the right) */}
+      <Page label="04 · Cart" height={1600}>
+        <div style={{ position:'relative' }}>
+          <Header cart={sampleCart} onNav={noop} onOpenCart={noop}/>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 460px', minHeight:1200 }}>
+            <div style={{ padding:'80px 64px' }}>
+              <div style={{ fontSize:12, letterSpacing:'.14em', textTransform:'uppercase', color:'#0099f2', fontWeight:700, marginBottom:10 }}>Continúa comprando</div>
+              <h2 style={{ fontFamily:'var(--tq-font-display)', fontSize:48, fontWeight:700, color:'#00557f', margin:'0 0 18px' }}>Estás a un paso.</h2>
+              <p style={{ color:'#00557f', opacity:.8, fontSize:17, lineHeight:1.55, maxWidth:520 }}>
+                Envío gratis desde 60 €, 30 días para cambios y la posibilidad de recoger en cualquiera de nuestras 17 tiendas en Tenerife.
+              </p>
+              <div style={{ marginTop:40, display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:20, maxWidth:640 }}>
+                {[
+                  ['Envío gratis', 'desde 60 €'],
+                  ['17 tiendas', 'en toda Tenerife'],
+                  ['Cambios fáciles', '30 días, sin preguntas'],
+                  ['Pago seguro', 'Visa · MC · Bizum · a plazos'],
+                ].map(([h,s]) => (
+                  <div key={h}>
+                    <div style={{ fontFamily:'var(--tq-font-display)', fontSize:20, fontWeight:700, color:'#00557f' }}>{h}</div>
+                    <div style={{ fontSize:13, color:'#00557f', opacity:.7, marginTop:4 }}>{s}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* static cart drawer */}
+            <aside style={{ background:'#e8e3df', boxShadow:'-20px 0 40px rgba(0,32,60,.10)', display:'flex', flexDirection:'column', minHeight:1200 }}>
+              <div style={{ padding:'22px 28px', borderBottom:'1px solid rgba(0,85,127,.12)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <h3 style={{ fontFamily:'var(--tq-font-display)', fontSize:22, fontWeight:700, color:'#00557f', margin:0 }}>Tu cesta</h3>
+                <span style={{ fontSize:18, color:'#00557f' }}>✕</span>
+              </div>
+              <div style={{ flex:1, padding:'8px 28px' }}>
+                {sampleCart.map((p,i) => (
+                  <div key={i} style={{ display:'grid', gridTemplateColumns:'64px 1fr auto', gap:12, padding:'16px 0', borderBottom:'1px solid rgba(0,85,127,.1)' }}>
+                    <div style={{ width:64, height:64, background:'#fff', borderRadius:10, display:'grid', placeItems:'center' }}>
+                      <img src={IconSrc.navy} style={{ width:'60%', opacity:.4 }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:11, letterSpacing:'.12em', textTransform:'uppercase', color:'#0099f2', fontWeight:700 }}>{p.cat}</div>
+                      <div style={{ fontSize:13, color:'#00557f', fontWeight:500 }}>{p.name}</div>
+                      <div style={{ fontSize:11, color:'#00557f', opacity:.7, marginTop:2 }}>{p.material}</div>
+                    </div>
+                    <div style={{ textAlign:'right' }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:'#00557f' }}>{p.price}</div>
+                      <div style={{ fontSize:11, color:'#00557f', opacity:.6, marginTop:4 }}>Quitar</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding:'20px 28px', borderTop:'1px solid rgba(0,85,127,.15)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, color:'#00557f', marginBottom:4 }}>
+                  <span>Subtotal</span>
+                  <span style={{ fontWeight:600 }}>627,00 €</span>
+                </div>
+                <div style={{ fontSize:12, color:'#00557f', opacity:.7, marginBottom:14 }}>Envío gratis incluido.</div>
+                <button style={{ ...btn.primary, width:'100%', padding:'14px', fontSize:15 }}>Ir a pagar</button>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </Page>
+
+      {/* PAGE 5 — Account */}
+      <Page label="05 · Account / Login" height={1100}>
+        <Header cart={[]} onNav={noop} onOpenCart={noop}/>
+        <Account/>
+        <Footer/>
+      </Page>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<StaticApp/>);
+
+// Auto-print once fonts, images and React have settled
+(async function waitAndPrint() {
+  // Wait a tick for React to commit
+  await new Promise(r => setTimeout(r, 300));
+  // Wait for fonts
+  try { if (document.fonts && document.fonts.ready) { await document.fonts.ready; } } catch(e){}
+  // Wait for all images (logo SVG + isotipo PNGs + pattern)
+  await new Promise(r => {
+    const imgs = Array.from(document.images);
+    if (imgs.length === 0) return r();
+    let pending = imgs.filter(i => !i.complete).length;
+    if (pending === 0) return r();
+    imgs.forEach(i => {
+      if (i.complete) return;
+      const done = () => { if (--pending <= 0) r(); };
+      i.addEventListener('load', done);
+      i.addEventListener('error', done);
+    });
+    setTimeout(r, 4000); // safety net
+  });
+  // Extra buffer for fetch()-injected logo SVGs in Core.jsx
+  setTimeout(() => window.print(), 800);
+})();
+</script>
+</body>
+</html>

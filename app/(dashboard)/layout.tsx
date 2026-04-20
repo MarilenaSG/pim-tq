@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { ReactNode } from 'react'
 import { ToastProvider } from '@/components/ui'
 import { ChatWidget } from '@/components/ui/ChatWidget'
@@ -40,13 +41,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <div className="flex h-screen bg-[var(--tq-bg)]">
       {/* Sidebar */}
       <aside className="w-60 shrink-0 flex flex-col bg-tq-snorkel text-white overflow-y-auto">
+
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/10">
-          <div className="text-xs font-bold tracking-widest uppercase text-white/50 mb-0.5">
-            Te Quiero Joyerías
-          </div>
-          <div className="text-lg font-semibold tracking-tight">
-            PIM
+        <div className="px-5 py-4 border-b border-white/10 flex items-center gap-3">
+          <Image
+            src="/brand/icon_cream.png"
+            alt="Te Quiero Joyerías"
+            width={32}
+            height={32}
+            className="shrink-0 opacity-90"
+          />
+          <div>
+            <div className="text-[10px] font-semibold tracking-widest uppercase text-white/50 leading-none mb-1">
+              Te Quiero Joyerías
+            </div>
+            <div className="text-base font-semibold tracking-tight leading-none">
+              PIM
+            </div>
           </div>
         </div>
 
@@ -75,7 +86,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </nav>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-white/10">
+        <div className="px-5 py-3 border-t border-white/10 flex items-center gap-2.5">
+          <Image
+            src="/brand/icon_cream.png"
+            alt=""
+            width={16}
+            height={16}
+            className="opacity-20"
+          />
           <div className="text-xs text-white/30">v1.7 · Sesión 17</div>
         </div>
       </aside>

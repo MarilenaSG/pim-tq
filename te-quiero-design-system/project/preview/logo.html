@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>html,body{margin:0;background:var(--tq-bg);padding:24px;font-family:var(--tq-font-body);display:grid;place-items:center;min-height:200px}
+img{max-width:80%;max-height:180px;height:auto}
+</style></head><body>
+<img src="../assets/logo.svg" alt="Te Quiero logo" style="filter:none">
+<style>
+  /* Paint SVG paths in Sky */
+  svg path { fill: #0099f2 !important; }
+</style>
+<script>
+fetch('../assets/logo.svg').then(r=>r.text()).then(t=>{
+  const wrap = document.createElement('div');
+  wrap.innerHTML = t;
+  const svg = wrap.querySelector('svg');
+  svg.style.maxWidth = '80%';
+  svg.style.maxHeight = '180px';
+  svg.querySelectorAll('path').forEach(p => p.setAttribute('fill', '#0099f2'));
+  document.body.innerHTML = '';
+  document.body.appendChild(svg);
+});
+</script>
+</body></html>

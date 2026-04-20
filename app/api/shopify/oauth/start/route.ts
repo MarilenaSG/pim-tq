@@ -26,12 +26,12 @@ export async function GET(_req: NextRequest) {
   // Generate CSRF state nonce
   const state = crypto.randomBytes(16).toString('hex')
 
-  // Store nonce in a short-lived cookie (5 min)
+  // Store nonce in a short-lived cookie (10 min)
   const cookieStore = await cookies()
   cookieStore.set('shopify_oauth_state', state, {
     httpOnly: true,
     sameSite: 'lax',
-    maxAge:   300,
+    maxAge:   600,
     path:     '/',
   })
 

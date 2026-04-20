@@ -9,7 +9,6 @@ import {
   FeatureCard,
   ActivityFeed,
   EmptyState,
-  ToastProvider,
   useToast,
   AnalyticsFilters,
 } from '@/components/ui'
@@ -67,8 +66,7 @@ export default function TestPage() {
   const [filters, setFilters] = useState<AnalyticsFilterValues>(DEFAULT_FILTERS)
 
   return (
-    <ToastProvider>
-      <div className="p-8 max-w-5xl space-y-12">
+    <div className="p-8 max-w-5xl space-y-12">
         {/* Header */}
         <PageHeader
           eyebrow="Design System"
@@ -240,8 +238,7 @@ export default function TestPage() {
             ))}
           </div>
         </section>
-      </div>
-    </ToastProvider>
+    </div>
   )
 }
 

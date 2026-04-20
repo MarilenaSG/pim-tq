@@ -1,0 +1,10 @@
+<!doctype html><html><body style="margin:0;background:#e8e3df;display:flex;align-items:center;justify-content:center;min-height:100vh">
+<img src="Logo_Azul (1) (4).svg" style="max-width:80vw;color:#00557f;fill:#00557f" id="l">
+<style>svg path, svg .cls-1 { fill: #00557f !important; }</style>
+<script>
+fetch('Logo_Azul (1) (4).svg').then(r=>r.text()).then(t=>{
+  document.body.innerHTML = t.replace('<svg', '<svg style="max-width:80vw;fill:#00557f"');
+  document.querySelectorAll('svg *').forEach(el => el.style.fill = '#00557f');
+});
+</script>
+</body></html>

@@ -1,7 +1,22 @@
 import React from 'react'
+import path from 'path'
 import {
-  Document, Page, View, Text, Image, StyleSheet,
+  Document, Page, View, Text, Image, StyleSheet, Font,
 } from '@react-pdf/renderer'
+
+// ── Font registration ──────────────────────────────────────────
+
+const fontsDir = path.join(process.cwd(), 'te-quiero-design-system/project/fonts')
+
+Font.register({
+  family: 'Poppins',
+  fonts: [
+    { src: path.join(fontsDir, 'Poppins-Regular.ttf'),  fontWeight: 400 },
+    { src: path.join(fontsDir, 'Poppins-Medium.ttf'),   fontWeight: 500 },
+    { src: path.join(fontsDir, 'Poppins-SemiBold.ttf'), fontWeight: 600 },
+    { src: path.join(fontsDir, 'Poppins-Bold.ttf'),     fontWeight: 700 },
+  ],
+})
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -23,20 +38,26 @@ export interface PdfProduct {
 
 const C = {
   snorkel:   '#00557f',
-  gold:      '#C8842A',
+  gold:      '#c8a164',   // official --tq-gold
   goldLight: '#fdf3e4',
   ink:       '#1d1d1b',
   gray:      '#b2b2b2',
   grayLight: '#f0ece8',
+  alyssum:   '#e8e3df',   // official --tq-alyssum
   white:     '#ffffff',
   border:    '#e2ddd9',
 }
 
-// A4 usable area with 24pt padding each side:
-// Width: 595 - 48 = 547pt  /  Height: 842 - 48 = 794pt
-// Header: ~48pt + 12pt gap = 60pt
-// Footer: 20pt (fixed, outside flow)
-// Grid: 794 - 60 - 20 = ~714pt  →  2 rows × ~350pt each (with 8pt gap)
+// A4 = 595 × 842 pt
+// Padding: 24 all sides → inner area: 547 × 794 pt
+// Header: ~52 pt (content ~30 + paddingBottom 10 + marginBottom 12)
+// Row gap: 8 pt
+// Footer: absolute, doesn't affect flow
+// Grid rows: (794 - 52 - 8) / 2 = 367 pt each → use 355 for safety
+
+const ROW_H   = 355  // pt per grid row
+const BODY_H  = 92   // pt for card text area (fixed)
+const IMG_H   = ROW_H - BODY_H - 1  // 1 = border-top
 
 const s = StyleSheet.create({
   page: {
@@ -45,48 +66,58 @@ const s = StyleSheet.create({
     paddingBottom: 24,
     paddingLeft:   24,
     paddingRight:  24,
-    fontFamily:    'Helvetica',
+    fontFamily:    'Poppins',
     flexDirection: 'column',
   },
 
   // ── Header ──────────────────────────────────────────────────
   header: {
-    flexDirection:     'row',
-    justifyContent:    'space-between',
-    alignItems:        'center',
-    paddingBottom:     10,
-    marginBottom:      12,
-    borderBottomWidth: 1.5,
+    flexDirection:    'row',
+    justifyContent:   'space-between',
+    alignItems:       'center',
+    paddingBottom:    10,
+    marginBottom:     12,
+    borderBottomWidth: 2,
     borderBottomColor: C.snorkel,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           9,
+  },
+  headerIcon: {
+    width:  28,
+    height: 28,
+  },
   headerBrand: {
-    fontSize:      6.5,
-    fontFamily:    'Helvetica-Bold',
-    color:         C.gold,
-    letterSpacing: 1.5,
+    fontSize:      5.5,
+    fontWeight:    600,
+    color:         C.gray,
+    letterSpacing: 1.8,
     textTransform: 'uppercase',
     marginBottom:  2,
   },
   headerTitle: {
-    fontSize:   15,
-    fontFamily: 'Helvetica-Bold',
-    color:      C.snorkel,
+    fontSize:      13,
+    fontWeight:    700,
+    color:         C.snorkel,
+    letterSpacing: 0.2,
   },
   headerDate: {
-    fontSize: 8,
-    color:    C.gray,
+    fontSize:   7.5,
+    fontWeight: 400,
+    color:      C.gray,
   },
 
-  // ── Grid: 2 rows ────────────────────────────────────────────
+  // ── Grid: 2 rows × 2 cols, fixed height ────────────────────
   gridContainer: {
-    flex:          1,
     flexDirection: 'column',
     gap:           8,
   },
   gridRow: {
-    flex:          1,
     flexDirection: 'row',
     gap:           8,
+    height:        ROW_H,
   },
 
   // ── Card ────────────────────────────────────────────────────
@@ -103,67 +134,65 @@ const s = StyleSheet.create({
     flex: 1,
   },
 
-  // Image fills remaining vertical space
+  // Image: fixed height, fills width, cropped to widest side
   cardImageWrap: {
-    flex:            1,
-    backgroundColor: C.grayLight,
+    height:          IMG_H,
+    backgroundColor: C.alyssum,
+    overflow:        'hidden',
     alignItems:      'center',
     justifyContent:  'center',
   },
   cardImage: {
-    width:      '100%',
-    height:     '100%',
-    objectFit:  'contain',
+    width:     '100%',
+    height:    '100%',
+    objectFit: 'cover',
   },
   cardNoImage: {
-    fontSize: 9,
+    fontSize: 8,
     color:    C.border,
   },
 
-  // Content at the bottom — fixed height
+  // Content: fixed height at bottom
   cardBody: {
+    height:            BODY_H,
     paddingHorizontal: 8,
-    paddingTop:        7,
-    paddingBottom:     7,
+    paddingTop:        6,
+    paddingBottom:     6,
     borderTopWidth:    1,
     borderTopColor:    C.border,
+    flexDirection:     'column',
+    justifyContent:    'space-between',
   },
 
-  // Row 1: marca + código
   topRow: {
     flexDirection:  'row',
     justifyContent: 'space-between',
     alignItems:     'center',
-    marginBottom:   3,
   },
   marca: {
-    fontSize:      6.5,
-    fontFamily:    'Helvetica-Bold',
+    fontSize:      6,
+    fontWeight:    600,
     color:         C.gold,
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   codigo: {
-    fontSize:   6.5,
-    fontFamily: 'Helvetica',
-    color:      C.gray,
+    fontSize:  6,
+    fontWeight: 400,
+    color:     C.gray,
   },
 
-  // Row 2: description
   description: {
-    fontSize:     8.5,
-    fontFamily:   'Helvetica-Bold',
-    color:        C.snorkel,
-    lineHeight:   1.3,
-    marginBottom: 4,
+    fontSize:   8,
+    fontWeight: 600,
+    color:      C.snorkel,
+    lineHeight: 1.3,
   },
 
-  // Row 3: pills + price
   midRow: {
     flexDirection:  'row',
     justifyContent: 'space-between',
     alignItems:     'center',
-    marginBottom:   4,
   },
   pillsRow: {
     flexDirection: 'row',
@@ -171,46 +200,47 @@ const s = StyleSheet.create({
   },
   pill: {
     paddingHorizontal: 4,
-    paddingVertical:   1.5,
+    paddingVertical:   2,
     borderRadius:      8,
     backgroundColor:   '#eef4f8',
   },
   pillText: {
-    fontSize: 6.5,
-    color:    C.snorkel,
+    fontSize:  6,
+    fontWeight: 500,
+    color:     C.snorkel,
   },
   pillGold: {
     paddingHorizontal: 4,
-    paddingVertical:   1.5,
+    paddingVertical:   2,
     borderRadius:      8,
     backgroundColor:   C.goldLight,
   },
   pillGoldText: {
-    fontSize:   6.5,
-    color:      C.gold,
-    fontFamily: 'Helvetica-Bold',
+    fontSize:  6,
+    fontWeight: 600,
+    color:     C.gold,
   },
   price: {
-    fontSize:   10,
-    fontFamily: 'Helvetica-Bold',
-    color:      C.snorkel,
+    fontSize:  10,
+    fontWeight: 700,
+    color:     C.snorkel,
   },
 
-  // Row 4: tags
   tagsRow: {
     flexDirection: 'row',
     flexWrap:      'wrap',
     gap:           3,
   },
   tag: {
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
     paddingVertical:   1.5,
     borderRadius:      3,
     backgroundColor:   C.grayLight,
   },
   tagText: {
-    fontSize: 6,
-    color:    '#888',
+    fontSize:  5.5,
+    fontWeight: 400,
+    color:     '#888',
   },
 
   // ── Footer ──────────────────────────────────────────────────
@@ -221,10 +251,18 @@ const s = StyleSheet.create({
     right:          24,
     flexDirection:  'row',
     justifyContent: 'space-between',
+    alignItems:     'center',
   },
   footerText: {
-    fontSize: 7,
-    color:    C.border,
+    fontSize:  6.5,
+    fontWeight: 400,
+    color:     C.gray,
+  },
+  footerDot: {
+    width:           3,
+    height:          3,
+    borderRadius:    2,
+    backgroundColor: C.gold,
   },
 })
 
@@ -246,12 +284,11 @@ function trunc(s: string, n: number) {
 // ── Product Card ──────────────────────────────────────────────
 
 function ProductCard({ p }: { p: PdfProduct }) {
-  const tags = (p.shopify_tags ?? []).slice(0, 5)
-  const desc = stripHtml(p.shopify_description)
+  const tags = (p.shopify_tags ?? []).slice(0, 4)
 
   return (
     <View style={s.card}>
-      {/* Image — fills all remaining space */}
+      {/* Image — fixed height, objectFit cover fills to widest side */}
       <View style={s.cardImageWrap}>
         {p.image_url ? (
           <Image style={s.cardImage} src={p.image_url} />
@@ -260,17 +297,17 @@ function ProductCard({ p }: { p: PdfProduct }) {
         )}
       </View>
 
-      {/* Fixed bottom content */}
+      {/* Fixed-height info block */}
       <View style={s.cardBody}>
         {/* Marca + código */}
         <View style={s.topRow}>
-          <Text style={s.marca}>{p.marca ?? p.familia ?? ''}</Text>
+          <Text style={s.marca}>{trunc(p.marca ?? p.familia ?? '', 28)}</Text>
           <Text style={s.codigo}>{p.codigo_modelo}</Text>
         </View>
 
         {/* Description */}
         <Text style={s.description}>
-          {trunc(p.description ?? p.codigo_modelo, 65)}
+          {trunc(p.description ?? p.codigo_modelo, 60)}
         </Text>
 
         {/* Pills + price */}
@@ -300,13 +337,6 @@ function ProductCard({ p }: { p: PdfProduct }) {
             ))}
           </View>
         )}
-
-        {/* Shopify description snippet */}
-        {desc.length > 0 && (
-          <Text style={{ fontSize: 7, color: '#666', marginTop: 3, lineHeight: 1.35 }}>
-            {trunc(desc, 120)}
-          </Text>
-        )}
       </View>
     </View>
   )
@@ -318,6 +348,11 @@ interface CatalogDocProps {
   products: PdfProduct[]
   title?:   string
 }
+
+const iconPath = path.join(
+  process.cwd(),
+  'te-quiero-design-system/project/assets/icon_navy.png'
+)
 
 export function CatalogDocument({ products, title }: CatalogDocProps) {
   const dateStr = new Date().toLocaleDateString('es-ES', {
@@ -337,16 +372,19 @@ export function CatalogDocument({ products, title }: CatalogDocProps) {
 
         return (
           <Page key={pageIdx} size="A4" style={s.page}>
-            {/* Header */}
+            {/* Header — navy pill with TQ icon */}
             <View style={s.header}>
-              <View>
-                <Text style={s.headerBrand}>Te Quiero Joyerías</Text>
-                <Text style={s.headerTitle}>Catálogo de producto</Text>
+              <View style={s.headerLeft}>
+                <Image src={iconPath} style={s.headerIcon} />
+                <View>
+                  <Text style={s.headerBrand}>Te Quiero Joyerías</Text>
+                  <Text style={s.headerTitle}>Catálogo de producto</Text>
+                </View>
               </View>
               <Text style={s.headerDate}>{dateStr}</Text>
             </View>
 
-            {/* Grid: always 2 rows × 2 cols filling the page */}
+            {/* Grid: 2 rows × 2 cols — all cells fixed height */}
             <View style={s.gridContainer}>
               <View style={s.gridRow}>
                 {p0 ? <ProductCard p={p0} /> : <View style={s.cardEmpty} />}
@@ -360,7 +398,8 @@ export function CatalogDocument({ products, title }: CatalogDocProps) {
 
             {/* Footer */}
             <View style={s.footer} fixed>
-              <Text style={s.footerText}>Te Quiero Joyerías · Uso interno</Text>
+              <Text style={s.footerText}>Te Quiero Joyerías · Catálogo interno</Text>
+              <View style={s.footerDot} />
               <Text
                 style={s.footerText}
                 render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}

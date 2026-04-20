@@ -114,7 +114,6 @@ export function buildOAuthUrl(shop: string, state: string): string {
     scope:        OAUTH_SCOPES,
     redirect_uri: `${getAppUrl()}/api/shopify/oauth/callback`,
     state,
-    'grant_options[]': 'per-user',
   })
   return `https://${shop}/admin/oauth/authorize?${params}`
 }
@@ -174,12 +173,41 @@ export function verifyShopifyHmac(
 
 // ── Shopify API fetch ─────────────────────────────────────────
 
-/** Parse the Link header from Shopify to get the next page URL */
-function parseNextLink(linkHeader: string | null): string | null {
-  if (!linkHeader) return null
-  // Format: <https://...?page_info=xxx&limit=250>; rel="next"
-  const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/)
-  return match ? match[1] : null
+// ── GraphQL query for product sync ───────────────────────────
+
+const PRODUCTS_GQL = `
+  query GetProducts($cursor: String) {
+    products(first: 250, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      edges {
+        node {
+          id title bodyHtml handle status vendor tags
+          images(first: 30) {
+            edges { node { id url altText } }
+          }
+          variants(first: 100) {
+            edges { node { id sku title position image { url } } }
+          }
+        }
+      }
+    }
+  }
+`
+
+interface GqlNode {
+  id: string; title: string; bodyHtml: string | null
+  handle: string; status: string; vendor: string | null; tags: string[]
+  images:   { edges: { node: { id: string; url: string; altText: string | null } }[] }
+  variants: { edges: { node: { id: string; sku: string | null; title: string; position: number; image: { url: string } | null } }[] }
+}
+
+interface GqlResponse {
+  data?: { products: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; edges: { node: GqlNode }[] } }
+  errors?: { message: string }[]
+}
+
+function gidToInt(gid: string): number {
+  return parseInt(gid.split('/').pop() ?? '0', 10)
 }
 
 export async function fetchAllShopifyProducts(
@@ -187,30 +215,64 @@ export async function fetchAllShopifyProducts(
   shop: string
 ): Promise<ShopifyProduct[]> {
   const products: ShopifyProduct[] = []
-  let url: string | null =
-    `https://${shop}/admin/api/2024-01/products.json?limit=250&status=any`
+  let cursor: string | null = null
 
-  while (url) {
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': token,
-        'Content-Type': 'application/json',
-      },
+  while (true) {
+    const response = await fetch(`https://${shop}/admin/api/2024-01/graphql.json`, {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: PRODUCTS_GQL, variables: { cursor } }),
       cache: 'no-store',
     })
 
     if (!response.ok) {
       const text = await response.text()
-      throw new Error(`Shopify API error ${response.status}: ${text}`)
+      throw new Error(`Shopify GraphQL error ${response.status}: ${text}`)
     }
 
-    const data = await response.json() as { products: ShopifyProduct[] }
-    products.push(...data.products)
+    const json = await response.json() as GqlResponse
+    if (json.errors?.length) {
+      throw new Error(`Shopify GraphQL: ${json.errors.map(e => e.message).join(', ')}`)
+    }
+    if (!json.data) throw new Error('Shopify GraphQL: respuesta sin data')
 
-    url = parseNextLink(response.headers.get('Link'))
+    const { edges, pageInfo } = json.data.products
 
-    // Respect Shopify rate limits (2 req/s for standard plans)
-    if (url) await new Promise(r => setTimeout(r, 500))
+    for (const { node } of edges) {
+      const variantNodes = node.variants.edges.map(e => e.node)
+
+      // Build image-url → variantId[] map for linking images to variants
+      const imgVariantMap = new Map<string, number[]>()
+      for (const v of variantNodes) {
+        if (v.image?.url) {
+          const list = imgVariantMap.get(v.image.url) ?? []
+          list.push(gidToInt(v.id))
+          imgVariantMap.set(v.image.url, list)
+        }
+      }
+
+      products.push({
+        id:        gidToInt(node.id),
+        title:     node.title,
+        body_html: node.bodyHtml,
+        vendor:    node.vendor,
+        handle:    node.handle,
+        status:    node.status.toLowerCase(),
+        tags:      node.tags.join(','),
+        variants:  variantNodes.map(v => ({ id: gidToInt(v.id), sku: v.sku, title: v.title })),
+        images:    node.images.edges.map(({ node: img }, i) => ({
+          id:          gidToInt(img.id),
+          src:         img.url,
+          alt:         img.altText,
+          position:    i + 1,
+          variant_ids: imgVariantMap.get(img.url) ?? [],
+        })),
+      })
+    }
+
+    if (!pageInfo.hasNextPage) break
+    cursor = pageInfo.endCursor
+    await new Promise(r => setTimeout(r, 500))
   }
 
   return products
@@ -230,7 +292,10 @@ export async function syncShopify(): Promise<ShopifySyncResult> {
     throw new Error('No hay access token de Shopify. Conecta la tienda primero en /settings/sync.')
   }
 
-  const shop = getShopDomain()
+  // Use the shop stored during OAuth (the real .myshopify.com domain),
+  // falling back to SHOPIFY_SHOP_DOMAIN env var for manual token setups
+  const storedShop = await getConnectedShop()
+  const shop = storedShop ?? getShopDomain()
   const supabase = createServiceClient()
   const now = new Date().toISOString()
   const errors: string[] = []

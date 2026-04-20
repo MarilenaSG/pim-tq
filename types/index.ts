@@ -20,7 +20,8 @@ export interface Product {
   variante_lider: string | null
 
   // Aggregated from variants
-  ingresos_modelo_12m: number | null
+  ingresos_12m: number | null
+  unidades_12m: number | null
   abc_ventas: AbcRating
   abc_unidades: AbcRating
 

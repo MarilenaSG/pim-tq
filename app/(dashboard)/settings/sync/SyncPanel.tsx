@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   triggerMetabaseSync,
   triggerShopifySync,
+  disconnectShopify,
   type SyncActionResult,
 } from './actions'
 import { SyncIndicator } from '@/components/ui'
@@ -61,8 +62,9 @@ export function SyncPanel({
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [metaPending, startMetaTrans] = useTransition()
-  const [shopifyPending, startShopifyTrans] = useTransition()
+  const [metaPending,       startMetaTrans]       = useTransition()
+  const [shopifyPending,    startShopifyTrans]    = useTransition()
+  const [disconnectPending, startDisconnectTrans] = useTransition()
   const [metaResult, setMetaResult] = useState<SyncActionResult | null>(null)
   const [shopifyResult, setShopifyResult] = useState<SyncActionResult | null>(null)
 
@@ -83,6 +85,13 @@ export function SyncPanel({
     startShopifyTrans(async () => {
       const res = await triggerShopifySync()
       setShopifyResult(res)
+      router.refresh()
+    })
+  }
+
+  function handleDisconnect() {
+    startDisconnectTrans(async () => {
+      await disconnectShopify()
       router.refresh()
     })
   }
@@ -161,32 +170,42 @@ export function SyncPanel({
               )}
             </div>
 
-            {/* Action button */}
-            {shopifyConnected ? (
-              <button
-                onClick={handleShopifySync}
-                disabled={shopifyPending}
-                className="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: '#0099f2' }}
-              >
-                {shopifyPending ? (
-                  <span className="flex items-center gap-2">
-                    <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Sincronizando…
-                  </span>
-                ) : (
-                  '↻ Sincronizar ahora'
-                )}
-              </button>
-            ) : (
-              <a
-                href="/api/shopify/oauth/start"
-                className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white no-underline transition-opacity hover:opacity-85"
-                style={{ background: '#00557f' }}
-              >
-                Conectar Shopify →
-              </a>
-            )}
+            {/* Action buttons */}
+            <div className="flex flex-col gap-2 items-end shrink-0">
+              {shopifyConnected ? (
+                <button
+                  onClick={handleShopifySync}
+                  disabled={shopifyPending || disconnectPending}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: '#0099f2' }}
+                >
+                  {shopifyPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Sincronizando…
+                    </span>
+                  ) : '↻ Sincronizar ahora'}
+                </button>
+              ) : (
+                <a
+                  href="/api/shopify/oauth/start"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white no-underline transition-opacity hover:opacity-85"
+                  style={{ background: '#00557f' }}
+                >
+                  Conectar Shopify →
+                </a>
+              )}
+              {shopifyConnected && (
+                <button
+                  onClick={handleDisconnect}
+                  disabled={shopifyPending || disconnectPending}
+                  className="text-xs font-medium transition-opacity hover:opacity-70 disabled:opacity-40"
+                  style={{ color: '#b2b2b2' }}
+                >
+                  {disconnectPending ? 'Desconectando…' : 'Reconectar / cambiar token'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Shopify result */}

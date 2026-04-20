@@ -99,3 +99,16 @@ export async function getShopifyStatus(): Promise<ShopifyStatus> {
     return { connected: false, shop: null }
   }
 }
+
+export async function disconnectShopify(): Promise<{ ok: boolean }> {
+  try {
+    const supabase = createServiceClient()
+    await Promise.all([
+      supabase.from('settings').delete().eq('key', 'shopify_access_token'),
+      supabase.from('settings').delete().eq('key', 'shopify_connected_shop'),
+    ])
+    return { ok: true }
+  } catch {
+    return { ok: false }
+  }
+}

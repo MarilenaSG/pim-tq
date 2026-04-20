@@ -10,7 +10,7 @@ import type { AbcRating } from '@/types'
 // precio_venta, precio_tachado, descuento_aplicado,
 // cost_price_medio, ultimo_coste_compra, ultimo_precio_venta,
 // margen_bruto, pct_margen_bruto, abc_ventas, abc_unidades,
-// ingresos_modelo_12m, unidades_modelo_12m, ingresos_slug_12m,
+// ingresos_12m, unidades_12m, ingresos_slug_12m,
 // unidades_mes_anterior, num_tiendas_activo
 
 export interface MetabaseRow {
@@ -42,8 +42,8 @@ export interface MetabaseRow {
   pct_margen_bruto: number | null
   abc_ventas: AbcRating
   abc_unidades: AbcRating
-  ingresos_modelo_12m: number | null
-  unidades_modelo_12m: number | null
+  ingresos_12m: number | null
+  unidades_12m: number | null
   ingresos_slug_12m: number | null
   unidades_mes_anterior: number | null
   num_tiendas_activo: number | null
@@ -68,8 +68,8 @@ function parseEuNum(val: string | undefined): number | null {
 }
 
 function parseAbcRating(val: string | undefined): AbcRating {
-  const v = val?.trim().toUpperCase()
-  if (v === 'A' || v === 'B' || v === 'C') return v
+  const letter = val?.trim().toUpperCase().charAt(0)
+  if (letter === 'A' || letter === 'B' || letter === 'C') return letter
   return null
 }
 
@@ -166,8 +166,8 @@ export function parseCsv(text: string): MetabaseRow[] {
       pct_margen_bruto:          parseEuNum(raw['pct_margen_bruto']),
       abc_ventas:                parseAbcRating(raw['abc_ventas']),
       abc_unidades:              parseAbcRating(raw['abc_unidades']),
-      ingresos_modelo_12m:       parseEuNum(raw['ingresos_modelo_12m']),
-      unidades_modelo_12m:       parseEuNum(raw['unidades_modelo_12m']),
+      ingresos_12m:              parseEuNum(raw['ingresos_12m']),
+      unidades_12m:       parseEuNum(raw['unidades_12m']),
       ingresos_slug_12m:         parseEuNum(raw['ingresos_slug_12m']),
       unidades_mes_anterior:     parseEuNum(raw['unidades_mes_anterior']),
       num_tiendas_activo:        parseEuNum(raw['num_tiendas_activo']),
@@ -233,8 +233,13 @@ export async function syncMetabase(): Promise<SyncResult> {
     metabase_synced_at:          now,
   }))
 
+  // Deduplicate by codigo_interno — the CSV can have repeated rows for the same SKU,
+  // which causes "ON CONFLICT DO UPDATE command cannot affect row a second time"
+  const uniqueVariantMap = new Map(variantRows.map(r => [r.codigo_interno, r]))
+  const deduplicatedVariants = Array.from(uniqueVariantMap.values())
+
   let variantsUpserted = 0
-  for (const batch of chunk(variantRows, 250)) {
+  for (const batch of chunk(deduplicatedVariants, 250)) {
     const { error } = await supabase
       .from('product_variants')
       .upsert(batch, { onConflict: 'codigo_interno' })
@@ -272,7 +277,8 @@ export async function syncMetabase(): Promise<SyncResult> {
     num_variantes:      r.num_variantes !== null ? Math.round(r.num_variantes) : null,
     lista_variantes:    r.lista_variantes,
     variante_lider:     r.variante_lider,
-    ingresos_modelo_12m: r.ingresos_modelo_12m,
+    ingresos_12m:       r.ingresos_12m,
+    unidades_12m:       r.unidades_12m !== null ? Math.round(r.unidades_12m) : null,
     abc_ventas:         r.abc_ventas,
     abc_unidades:       r.abc_unidades,
     metabase_synced_at: now,
