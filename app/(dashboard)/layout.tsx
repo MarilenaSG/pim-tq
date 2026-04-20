@@ -75,7 +75,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-white/10">
-          <div className="text-xs text-white/30">v0.2 · Sesión 2</div>
+          <div className="text-xs text-white/30">v1.2 · Sesión 12</div>
         </div>
       </aside>
 
