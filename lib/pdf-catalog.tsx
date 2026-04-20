@@ -282,7 +282,8 @@ function ProductCard({ p }: { p: PdfProduct }) {
       {/* Image — fixed height, objectFit cover fills to widest side */}
       <View style={s.cardImageWrap}>
         {p.image_url ? (
-          <Image style={s.cardImage} src={p.image_url} alt={p.description ?? ''} />
+          // eslint-disable-next-line jsx-a11y/alt-text
+          <Image style={s.cardImage} src={p.image_url} />
         ) : (
           <Text style={s.cardNoImage}>Sin imagen</Text>
         )}
@@ -366,7 +367,8 @@ export function CatalogDocument({ products, title }: CatalogDocProps) {
             {/* Header — navy pill with TQ icon */}
             <View style={s.header}>
               <View style={s.headerLeft}>
-                <Image src={iconPath} style={s.headerIcon} alt="Te Quiero" />
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                <Image src={iconPath} style={s.headerIcon} />
                 <View>
                   <Text style={s.headerBrand}>Te Quiero Joyerías</Text>
                   <Text style={s.headerTitle}>Catálogo de producto</Text>
