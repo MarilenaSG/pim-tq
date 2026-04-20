@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { PriceSuggestionPanel } from './PriceSuggestionPanel'
 
 type GenerationType = 'shopify_description' | 'seo_title' | 'tags' | 'catalog_description'
 
@@ -70,6 +71,11 @@ export function AiContentPanel({ codigoModelo }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Price suggestion */}
+      <PriceSuggestionPanel codigoModelo={codigoModelo} />
+
+      <div className="border-t border-[#e2ddd9] pt-4" />
+
       {/* Intro */}
       <div
         className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm"

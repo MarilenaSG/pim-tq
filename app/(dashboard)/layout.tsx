@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ReactNode } from 'react'
 import { ToastProvider } from '@/components/ui'
+import { ChatWidget } from '@/components/ui/ChatWidget'
 
 const navSections = [
   {
@@ -85,6 +86,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           {children}
         </ToastProvider>
       </main>
+
+      <ChatWidget />
     </div>
   )
 }
