@@ -23,7 +23,7 @@ export function ProductFilters({ metals, categories, familias, karats }: Props) 
 
   function setParam(key: string, value: string) {
     const p = new URLSearchParams(sp.toString())
-    value ? p.set(key, value) : p.delete(key)
+    if (value) { p.set(key, value) } else { p.delete(key) }
     p.delete('page')
     router.replace(`${pathname}?${p.toString()}`, { scroll: false })
   }

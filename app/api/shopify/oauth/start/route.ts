@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { buildOAuthUrl } from '@/lib/shopify'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const clientId = process.env.SHOPIFY_CLIENT_ID
   if (!clientId) {
     return NextResponse.json({ error: 'SHOPIFY_CLIENT_ID no configurado' }, { status: 500 })

@@ -268,15 +268,6 @@ const s = StyleSheet.create({
 
 // ── Helpers ───────────────────────────────────────────────────
 
-function stripHtml(html: string | null): string {
-  if (!html) return ''
-  return html
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
 function trunc(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s
 }
@@ -291,7 +282,7 @@ function ProductCard({ p }: { p: PdfProduct }) {
       {/* Image — fixed height, objectFit cover fills to widest side */}
       <View style={s.cardImageWrap}>
         {p.image_url ? (
-          <Image style={s.cardImage} src={p.image_url} />
+          <Image style={s.cardImage} src={p.image_url} alt={p.description ?? ''} />
         ) : (
           <Text style={s.cardNoImage}>Sin imagen</Text>
         )}
@@ -375,7 +366,7 @@ export function CatalogDocument({ products, title }: CatalogDocProps) {
             {/* Header — navy pill with TQ icon */}
             <View style={s.header}>
               <View style={s.headerLeft}>
-                <Image src={iconPath} style={s.headerIcon} />
+                <Image src={iconPath} style={s.headerIcon} alt="Te Quiero" />
                 <View>
                   <Text style={s.headerBrand}>Te Quiero Joyerías</Text>
                   <Text style={s.headerTitle}>Catálogo de producto</Text>

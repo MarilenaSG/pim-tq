@@ -214,7 +214,7 @@ const SECTIONS: Section[] = [
           <LI>Desactivar un campo lo oculta pero no borra sus valores</LI>
         </UL>
         <H3>Editar valores</H3>
-        <P>En la ficha de cada producto, tab <strong>Campos custom</strong>, puedes editar los valores inline. Los cambios se guardan al hacer clic en "Guardar".</P>
+        <P>En la ficha de cada producto, tab <strong>Campos custom</strong>, puedes editar los valores inline. Los cambios se guardan al hacer clic en &quot;Guardar&quot;.</P>
         <H3>Rellenar en lote</H3>
         <P>Usa la pestaña <strong>Actualizar en lote</strong> de Exportar para rellenar campos en múltiples productos a la vez con un CSV.</P>
       </>

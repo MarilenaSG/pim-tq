@@ -201,7 +201,7 @@ export function AiContentPanel({ codigoModelo }: Props) {
 
             {!result && !error && !isLoading && (
               <div className="px-5 py-4 text-xs" style={{ color: '#b2b2b2' }}>
-                Haz clic en "Generar" para crear el contenido con IA
+                Haz clic en &quot;Generar&quot; para crear el contenido con IA
               </div>
             )}
           </div>

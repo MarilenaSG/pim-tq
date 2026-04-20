@@ -117,7 +117,7 @@ export function PriceSuggestionPanel({ codigoModelo }: Props) {
 
       {!result && !error && !loading && (
         <div className="px-5 py-4 text-xs" style={{ color: '#b2b2b2' }}>
-          Haz clic en "Sugerir precio" para calcular el PVP óptimo con IA
+          Haz clic en &quot;Sugerir precio&quot; para calcular el PVP óptimo con IA
         </div>
       )}
     </div>
