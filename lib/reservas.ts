@@ -93,8 +93,7 @@ export async function syncReservas(): Promise<SyncReservasResult> {
   }
 
   const validRows = rows.filter(r => validSlugs.has(r.codigo_interno))
-  const skipped = rows.length - validRows.length
-  // skipped rows are descatalogued variants — not an error, just omit silently
+  // skipped rows are descatalogued variants — omit silently
 
   if (validRows.length === 0) {
     errors.push('Ningún slug de reservas coincide con product_variants. Ejecuta primero el sync de Metabase.')

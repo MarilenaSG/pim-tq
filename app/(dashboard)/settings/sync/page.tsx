@@ -13,7 +13,7 @@ async function getSyncData() {
       .from('sync_log')
       .select('*')
       .order('started_at', { ascending: false })
-      .limit(10),
+      .limit(20),
     getShopifyStatus(),
   ])
 

@@ -84,16 +84,17 @@ export async function syncVentas(): Promise<SyncVentasResult> {
 
   const supabase = createServiceClient()
 
-  // Build codigo_interno → codigo_modelo lookup from product_variants
-  const allCodigos = Array.from(new Set(rows.map(r => r.codigo_interno)))
-  const variantMap = new Map<string, string>()
+  // The CSV's "codigo_interno" column actually contains slug values (ERP catalog code).
+  // Look up codigo_modelo via product_variants.slug.
+  const allSlugs = Array.from(new Set(rows.map(r => r.codigo_interno)))
+  const variantMap = new Map<string, string>() // slug → codigo_modelo
   const LOOKUP_CHUNK = 500
-  for (let i = 0; i < allCodigos.length; i += LOOKUP_CHUNK) {
+  for (let i = 0; i < allSlugs.length; i += LOOKUP_CHUNK) {
     const { data } = await supabase
       .from('product_variants')
-      .select('codigo_interno, codigo_modelo')
-      .in('codigo_interno', allCodigos.slice(i, i + LOOKUP_CHUNK))
-    for (const v of data ?? []) variantMap.set(v.codigo_interno, v.codigo_modelo)
+      .select('slug, codigo_modelo')
+      .in('slug', allSlugs.slice(i, i + LOOKUP_CHUNK))
+    for (const v of data ?? []) if (v.slug) variantMap.set(v.slug, v.codigo_modelo)
   }
 
   // Enrich rows with codigo_modelo, skip rows with no match

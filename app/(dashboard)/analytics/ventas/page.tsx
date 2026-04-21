@@ -12,7 +12,7 @@ export default async function VentasAnalyticsPage() {
 
   const [ventasRes, variantsRes, productsRes] = await Promise.all([
     supabase.from('ventas_mensuales').select('codigo_interno, anyo, mes, unidades_vendidas, ingresos_netos, coste_total'),
-    supabase.from('product_variants').select('codigo_interno, codigo_modelo'),
+    supabase.from('product_variants').select('slug, codigo_modelo'),
     supabase.from('products').select('codigo_modelo, description, familia, metal'),
   ])
 
@@ -20,9 +20,9 @@ export default async function VentasAnalyticsPage() {
   const variants = variantsRes.data ?? []
   const products = productsRes.data ?? []
 
-  // Build lookup maps
+  // ventas_mensuales.codigo_interno contains slug values — join via product_variants.slug
   const variantToModel = new Map<string, string>()
-  for (const v of variants) variantToModel.set(v.codigo_interno, v.codigo_modelo)
+  for (const v of variants) if (v.slug) variantToModel.set(v.slug, v.codigo_modelo)
 
   const modelMeta = new Map<string, { description: string | null; familia: string | null; metal: string | null }>()
   for (const p of products) modelMeta.set(p.codigo_modelo, { description: p.description, familia: p.familia, metal: p.metal })

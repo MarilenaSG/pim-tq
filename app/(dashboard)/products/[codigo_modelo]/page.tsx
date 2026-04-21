@@ -59,14 +59,14 @@ export default async function ProductPage({
 
   if (!productRes.data) return notFound()
 
-  // Fetch ventas + reservas only when needed (lazy after variants are known)
-  const variantCodes = (variantsRes.data ?? []).map((v: { codigo_interno: string }) => v.codigo_interno).filter(Boolean)
+  // ventas_mensuales and reservas_activas store slug values in their codigo_interno column
+  const slugCodes = (variantsRes.data ?? []).map((v: { slug?: string | null }) => v.slug).filter((s): s is string => !!s)
   const [ventasRes, reservasRes] = await Promise.all([
-    variantCodes.length > 0
-      ? supabase.from('ventas_mensuales').select('*').in('codigo_interno', variantCodes).order('anyo').order('mes')
+    slugCodes.length > 0
+      ? supabase.from('ventas_mensuales').select('*').in('codigo_interno', slugCodes).order('anyo').order('mes')
       : Promise.resolve({ data: [] }),
-    variantCodes.length > 0
-      ? supabase.from('reservas_activas').select('*').in('codigo_interno', variantCodes).order('reservas_count', { ascending: false })
+    slugCodes.length > 0
+      ? supabase.from('reservas_activas').select('*').in('codigo_interno', slugCodes).order('reservas_count', { ascending: false })
       : Promise.resolve({ data: [] }),
   ])
 
@@ -79,10 +79,10 @@ export default async function ProductPage({
   const ventas       = (ventasRes.data       ?? []) as import('./VentasTab').VentaRow[]
   const reservas     = (reservasRes.data     ?? []) as import('./VentasTab').ReservaRow[]
 
-  // slug map: codigo_interno → display label (slug or variante)
+  // Map slug → variante label for display in ventas tab
   const variantSlugMap: Record<string, string> = {}
   for (const v of variants) {
-    variantSlugMap[v.codigo_interno] = v.slug ?? v.codigo_interno
+    if (v.slug) variantSlugMap[v.slug] = v.slug
   }
 
   const primaryImage = images.find(img => img.is_primary) ?? images[0] ?? null
