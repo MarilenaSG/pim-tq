@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   triggerMetabaseSync,
   triggerShopifySync,
+  triggerVentasSync,
+  triggerReservasSync,
   disconnectShopify,
   type SyncActionResult,
 } from './actions'
@@ -14,6 +16,8 @@ import type { SyncLog } from '@/types'
 interface SyncPanelProps {
   lastMetabaseSync: SyncLog | null
   lastShopifySync:  SyncLog | null
+  lastVentasSync:   SyncLog | null
+  lastReservasSync: SyncLog | null
   recentLogs:       SyncLog[]
   shopifyConnected: boolean
   shopifyShop:      string | null
@@ -55,6 +59,8 @@ function ShopifyStats({ result }: { result: SyncActionResult }) {
 export function SyncPanel({
   lastMetabaseSync,
   lastShopifySync,
+  lastVentasSync,
+  lastReservasSync,
   recentLogs,
   shopifyConnected,
   shopifyShop,
@@ -64,9 +70,13 @@ export function SyncPanel({
 
   const [metaPending,       startMetaTrans]       = useTransition()
   const [shopifyPending,    startShopifyTrans]    = useTransition()
+  const [ventasPending,     startVentasTrans]     = useTransition()
+  const [reservasPending,   startReservasTrans]   = useTransition()
   const [disconnectPending, startDisconnectTrans] = useTransition()
-  const [metaResult, setMetaResult] = useState<SyncActionResult | null>(null)
+  const [metaResult,    setMetaResult]    = useState<SyncActionResult | null>(null)
   const [shopifyResult, setShopifyResult] = useState<SyncActionResult | null>(null)
+  const [ventasResult,  setVentasResult]  = useState<SyncActionResult | null>(null)
+  const [reservasResult, setReservasResult] = useState<SyncActionResult | null>(null)
 
   // Show OAuth result from URL param
   const oauthResult = searchParams.get('shopify')
@@ -85,6 +95,24 @@ export function SyncPanel({
     startShopifyTrans(async () => {
       const res = await triggerShopifySync()
       setShopifyResult(res)
+      router.refresh()
+    })
+  }
+
+  function handleVentasSync() {
+    setVentasResult(null)
+    startVentasTrans(async () => {
+      const res = await triggerVentasSync()
+      setVentasResult(res)
+      router.refresh()
+    })
+  }
+
+  function handleReservasSync() {
+    setReservasResult(null)
+    startReservasTrans(async () => {
+      const res = await triggerReservasSync()
+      setReservasResult(res)
       router.refresh()
     })
   }
@@ -221,6 +249,38 @@ export function SyncPanel({
           )}
         </div>
       </div>
+
+      {/* ── Ventas mensuales card ─────────────────────────────── */}
+      <SyncCard
+        title="Ventas mensuales"
+        description="Histórico mensual de ventas por variante → ventas_mensuales"
+        lastSync={lastVentasSync}
+        isPending={ventasPending}
+        result={ventasResult}
+        onSync={handleVentasSync}
+        statsComponent={ventasResult ? (
+          ventasResult.ok
+            ? <span>✓ {ventasResult.rowsUpserted} filas actualizadas</span>
+            : <span>✕ {ventasResult.error ?? ventasResult.errors?.join(', ')}</span>
+        ) : null}
+        color="#C8842A"
+      />
+
+      {/* ── Reservas activas card ─────────────────────────────── */}
+      <SyncCard
+        title="Reservas activas"
+        description="Snapshot diario de reservas por variante → reservas_activas (reemplaza todos los datos)"
+        lastSync={lastReservasSync}
+        isPending={reservasPending}
+        result={reservasResult}
+        onSync={handleReservasSync}
+        statsComponent={reservasResult ? (
+          reservasResult.ok
+            ? <span>✓ {reservasResult.rowsInserted} reservas importadas</span>
+            : <span>✕ {reservasResult.error ?? reservasResult.errors?.join(', ')}</span>
+        ) : null}
+        color="#3A9E6A"
+      />
 
       {/* ── Sync log ──────────────────────────────────────────── */}
       <div>

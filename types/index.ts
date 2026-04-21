@@ -122,7 +122,7 @@ export interface CustomFieldDefinition {
 
 // ── Sync ─────────────────────────────────────────────────────
 
-export type SyncSource = 'metabase' | 'shopify'
+export type SyncSource = 'metabase' | 'shopify' | 'ventas' | 'reservas'
 export type SyncStatus = 'success' | 'error' | 'running'
 export type SyncTrigger = 'cron' | 'manual'
 
