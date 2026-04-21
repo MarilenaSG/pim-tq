@@ -11,7 +11,7 @@ export default async function VentasAnalyticsPage() {
   const supabase = createServerClient()
 
   const [ventasRes, variantsRes, productsRes] = await Promise.all([
-    supabase.from('ventas_mensuales').select('codigo_interno, anyo, mes, unidades_vendidas, ingresos_netos, coste_total'),
+    supabase.from('ventas_mensuales').select('slug, anyo, mes, unidades_vendidas, ingresos_netos, coste_total'),
     supabase.from('product_variants').select('slug, codigo_modelo'),
     supabase.from('products').select('codigo_modelo, description, familia, metal'),
   ])
@@ -20,7 +20,7 @@ export default async function VentasAnalyticsPage() {
   const variants = variantsRes.data ?? []
   const products = productsRes.data ?? []
 
-  // ventas_mensuales.codigo_interno contains slug values — join via product_variants.slug
+  // ventas_mensuales.slug joins directly to product_variants.slug
   const variantToModel = new Map<string, string>()
   for (const v of variants) if (v.slug) variantToModel.set(v.slug, v.codigo_modelo)
 
@@ -52,7 +52,7 @@ export default async function VentasAnalyticsPage() {
   // ── By model ─────────────────────────────────────────────────
   const byModel = new Map<string, { ingresos: number; unidades: number }>()
   for (const row of ventas) {
-    const model = variantToModel.get(row.codigo_interno)
+    const model = variantToModel.get(row.slug)
     if (!model) continue
     const ex = byModel.get(model) ?? { ingresos: 0, unidades: 0 }
     ex.ingresos += Number(row.ingresos_netos ?? 0)
@@ -72,7 +72,7 @@ export default async function VentasAnalyticsPage() {
   // ── By familia ───────────────────────────────────────────────
   const byFamilia = new Map<string, { ingresos: number; unidades: number }>()
   for (const row of ventas) {
-    const model = variantToModel.get(row.codigo_interno)
+    const model = variantToModel.get(row.slug)
     const familia = model ? (modelMeta.get(model)?.familia ?? 'Sin familia') : 'Sin familia'
     const ex = byFamilia.get(familia) ?? { ingresos: 0, unidades: 0 }
     ex.ingresos += Number(row.ingresos_netos ?? 0)
@@ -87,7 +87,7 @@ export default async function VentasAnalyticsPage() {
   // ── By metal ─────────────────────────────────────────────────
   const byMetal = new Map<string, { ingresos: number; unidades: number }>()
   for (const row of ventas) {
-    const model = variantToModel.get(row.codigo_interno)
+    const model = variantToModel.get(row.slug)
     const metal = model ? (modelMeta.get(model)?.metal ?? 'Sin metal') : 'Sin metal'
     const ex = byMetal.get(metal) ?? { ingresos: 0, unidades: 0 }
     ex.ingresos += Number(row.ingresos_netos ?? 0)

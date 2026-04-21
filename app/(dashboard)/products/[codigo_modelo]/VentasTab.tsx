@@ -8,7 +8,7 @@ import {
 const MESES_CORTO = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 export interface VentaRow {
-  codigo_interno: string
+  slug: string
   anyo: number
   mes: number
   unidades_vendidas: number | null
@@ -17,7 +17,7 @@ export interface VentaRow {
 }
 
 export interface ReservaRow {
-  codigo_interno: string
+  slug: string
   fecha_snapshot: string | null
   reservas_count: number | null
   unidades_reservadas: number | null
@@ -181,9 +181,9 @@ export function VentasTab({ ventas, reservas, variantSlugMap }: Props) {
             </thead>
             <tbody>
               {reservas.map((r, i) => (
-                <tr key={r.codigo_interno} style={{ borderBottom: i < reservas.length - 1 ? '1px solid rgba(0,85,127,0.04)' : 'none' }}>
+                <tr key={r.slug} style={{ borderBottom: i < reservas.length - 1 ? '1px solid rgba(0,85,127,0.04)' : 'none' }}>
                   <td className="px-4 py-2.5 font-mono text-xs font-bold text-tq-sky">
-                    {variantSlugMap[r.codigo_interno] ?? r.codigo_interno}
+                    {variantSlugMap[r.slug] ?? r.slug}
                   </td>
                   <td className="px-4 py-2.5 text-sm font-bold" style={{ color: (r.reservas_count ?? 0) > 0 ? '#C8842A' : '#b2b2b2' }}>
                     {r.reservas_count ?? 0}
@@ -220,9 +220,9 @@ export function VentasTab({ ventas, reservas, variantSlugMap }: Props) {
                   const ing = Number(r.ingresos_netos ?? 0)
                   const mrg = ing - Number(r.coste_total ?? 0)
                   return (
-                    <tr key={`${r.codigo_interno}-${r.anyo}-${r.mes}`}
+                    <tr key={`${r.slug}-${r.anyo}-${r.mes}`}
                       style={{ borderBottom: i < ventas.length - 1 ? '1px solid rgba(0,85,127,0.04)' : 'none' }}>
-                      <td className="px-4 py-2 font-mono text-xs font-bold text-tq-sky">{r.codigo_interno}</td>
+                      <td className="px-4 py-2 font-mono text-xs font-bold text-tq-sky">{r.slug}</td>
                       <td className="px-4 py-2 text-xs text-tq-snorkel">{r.anyo}</td>
                       <td className="px-4 py-2 text-xs text-tq-snorkel">{MESES_CORTO[r.mes]}</td>
                       <td className="px-4 py-2 text-xs font-bold text-tq-snorkel">{r.unidades_vendidas ?? 0}</td>

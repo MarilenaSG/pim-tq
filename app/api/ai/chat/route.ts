@@ -122,13 +122,13 @@ async function buildContext(lastMessage: string): Promise<string> {
   if (/reserva|pedido pendiente|demanda/.test(msg)) {
     const { data: reservas } = await supabase
       .from('reservas_activas')
-      .select('codigo_interno, reservas_count, unidades_reservadas')
+      .select('slug, reservas_count, unidades_reservadas')
       .order('reservas_count', { ascending: false })
       .limit(10)
 
     if (reservas && reservas.length > 0) {
       const totalRes = reservas.reduce((s, r) => s + Number(r.reservas_count ?? 0), 0)
-      const rows = reservas.map(r => `  ${r.codigo_interno}: ${r.reservas_count} reservas`).join('\n')
+      const rows = reservas.map(r => `  ${r.slug}: ${r.reservas_count} reservas`).join('\n')
       sections.push(`RESERVAS ACTIVAS (top 10, total: ${totalRes}):\n${rows}`)
     }
   }

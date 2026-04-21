@@ -39,7 +39,7 @@ export async function syncReservas(): Promise<SyncReservasResult> {
   }
 
   const rows: {
-    codigo_interno: string
+    slug: string
     fecha_snapshot: string | null
     reservas_count: number | null
     unidades_reservadas: number | null
@@ -53,8 +53,8 @@ export async function syncReservas(): Promise<SyncReservasResult> {
     const cols = parseCSVLine(lines[i])
     if (cols.length < 2) continue
 
-    const codigoInterno = cols[idx.codigo_interno]?.trim()
-    if (!codigoInterno) continue
+    const slug = cols[idx.codigo_interno]?.trim()
+    if (!slug) continue
 
     const fechaRaw = cols[idx.fecha_snapshot]?.trim() ?? ''
     const fechaISO = parseSpanishDate(fechaRaw)
@@ -64,7 +64,7 @@ export async function syncReservas(): Promise<SyncReservasResult> {
     }
 
     rows.push({
-      codigo_interno:      codigoInterno,
+      slug,
       fecha_snapshot:      fechaISO,
       reservas_count:      parseInt((cols[idx.reservas_count] ?? '').trim(), 10) || null,
       unidades_reservadas: parseInt((cols[idx.unidades_reservadas] ?? '').trim(), 10) || null,
@@ -79,9 +79,8 @@ export async function syncReservas(): Promise<SyncReservasResult> {
 
   const supabase = createServiceClient()
 
-  // The CSV column is called "codigo_interno" but contains slug values (ERP catalog code).
-  // Validate against product_variants.slug — skip rows with no match.
-  const allSlugs = Array.from(new Set(rows.map(r => r.codigo_interno)))
+  // Validate slugs against product_variants.slug — skip rows with no match (descatalogued).
+  const allSlugs = Array.from(new Set(rows.map(r => r.slug)))
   const validSlugs = new Set<string>()
   const LOOKUP_CHUNK = 500
   for (let i = 0; i < allSlugs.length; i += LOOKUP_CHUNK) {
@@ -92,7 +91,7 @@ export async function syncReservas(): Promise<SyncReservasResult> {
     for (const v of data ?? []) if (v.slug) validSlugs.add(v.slug)
   }
 
-  const validRows = rows.filter(r => validSlugs.has(r.codigo_interno))
+  const validRows = rows.filter(r => validSlugs.has(r.slug))
   // skipped rows are descatalogued variants — omit silently
 
   if (validRows.length === 0) {
@@ -104,7 +103,7 @@ export async function syncReservas(): Promise<SyncReservasResult> {
   const { error: deleteError } = await supabase
     .from('reservas_activas')
     .delete()
-    .not('codigo_interno', 'is', null) // match all rows (codigo_interno is NOT NULL)
+    .not('slug', 'is', null) // match all rows (slug is NOT NULL)
 
   if (deleteError) {
     errors.push(`Error limpiando reservas_activas: ${deleteError.message}`)

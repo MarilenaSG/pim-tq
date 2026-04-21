@@ -59,14 +59,13 @@ export default async function ProductPage({
 
   if (!productRes.data) return notFound()
 
-  // ventas_mensuales and reservas_activas store slug values in their codigo_interno column
   const slugCodes = (variantsRes.data ?? []).map((v: { slug?: string | null }) => v.slug).filter((s): s is string => !!s)
   const [ventasRes, reservasRes] = await Promise.all([
     slugCodes.length > 0
-      ? supabase.from('ventas_mensuales').select('*').in('codigo_interno', slugCodes).order('anyo').order('mes')
+      ? supabase.from('ventas_mensuales').select('*').in('slug', slugCodes).order('anyo').order('mes')
       : Promise.resolve({ data: [] }),
     slugCodes.length > 0
-      ? supabase.from('reservas_activas').select('*').in('codigo_interno', slugCodes).order('reservas_count', { ascending: false })
+      ? supabase.from('reservas_activas').select('*').in('slug', slugCodes).order('reservas_count', { ascending: false })
       : Promise.resolve({ data: [] }),
   ])
 

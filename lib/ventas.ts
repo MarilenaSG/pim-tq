@@ -38,7 +38,7 @@ export async function syncVentas(): Promise<SyncVentasResult> {
   }
 
   const rows: {
-    codigo_interno: string
+    slug: string
     anyo: number
     mes: number
     unidades_vendidas: number | null
@@ -55,8 +55,8 @@ export async function syncVentas(): Promise<SyncVentasResult> {
     const cols = parseCSVLine(lines[i])
     if (cols.length < 4) continue
 
-    const codigoInterno = cols[idx.codigo_interno]?.trim()
-    if (!codigoInterno) continue
+    const slug = cols[idx.codigo_interno]?.trim()
+    if (!slug) continue
 
     const anyo = parseAnyo(cols[idx.anyo] ?? '')
     const mes  = parseInt((cols[idx.mes] ?? '').trim(), 10)
@@ -67,7 +67,7 @@ export async function syncVentas(): Promise<SyncVentasResult> {
     }
 
     rows.push({
-      codigo_interno:    codigoInterno,
+      slug,
       anyo,
       mes,
       unidades_vendidas: parseInt((cols[idx.unidades_vendidas] ?? '').trim(), 10) || null,
@@ -84,9 +84,8 @@ export async function syncVentas(): Promise<SyncVentasResult> {
 
   const supabase = createServiceClient()
 
-  // The CSV's "codigo_interno" column actually contains slug values (ERP catalog code).
-  // Look up codigo_modelo via product_variants.slug.
-  const allSlugs = Array.from(new Set(rows.map(r => r.codigo_interno)))
+  // Look up codigo_modelo via product_variants.slug
+  const allSlugs = Array.from(new Set(rows.map(r => r.slug)))
   const variantMap = new Map<string, string>() // slug → codigo_modelo
   const LOOKUP_CHUNK = 500
   for (let i = 0; i < allSlugs.length; i += LOOKUP_CHUNK) {
@@ -97,13 +96,13 @@ export async function syncVentas(): Promise<SyncVentasResult> {
     for (const v of data ?? []) if (v.slug) variantMap.set(v.slug, v.codigo_modelo)
   }
 
-  // Enrich rows with codigo_modelo, skip rows with no match
+  // Enrich rows with codigo_modelo, skip rows with no match (descatalogued)
   const enrichedRows = rows
-    .map(r => ({ ...r, codigo_modelo: variantMap.get(r.codigo_interno) ?? null }))
+    .map(r => ({ ...r, codigo_modelo: variantMap.get(r.slug) ?? null }))
     .filter((r): r is typeof r & { codigo_modelo: string } => r.codigo_modelo !== null)
 
   if (enrichedRows.length === 0) {
-    errors.push('Ningún codigo_interno del CSV coincide con product_variants. Ejecuta primero el sync de Metabase.')
+    errors.push('Ningún slug del CSV coincide con product_variants. Ejecuta primero el sync de Metabase.')
     return { rowsUpserted: 0, errors }
   }
 
@@ -113,7 +112,7 @@ export async function syncVentas(): Promise<SyncVentasResult> {
     const chunk = enrichedRows.slice(i, i + CHUNK)
     const { error } = await supabase
       .from('ventas_mensuales')
-      .upsert(chunk, { onConflict: 'codigo_interno,anyo,mes' })
+      .upsert(chunk, { onConflict: 'slug,anyo,mes' })
 
     if (error) {
       errors.push(`Upsert ventas (chunk ${Math.floor(i / CHUNK) + 1}): ${error.message}`)
