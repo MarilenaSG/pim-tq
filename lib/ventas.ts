@@ -83,12 +83,33 @@ export async function syncVentas(): Promise<SyncVentasResult> {
   }
 
   const supabase = createServiceClient()
-  let rowsUpserted = 0
 
-  // Batch upsert in chunks of 500
+  // Build codigo_interno → codigo_modelo lookup from product_variants
+  const allCodigos = Array.from(new Set(rows.map(r => r.codigo_interno)))
+  const variantMap = new Map<string, string>()
+  const LOOKUP_CHUNK = 500
+  for (let i = 0; i < allCodigos.length; i += LOOKUP_CHUNK) {
+    const { data } = await supabase
+      .from('product_variants')
+      .select('codigo_interno, codigo_modelo')
+      .in('codigo_interno', allCodigos.slice(i, i + LOOKUP_CHUNK))
+    for (const v of data ?? []) variantMap.set(v.codigo_interno, v.codigo_modelo)
+  }
+
+  // Enrich rows with codigo_modelo, skip rows with no match
+  const enrichedRows = rows
+    .map(r => ({ ...r, codigo_modelo: variantMap.get(r.codigo_interno) ?? null }))
+    .filter((r): r is typeof r & { codigo_modelo: string } => r.codigo_modelo !== null)
+
+  if (enrichedRows.length === 0) {
+    errors.push('Ningún codigo_interno del CSV coincide con product_variants. Ejecuta primero el sync de Metabase.')
+    return { rowsUpserted: 0, errors }
+  }
+
+  let rowsUpserted = 0
   const CHUNK = 500
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK)
+  for (let i = 0; i < enrichedRows.length; i += CHUNK) {
+    const chunk = enrichedRows.slice(i, i + CHUNK)
     const { error } = await supabase
       .from('ventas_mensuales')
       .upsert(chunk, { onConflict: 'codigo_interno,anyo,mes' })
