@@ -83,7 +83,7 @@ export async function syncReservas(): Promise<SyncReservasResult> {
   const { error: deleteError } = await supabase
     .from('reservas_activas')
     .delete()
-    .gte('id', '00000000-0000-0000-0000-000000000000') // match all rows
+    .not('codigo_interno', 'is', null) // match all rows (codigo_interno is NOT NULL)
 
   if (deleteError) {
     errors.push(`Error limpiando reservas_activas: ${deleteError.message}`)
