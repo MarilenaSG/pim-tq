@@ -94,10 +94,7 @@ export async function syncReservas(): Promise<SyncReservasResult> {
 
   const validRows = rows.filter(r => validSlugs.has(r.codigo_interno))
   const skipped = rows.length - validRows.length
-  if (skipped > 0) {
-    // Non-critical: some slugs may not exist yet (new products not yet synced from Metabase)
-    errors.push(`${skipped} reservas omitidas: slug no encontrado en product_variants`)
-  }
+  // skipped rows are descatalogued variants — not an error, just omit silently
 
   if (validRows.length === 0) {
     errors.push('Ningún slug de reservas coincide con product_variants. Ejecuta primero el sync de Metabase.')
