@@ -79,6 +79,29 @@ export async function syncReservas(): Promise<SyncReservasResult> {
 
   const supabase = createServiceClient()
 
+  // Look up which codigo_interno values exist in product_variants (FK constraint)
+  const allCodigos = Array.from(new Set(rows.map(r => r.codigo_interno)))
+  const validCodigos = new Set<string>()
+  const LOOKUP_CHUNK = 500
+  for (let i = 0; i < allCodigos.length; i += LOOKUP_CHUNK) {
+    const { data } = await supabase
+      .from('product_variants')
+      .select('codigo_interno')
+      .in('codigo_interno', allCodigos.slice(i, i + LOOKUP_CHUNK))
+    for (const v of data ?? []) validCodigos.add(v.codigo_interno)
+  }
+
+  const validRows = rows.filter(r => validCodigos.has(r.codigo_interno))
+  const skipped = rows.length - validRows.length
+  if (skipped > 0) {
+    errors.push(`${skipped} reservas ignoradas: codigo_interno no existe en product_variants`)
+  }
+
+  if (validRows.length === 0) {
+    errors.push('Ningún codigo_interno de reservas coincide con product_variants. Ejecuta primero el sync de Metabase.')
+    return { rowsInserted: 0, errors }
+  }
+
   // Replace snapshot: delete all existing rows, then insert fresh
   const { error: deleteError } = await supabase
     .from('reservas_activas')
@@ -94,8 +117,8 @@ export async function syncReservas(): Promise<SyncReservasResult> {
   const CHUNK = 500
   let rowsInserted = 0
 
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK)
+  for (let i = 0; i < validRows.length; i += CHUNK) {
+    const chunk = validRows.slice(i, i + CHUNK)
     const { error } = await supabase.from('reservas_activas').insert(chunk)
     if (error) {
       errors.push(`Insert reservas (chunk ${Math.floor(i / CHUNK) + 1}): ${error.message}`)
