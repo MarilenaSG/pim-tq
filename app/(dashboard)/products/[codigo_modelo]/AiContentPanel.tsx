@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { PriceSuggestionPanel } from './PriceSuggestionPanel'
+import { saveAiContent } from './aiSaveAction'
 
 type GenerationType = 'shopify_description' | 'seo_title' | 'tags' | 'catalog_description'
 
@@ -41,6 +42,8 @@ export function AiContentPanel({ codigoModelo }: Props) {
   const [loading, setLoading]   = useState<GenerationType | null>(null)
   const [errors, setErrors]     = useState<Partial<Record<GenerationType, string>>>({})
   const [copied, setCopied]     = useState<GenerationType | null>(null)
+  const [saved, setSaved]       = useState<Partial<Record<GenerationType, 'saving' | 'ok' | 'error'>>>({})
+  const [, startSaveTrans]      = useTransition()
 
   async function generate(type: GenerationType) {
     setLoading(type)
@@ -67,6 +70,15 @@ export function AiContentPanel({ codigoModelo }: Props) {
     await navigator.clipboard.writeText(text)
     setCopied(type)
     setTimeout(() => setCopied(null), 2000)
+  }
+
+  function handleSave(type: GenerationType, text: string) {
+    setSaved(prev => ({ ...prev, [type]: 'saving' }))
+    startSaveTrans(async () => {
+      const res = await saveAiContent(codigoModelo, type, text)
+      setSaved(prev => ({ ...prev, [type]: res.ok ? 'ok' : 'error' }))
+      if (res.ok) setTimeout(() => setSaved(prev => ({ ...prev, [type]: undefined })), 3000)
+    })
   }
 
   return (
@@ -181,7 +193,7 @@ export function AiContentPanel({ codigoModelo }: Props) {
                 )}
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 mt-3">
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
                   <button
                     onClick={() => copyToClipboard(type, result)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
@@ -192,9 +204,22 @@ export function AiContentPanel({ codigoModelo }: Props) {
                   >
                     {isCopied ? '✓ Copiado' : '⎘ Copiar'}
                   </button>
-                  <span className="text-[10px]" style={{ color: '#b2b2b2' }}>
-                    Revisa el contenido antes de usarlo en Shopify
-                  </span>
+                  <button
+                    onClick={() => handleSave(type, result)}
+                    disabled={saved[type] === 'saving'}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+                    style={{
+                      background: saved[type] === 'ok'    ? 'rgba(58,158,106,0.12)'  :
+                                  saved[type] === 'error' ? 'rgba(192,57,43,0.10)'   : 'rgba(200,132,42,0.10)',
+                      color:      saved[type] === 'ok'    ? '#2d7a54'                :
+                                  saved[type] === 'error' ? '#992d22'                : '#a06818',
+                    }}
+                  >
+                    {saved[type] === 'saving' ? '…' :
+                     saved[type] === 'ok'     ? '✓ Guardado' :
+                     saved[type] === 'error'  ? '✕ Error al guardar' :
+                     '↓ Guardar en ficha'}
+                  </button>
                 </div>
               </div>
             )}
