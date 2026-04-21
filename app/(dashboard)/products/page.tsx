@@ -134,7 +134,7 @@ export default async function ProductsPage({
 
   // Phase 2: images + shopify status + completitud data for visible products
   const codes = products.map(p => p.codigo_modelo)
-  const [imagesResult, shopifyResult, imgCountResult, shopifyFullResult, fieldDefsResult] =
+  const [imagesResult, shopifyResult, imgCountResult, shopifyFullResult, fieldDefsResult, leaderSlugsResult] =
     codes.length > 0
       ? await Promise.all([
           supabase.from('product_images').select('codigo_modelo, url').in('codigo_modelo', codes).eq('is_primary', true),
@@ -142,6 +142,7 @@ export default async function ProductsPage({
           supabase.from('product_images').select('codigo_modelo').in('codigo_modelo', codes),
           supabase.from('product_shopify_data').select('codigo_modelo, shopify_description, shopify_seo_title, shopify_tags').in('codigo_modelo', codes),
           supabase.from('custom_field_definitions').select('field_key').eq('is_active', true),
+          supabase.from('product_variants').select('codigo_modelo, slug').in('codigo_modelo', codes).eq('es_variante_lider', true),
         ])
       : [
           { data: [] as { codigo_modelo: string; url: string }[] },
@@ -149,10 +150,12 @@ export default async function ProductsPage({
           { data: [] as { codigo_modelo: string }[] },
           { data: [] as { codigo_modelo: string; shopify_description: string | null; shopify_seo_title: string | null; shopify_tags: string[] | null }[] },
           { data: [] as { field_key: string }[] },
+          { data: [] as { codigo_modelo: string; slug: string }[] },
         ]
 
-  const imageMap   = Object.fromEntries((imagesResult.data ?? []).map(r => [r.codigo_modelo, r.url]))
-  const shopifyMap = Object.fromEntries((shopifyResult.data ?? []).map(r => [r.codigo_modelo, r.shopify_status]))
+  const imageMap    = Object.fromEntries((imagesResult.data ?? []).map(r => [r.codigo_modelo, r.url]))
+  const shopifyMap  = Object.fromEntries((shopifyResult.data ?? []).map(r => [r.codigo_modelo, r.shopify_status]))
+  const slugMap     = Object.fromEntries((leaderSlugsResult.data ?? []).map(r => [r.codigo_modelo, r.slug]))
 
   // Build completitud data per product
   const primarySet = new Set((imagesResult.data ?? []).map(r => r.codigo_modelo))
@@ -267,6 +270,11 @@ export default async function ProductsPage({
                       >
                         {p.codigo_modelo}
                       </Link>
+                      {slugMap[p.codigo_modelo] && (
+                        <div className="font-mono text-[10px] mt-0.5" style={{ color: '#b2b2b2' }}>
+                          {slugMap[p.codigo_modelo]}
+                        </div>
+                      )}
                     </td>
 
                     {/* Descripción */}

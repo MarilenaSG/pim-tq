@@ -357,7 +357,7 @@ function TabVariantes({ variants }: { variants: ProductVariant[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(0,85,127,0.08)' }}>
-              {['Código (slug)', 'Var.', '★', 'Precio venta', 'Tachado', 'Dto.', 'Coste medio', 'Margen', '% Margen', 'Stock', 'ABC', 'Ingresos 12m', 'Tiendas'].map(h => (
+              {['Slug (ERP)', 'Cód. interno', 'Var.', '★', 'Precio venta', 'Tachado', 'Dto.', 'Coste medio', 'Margen', '% Margen', 'Stock', 'ABC', 'Ingresos 12m', 'Tiendas'].map(h => (
                 <th key={h} className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
                   {h}
                 </th>
@@ -374,6 +374,7 @@ function TabVariantes({ variants }: { variants: ProductVariant[] }) {
                   background:   v.es_variante_lider ? 'rgba(0,153,242,0.03)' : undefined,
                 }}
               >
+                <td className="px-3 py-2 font-mono text-xs font-bold text-tq-sky">{v.slug ?? v.codigo_interno}</td>
                 <td className="px-3 py-2 font-mono text-xs text-tq-snorkel">{v.codigo_interno}</td>
                 <td className="px-3 py-2 font-mono text-xs font-bold text-tq-snorkel">{v.variante ?? '—'}</td>
                 <td className="px-3 py-2 text-center text-xs" style={{ color: v.es_variante_lider ? '#C8842A' : '#e8e3df' }}>★</td>

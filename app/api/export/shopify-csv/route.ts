@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       description,
       product_shopify_data(shopify_handle),
       product_custom_fields(field_key, field_value),
-      product_variants(codigo_interno, variante)
+      product_variants(slug, codigo_interno, variante)
     `)
 
   if (familia)         q = q.eq('familia', familia)
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     description: string | null
     product_shopify_data: { shopify_handle: string | null } | null
     product_custom_fields: { field_key: string; field_value: string | null }[]
-    product_variants: { codigo_interno: string; variante: string | null }[]
+    product_variants: { slug: string; codigo_interno: string; variante: string | null }[]
   }
 
   let products = (rawProducts ?? []) as unknown as RawProduct[]
@@ -145,10 +145,10 @@ export async function GET(request: NextRequest) {
       } else {
         // First variant row: includes text fields
         const [first, ...rest] = variants
-        rows.push(csvRow([handle, title, body, tags, seoTitle, seoDesc, first.codigo_interno, precio, precioTachado]))
+        rows.push(csvRow([handle, title, body, tags, seoTitle, seoDesc, first.slug, precio, precioTachado]))
         // Additional variant rows: empty text fields
         for (const v of rest) {
-          rows.push(csvRow([handle, '', '', '', '', '', v.codigo_interno, precio, precioTachado]))
+          rows.push(csvRow([handle, '', '', '', '', '', v.slug, precio, precioTachado]))
         }
       }
     }
