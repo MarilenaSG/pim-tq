@@ -33,6 +33,7 @@ const navSections = [
       { href: '/analytics/rentabilidad', label: 'Rentabilidad', icon: '▧' },
       { href: '/analytics/stock',        label: 'Stock',        icon: '▥' },
       { href: '/analytics/price-ladder', label: 'Price Ladder', icon: '▤' },
+      { href: '/analytics/ventas',       label: 'Ventas',       icon: '▨' },
     ],
   },
   {
