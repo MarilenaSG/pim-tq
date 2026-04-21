@@ -343,58 +343,62 @@ export async function syncShopify(): Promise<ShopifySyncResult> {
   let skippedNoMatch = 0
 
   for (const product of shopifyProducts) {
-    // Find codigo_modelo: match Shopify variant SKU against product_variants.slug
-    let codigoModelo: string | null = null
+    // Collect ALL unique codigo_modelo values from this product's variants.
+    // A single Shopify product can group variants from different PIM models
+    // (e.g. gold collar + silver collar = same Shopify product, different codigo_modelo).
+    const modelosForProduct = new Set<string>()
     for (const variant of product.variants) {
       if (variant.sku && skuToModel.has(variant.sku)) {
-        codigoModelo = skuToModel.get(variant.sku)!
-        break
+        modelosForProduct.add(skuToModel.get(variant.sku)!)
       }
     }
 
-    if (!codigoModelo) {
+    if (modelosForProduct.size === 0) {
       skippedNoMatch++
       continue
     }
 
-    // Shopify data row
-    shopifyDataRows.push({
-      codigo_modelo:       codigoModelo,
-      shopify_product_id:  String(product.id),
-      shopify_title:       product.title || null,
-      shopify_description: product.body_html || null,
-      shopify_tags:        product.tags
-                             ? product.tags.split(',').map(t => t.trim()).filter(t => t !== '')
-                             : [],
-      shopify_status:      product.status || null,
-      shopify_handle:      product.handle || null,
-      shopify_vendor:      product.vendor || null,
-      shopify_seo_title:   null,   // metafields API — Sesión futura
-      shopify_seo_desc:    null,
-      synced_at:           now,
-    })
+    const tags = product.tags
+      ? product.tags.split(',').map(t => t.trim()).filter(t => t !== '')
+      : []
 
-    // Images
-    for (const img of product.images) {
-      const firstVariantId = img.variant_ids[0]
-      const linkedVariant = firstVariantId
-        ? product.variants.find(v => v.id === firstVariantId)
-        : undefined
-
-      imageRows.push({
-        codigo_modelo: codigoModelo,
-        url:           img.src,
-        source:        'shopify' as const,
-        variante:      linkedVariant?.title ?? null,
-        alt_text:      img.alt || null,
-        orden:         img.position,
-        is_primary:    img.position === 1,
+    // One shopify_data row + images per matched codigo_modelo
+    for (const codigoModelo of Array.from(modelosForProduct)) {
+      shopifyDataRows.push({
+        codigo_modelo:       codigoModelo,
+        shopify_product_id:  String(product.id),
+        shopify_title:       product.title || null,
+        shopify_description: product.body_html || null,
+        shopify_tags:        tags,
+        shopify_status:      product.status || null,
+        shopify_handle:      product.handle || null,
+        shopify_vendor:      product.vendor || null,
+        shopify_seo_title:   null,
+        shopify_seo_desc:    null,
+        synced_at:           now,
       })
+
+      for (const img of product.images) {
+        const firstVariantId = img.variant_ids[0]
+        const linkedVariant = firstVariantId
+          ? product.variants.find(v => v.id === firstVariantId)
+          : undefined
+
+        imageRows.push({
+          codigo_modelo: codigoModelo,
+          url:           img.src,
+          source:        'shopify' as const,
+          variante:      linkedVariant?.title ?? null,
+          alt_text:      img.alt || null,
+          orden:         img.position,
+          is_primary:    img.position === 1,
+        })
+      }
     }
   }
 
-  // 5 · Upsert product_shopify_data — deduplicate by codigo_modelo first
-  // (multiple Shopify products can match the same codigo_modelo via variant SKUs)
+  // 5 · Upsert product_shopify_data — deduplicate by codigo_modelo
+  // (two different Shopify products could both match the same codigo_modelo)
   const seenModels = new Set<string>()
   const uniqueShopifyDataRows = shopifyDataRows.filter(r => {
     if (seenModels.has(r.codigo_modelo)) return false
