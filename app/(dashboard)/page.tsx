@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { KpiCard, SyncIndicator, StatusBadge } from '@/components/ui'
-import type { SyncLog } from '@/types'
+import type { SyncLog, AlertSummary } from '@/types'
 
 async function getDashboardData() {
   const supabase = createServerClient()
@@ -40,14 +40,33 @@ async function getDashboardData() {
   const lastMetabase = logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null
   const lastShopify  = logs.find(l => l.source === 'shopify'  && l.status !== 'running') ?? null
 
-  return { totalProducts, totalVariants, totalShopify, sinImagenShopify, abcACount, sinShopify, totalIngresos, lastMetabase, lastShopify }
+  // Completitud aproximada: products without primary image
+  const { count: withPrimary } = await supabase
+    .from('product_images')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_primary', true)
+  const sinImagenPrimaria = Math.max(0, totalProducts - (withPrimary ?? 0))
+  const pctIncompletas = totalProducts > 0
+    ? Math.round((sinImagenPrimaria / totalProducts) * 100)
+    : 0
+
+  return { totalProducts, totalVariants, totalShopify, sinImagenShopify, abcACount, sinShopify, totalIngresos, lastMetabase, lastShopify, sinImagenPrimaria, pctIncompletas }
 }
 
 export default async function DashboardPage() {
   const {
     totalProducts, totalVariants, totalShopify, sinImagenShopify,
     abcACount, sinShopify, totalIngresos, lastMetabase, lastShopify,
+    sinImagenPrimaria, pctIncompletas,
   } = await getDashboardData()
+
+  // Fetch alert summary (non-blocking, cached 5min)
+  let alertSummary: AlertSummary | null = null
+  try {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`
+    const res = await fetch(`${base}/api/alerts/summary`, { next: { revalidate: 300 } })
+    if (res.ok) alertSummary = await res.json()
+  } catch { /* non-critical */ }
 
   const shopifyPct       = totalProducts > 0 ? Math.round((totalShopify      / totalProducts) * 100) : 0
   const sinImagenPct     = totalProducts > 0 ? Math.round((sinImagenShopify  / totalProducts) * 100) : 0
@@ -112,7 +131,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* KPI grid — negocio */}
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         <KpiCard
           label="Ingresos 12m"
           value={formatEur(totalIngresos)}
@@ -127,7 +146,57 @@ export default async function DashboardPage() {
           color="amber"
           icon="★"
         />
+        <KpiCard
+          label="Fichas incompletas"
+          value={sinImagenPrimaria.toLocaleString('es-ES')}
+          sub={`${pctIncompletas}% sin imagen primaria`}
+          color={sinImagenPrimaria === 0 ? 'green' : 'amber'}
+          icon="◻"
+        />
       </div>
+
+      {/* Alert widget */}
+      {alertSummary && (
+        <div
+          className="mb-6 rounded-xl px-5 py-4"
+          style={{
+            background: alertSummary.total === 0 ? 'rgba(58,158,106,0.06)' : 'rgba(200,132,42,0.06)',
+            border: `1px solid ${alertSummary.total === 0 ? 'rgba(58,158,106,0.2)' : 'rgba(200,132,42,0.2)'}`,
+          }}
+        >
+          {alertSummary.total === 0 ? (
+            <p className="text-sm font-semibold" style={{ color: '#2d7a54' }}>✓ Sin alertas pendientes</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold" style={{ color: '#a06818' }}>
+                  ⚑ {alertSummary.total} alerta{alertSummary.total !== 1 ? 's' : ''} activa{alertSummary.total !== 1 ? 's' : ''}
+                  {alertSummary.criticas > 0 && (
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: '#C0392B', color: '#fff' }}>
+                      {alertSummary.criticas} crítica{alertSummary.criticas !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+                <Link href="/alerts" className="text-xs font-semibold" style={{ color: '#0099f2' }}>Ver todas →</Link>
+              </div>
+              <div className="flex flex-wrap gap-3 text-xs">
+                {alertSummary.byCategory.stock > 0 && (
+                  <span style={{ color: '#C0392B' }}>🔴 Stock: {alertSummary.byCategory.stock}</span>
+                )}
+                {alertSummary.byCategory.fichas > 0 && (
+                  <span style={{ color: '#C8842A' }}>🟠 Fichas: {alertSummary.byCategory.fichas}</span>
+                )}
+                {alertSummary.byCategory.ciclo_vida > 0 && (
+                  <span style={{ color: '#C8842A' }}>🟠 Ciclo vida: {alertSummary.byCategory.ciclo_vida}</span>
+                )}
+                {alertSummary.byCategory.sync > 0 && (
+                  <span style={{ color: '#C0392B' }}>🔴 Sync: {alertSummary.byCategory.sync}</span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Sync status */}
       <h2 className="text-[11px] font-bold tracking-widest uppercase mb-3" style={{ color: '#00557f' }}>

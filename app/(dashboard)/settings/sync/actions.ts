@@ -3,6 +3,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { syncMetabase } from '@/lib/metabase'
 import { syncShopify, getStoredShopifyToken, getConnectedShop } from '@/lib/shopify'
+import { syncVentas } from '@/lib/ventas'
+import { syncReservas } from '@/lib/reservas'
 
 export interface SyncActionResult {
   ok: boolean
@@ -12,6 +14,8 @@ export interface SyncActionResult {
   shopifyDataUpserted?: number
   productsProcessed?: number
   skippedNoMatch?: number
+  rowsUpserted?: number
+  rowsInserted?: number
   errors?: string[]
   error?: string
 }
@@ -23,7 +27,7 @@ export interface ShopifyStatus {
 
 async function withSyncLog(
   supabase: ReturnType<typeof createServiceClient>,
-  source: 'metabase' | 'shopify',
+  source: string,
   fn: () => Promise<SyncActionResult>
 ): Promise<SyncActionResult> {
   const { data: logEntry } = await supabase
@@ -37,7 +41,8 @@ async function withSyncLog(
     const result = await fn()
     const records =
       (result.modelsUpserted ?? 0) + (result.variantsUpserted ?? 0) +
-      (result.shopifyDataUpserted ?? 0) + (result.imagesUpserted ?? 0)
+      (result.shopifyDataUpserted ?? 0) + (result.imagesUpserted ?? 0) +
+      (result.rowsUpserted ?? 0) + (result.rowsInserted ?? 0)
 
     if (logId) {
       await supabase.from('sync_log').update({
@@ -84,6 +89,30 @@ export async function triggerShopifySync(): Promise<SyncActionResult> {
       productsProcessed:   result.productsProcessed,
       skippedNoMatch:      result.skippedNoMatch,
       errors:              result.errors,
+    }
+  })
+}
+
+export async function triggerVentasSync(): Promise<SyncActionResult> {
+  const supabase = createServiceClient()
+  return withSyncLog(supabase, 'ventas', async () => {
+    const result = await syncVentas()
+    return {
+      ok:           result.errors.length === 0,
+      rowsUpserted: result.rowsUpserted,
+      errors:       result.errors,
+    }
+  })
+}
+
+export async function triggerReservasSync(): Promise<SyncActionResult> {
+  const supabase = createServiceClient()
+  return withSyncLog(supabase, 'reservas', async () => {
+    const result = await syncReservas()
+    return {
+      ok:          result.errors.length === 0,
+      rowsInserted: result.rowsInserted,
+      errors:      result.errors,
     }
   })
 }

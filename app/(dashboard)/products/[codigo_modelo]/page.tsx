@@ -1,9 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui'
 import { CustomFieldsEditor } from './CustomFieldsEditor'
 import { AiContentPanel } from './AiContentPanel'
+import { ProductComments } from './ProductComments'
+import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
 import type {
   Product, ProductVariant, ProductImage,
   ProductShopifyData, ProductCustomField, CustomFieldDefinition, AbcRating,
@@ -18,6 +21,7 @@ const TABS = [
   { key: 'shopify',   label: 'Shopify'       },
   { key: 'custom',    label: 'Campos custom' },
   { key: 'ia',        label: '✦ IA'          },
+  { key: 'notas',     label: 'Notas'         },
 ] as const
 
 type TabKey = typeof TABS[number]['key']
@@ -38,6 +42,7 @@ export default async function ProductPage({
   const tab: TabKey = (VALID_TABS.includes(rawTab as TabKey) ? rawTab : 'resumen') as TabKey
 
   const supabase = createServerClient()
+  const user = await getCurrentUser()
 
   const [productRes, variantsRes, imagesRes, shopifyRes, customFieldsRes, fieldDefsRes] =
     await Promise.all([
@@ -114,12 +119,13 @@ export default async function ProductPage({
       </nav>
 
       {/* Tab content */}
-      {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} variants={variants} shopify={shopify} />}
+      {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} images={images} variants={variants} shopify={shopify} customFields={customFields} fieldDefs={fieldDefs} />}
       {tab === 'variantes' && <TabVariantes variants={variants} />}
       {tab === 'imagenes'  && <TabImagenes  images={images} />}
       {tab === 'shopify'   && <TabShopify   shopify={shopify} />}
       {tab === 'custom'    && <CustomFieldsEditor fieldDefs={fieldDefs} customFields={customFields} codigo={codigo_modelo} />}
       {tab === 'ia'        && <AiContentPanel codigoModelo={codigo_modelo} />}
+      {tab === 'notas'     && <ProductComments codigo_modelo={codigo_modelo} userEmail={user?.email ?? null} />}
     </div>
   )
 }
@@ -171,12 +177,34 @@ function DataRow({ label, children }: { label: string; children: React.ReactNode
 // ── Tab: Resumen ──────────────────────────────────────────────────
 
 function TabResumen({
-  product, primaryImage, variants, shopify,
+  product, primaryImage, images, variants, shopify, customFields, fieldDefs,
 }: {
-  product: Product; primaryImage: ProductImage | null
-  variants: ProductVariant[]; shopify: ProductShopifyData | null
+  product: Product
+  primaryImage: ProductImage | null
+  images: ProductImage[]
+  variants: ProductVariant[]
+  shopify: ProductShopifyData | null
+  customFields: ProductCustomField[]
+  fieldDefs: CustomFieldDefinition[]
 }) {
   const leader = variants.find(v => v.es_variante_lider)
+
+  const activeDefs = fieldDefs.filter(d => d.is_active)
+  const filledKeys = new Set(customFields.filter(f => f.field_value).map(f => f.field_key))
+  const camposRatio = activeDefs.length > 0
+    ? activeDefs.filter(d => filledKeys.has(d.field_key)).length / activeDefs.length
+    : 0
+
+  const completitud = calcularCompletitud({
+    hasImagenPrimaria:       images.some(i => i.is_primary),
+    hasDescripcionShopify:   !!(shopify?.shopify_description),
+    hasTituloSEO:            !!(shopify?.shopify_seo_title),
+    hasTags:                 !!(shopify?.shopify_tags?.length),
+    hasImagenAdicional:      images.length >= 2,
+    camposCustomRellenos:    camposRatio,
+    totalCamposCustomActivos: activeDefs.length,
+  })
+  const col = NIVEL_COLOR[completitud.nivel]
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -227,13 +255,60 @@ function TabResumen({
           ))}
         </div>
 
+        {/* Completitud card */}
+        <div
+          className="rounded-xl px-5 py-4"
+          style={{ background: col.bg, border: `1px solid ${col.bar}30` }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold" style={{ color: col.text }}>
+              Completitud de ficha — {completitud.score}%
+            </span>
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-bold capitalize"
+              style={{ background: col.bar, color: '#fff' }}
+            >
+              {completitud.nivel}
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full mb-4" style={{ background: 'rgba(0,0,0,0.08)' }}>
+            <div
+              className="h-2 rounded-full transition-all"
+              style={{ width: `${completitud.score}%`, background: col.bar }}
+            />
+          </div>
+          <ul className="space-y-1.5">
+            {completitud.detalles.map(d => (
+              <li key={d.criterio} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2" style={{ color: d.cumplido ? col.text : '#b2b2b2' }}>
+                  <span>{d.cumplido ? '✓' : '✗'}</span>
+                  {d.criterio}
+                </span>
+                {!d.cumplido && d.tab && (
+                  <Link
+                    href={`/products/${product.codigo_modelo}?tab=${d.tab}${d.generacion ? `&gen=${d.generacion}` : ''}`}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors"
+                    style={{ background: 'rgba(0,153,242,0.1)', color: '#0099f2' }}
+                  >
+                    {d.generacion ? 'Generar con IA' : 'Ir →'}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {/* Product fields */}
         <div className="bg-white rounded-xl px-5 py-1" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
           <DataRow label="Categoría">{product.category ?? '—'}</DataRow>
           <DataRow label="Familia">{product.familia ?? '—'}</DataRow>
           <DataRow label="Metal">{product.metal ?? '—'}</DataRow>
           <DataRow label="Quilates">{product.karat ?? '—'}</DataRow>
-          <DataRow label="Proveedor">{product.supplier_name ?? '—'}</DataRow>
+          <DataRow label="Proveedor">
+            {product.supplier_name
+              ? <Link href={`/suppliers?highlight=${encodeURIComponent(product.supplier_name)}`} className="text-tq-sky hover:underline font-medium">{product.supplier_name}</Link>
+              : '—'}
+          </DataRow>
           <DataRow label="1ª entrada">{fmtDate(product.primera_entrada)}</DataRow>
           <DataRow label="Variante líder">
             <span className="font-mono text-xs">{product.variante_lider ?? '—'}</span>
@@ -287,7 +362,7 @@ function TabVariantes({ variants }: { variants: ProductVariant[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(0,85,127,0.08)' }}>
-              {['Código (slug)', 'Var.', '★', 'Precio venta', 'Tachado', 'Dto.', 'Coste medio', 'Margen', '% Margen', 'Stock', 'ABC', 'Ingresos 12m', 'Tiendas'].map(h => (
+              {['Slug (ERP)', 'Cód. interno', 'Var.', '★', 'Precio venta', 'Tachado', 'Dto.', 'Coste medio', 'Margen', '% Margen', 'Stock', 'ABC', 'Ingresos 12m', 'Tiendas'].map(h => (
                 <th key={h} className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
                   {h}
                 </th>
@@ -304,6 +379,7 @@ function TabVariantes({ variants }: { variants: ProductVariant[] }) {
                   background:   v.es_variante_lider ? 'rgba(0,153,242,0.03)' : undefined,
                 }}
               >
+                <td className="px-3 py-2 font-mono text-xs font-bold text-tq-sky">{v.slug ?? v.codigo_interno}</td>
                 <td className="px-3 py-2 font-mono text-xs text-tq-snorkel">{v.codigo_interno}</td>
                 <td className="px-3 py-2 font-mono text-xs font-bold text-tq-snorkel">{v.variante ?? '—'}</td>
                 <td className="px-3 py-2 text-center text-xs" style={{ color: v.es_variante_lider ? '#C8842A' : '#e8e3df' }}>★</td>

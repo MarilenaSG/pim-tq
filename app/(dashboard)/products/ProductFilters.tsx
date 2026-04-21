@@ -8,9 +8,10 @@ interface Props {
   categories: string[]
   familias:   string[]
   karats:     string[]
+  suppliers:  string[]
 }
 
-export function ProductFilters({ metals, categories, familias, karats }: Props) {
+export function ProductFilters({ metals, categories, familias, karats, suppliers }: Props) {
   const router   = useRouter()
   const pathname = usePathname()
   const sp       = useSearchParams()
@@ -42,8 +43,9 @@ export function ProductFilters({ metals, categories, familias, karats }: Props) 
   const familia  = sp.get('familia')  ?? ''
   const karat    = sp.get('karat')    ?? ''
   const abc      = sp.get('abc')      ?? ''
+  const supplier = sp.get('supplier') ?? ''
 
-  const hasFilters = searchValue || metal || category || familia || karat || abc
+  const hasFilters = searchValue || metal || category || familia || karat || abc || supplier
 
   return (
     <div
@@ -67,6 +69,7 @@ export function ProductFilters({ metals, categories, familias, karats }: Props) 
       <FilterSelect value={category} onChange={v => setParam('category', v)} placeholder="Categoría: todas"  options={categories} />
       <FilterSelect value={familia}  onChange={v => setParam('familia', v)}  placeholder="Familia: todas"    options={familias}   />
       <FilterSelect value={karat}    onChange={v => setParam('karat', v)}    placeholder="Quilates: todos"   options={karats}     />
+      <FilterSelect value={supplier} onChange={v => setParam('supplier', v)} placeholder="Proveedor: todos"  options={suppliers}  />
 
       {/* ABC */}
       <select
@@ -79,6 +82,19 @@ export function ProductFilters({ metals, categories, familias, karats }: Props) 
         <option value="A">A — Alta rotación</option>
         <option value="B">B — Media rotación</option>
         <option value="C">C — Baja rotación</option>
+      </select>
+
+      {/* Completitud */}
+      <select
+        value={sp.get('completitud') ?? ''}
+        onChange={e => setParam('completitud', e.target.value)}
+        className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+        style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+      >
+        <option value="">Completitud: todas</option>
+        <option value="alta">Alta (≥ 80%)</option>
+        <option value="media">Media (40–79%)</option>
+        <option value="baja">Baja (&lt; 40%)</option>
       </select>
 
       {/* Clear */}

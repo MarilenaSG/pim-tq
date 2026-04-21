@@ -3,35 +3,47 @@ import Image from 'next/image'
 import { ReactNode } from 'react'
 import { ToastProvider } from '@/components/ui'
 import { ChatWidget } from '@/components/ui/ChatWidget'
+import { SidebarUserFooter } from '@/components/ui/SidebarUserFooter'
+import { SidebarAlertBadge } from '@/components/ui/SidebarAlertBadge'
 
 const navSections = [
   {
     label: 'Principal',
     items: [
-      { href: '/', label: 'Dashboard', icon: '◈' },
-      { href: '/products', label: 'Productos', icon: '◻' },
-      { href: '/catalog', label: 'Catálogo', icon: '◫' },
+      { href: '/',         label: 'Dashboard', icon: '◈' },
+      { href: '/products', label: 'Productos',  icon: '◻' },
+      { href: '/catalog',  label: 'Catálogo',   icon: '◫' },
+    ],
+  },
+  {
+    label: 'Operativo',
+    items: [
+      { href: '/alerts',   label: 'Alertas',           icon: '⚑', badge: true },
+      { href: '/campaigns', label: 'Campañas',          icon: '◈' },
+      { href: '/category', label: 'Category Manager',  icon: '▦' },
+      { href: '/suppliers', label: 'Proveedores',       icon: '◇' },
     ],
   },
   {
     label: 'Analítica',
     items: [
-      { href: '/analytics/surtido', label: 'Surtido', icon: '▦' },
-      { href: '/analytics/precio', label: 'Precio', icon: '▤' },
-      { href: '/analytics/ciclo-vida', label: 'Ciclo de vida', icon: '▣' },
+      { href: '/analytics/surtido',      label: 'Surtido',      icon: '▦' },
+      { href: '/analytics/precio',       label: 'Precio',       icon: '▤' },
+      { href: '/analytics/ciclo-vida',   label: 'Ciclo de vida', icon: '▣' },
       { href: '/analytics/rentabilidad', label: 'Rentabilidad', icon: '▧' },
-      { href: '/analytics/stock', label: 'Stock', icon: '▥' },
+      { href: '/analytics/stock',        label: 'Stock',        icon: '▥' },
+      { href: '/analytics/price-ladder', label: 'Price Ladder', icon: '▤' },
     ],
   },
   {
     label: 'Configuración',
     items: [
-      { href: '/export', label: 'Exportar', icon: '↗' },
-      { href: '/settings/sync', label: 'Sincronización', icon: '↻' },
-      { href: '/settings/fields', label: 'Campos custom', icon: '≡' },
-      { href: '/settings/pricing', label: 'Reglas de precio', icon: '⊞' },
-      { href: '/help', label: 'Ayuda', icon: '?' },
-      { href: '/test', label: 'Design system', icon: '◐' },
+      { href: '/export',           label: 'Exportar',          icon: '↗' },
+      { href: '/settings/sync',    label: 'Sincronización',    icon: '↻' },
+      { href: '/settings/fields',  label: 'Campos custom',     icon: '≡' },
+      { href: '/settings/pricing', label: 'Reglas de precio',  icon: '⊞' },
+      { href: '/settings/alerts',  label: 'Umbrales de alerta', icon: '⚑' },
+      { href: '/help',             label: 'Ayuda',             icon: '?' },
     ],
   },
 ]
@@ -77,6 +89,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     >
                       <span className="text-xs opacity-60">{item.icon}</span>
                       {item.label}
+                      {'badge' in item && item.badge && (
+                        <SidebarAlertBadge />
+                      )}
                     </Link>
                   </li>
                 ))}
@@ -94,8 +109,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             height={16}
             className="opacity-20"
           />
-          <div className="text-xs text-white/30">v1.7 · Sesión 17</div>
+          <div className="text-xs text-white/30">v2.0</div>
         </div>
+        <SidebarUserFooter />
       </aside>
 
       {/* Main content */}

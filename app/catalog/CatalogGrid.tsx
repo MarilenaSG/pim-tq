@@ -19,6 +19,7 @@ interface CatalogProduct {
   num_variantes: number | null
   image_url:     string | null
   precio_venta:  number | null
+  slug_lider:    string | null
   marca:         string | null
   activo:        boolean
   variants:      Variant[]
@@ -120,7 +121,7 @@ function ProductCard({ p }: { p: CatalogProduct }) {
             </span>
           )}
           <span className="text-[10px] font-mono ml-auto" style={{ color: '#b2b2b2' }}>
-            {p.codigo_modelo}
+            {p.slug_lider ?? p.codigo_modelo}
           </span>
         </div>
 

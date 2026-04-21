@@ -312,17 +312,17 @@ export async function syncShopify(): Promise<ShopifySyncResult> {
   )
   const uniqueSkus = Array.from(new Set(allSkus))
 
-  // 3 · Batch query product_variants to get codigo_modelo for each SKU
+  // 3 · Batch query product_variants to get codigo_modelo for each SKU (matched by slug)
   const skuToModel = new Map<string, string>()
   for (const batch of chunk(uniqueSkus, 500)) {
     const { data: variants } = await supabase
       .from('product_variants')
-      .select('codigo_interno, codigo_modelo')
-      .in('codigo_interno', batch)
+      .select('slug, codigo_modelo')
+      .in('slug', batch)
 
     if (variants) {
       for (const v of variants) {
-        skuToModel.set(v.codigo_interno, v.codigo_modelo)
+        skuToModel.set(v.slug, v.codigo_modelo)
       }
     }
   }
@@ -343,7 +343,7 @@ export async function syncShopify(): Promise<ShopifySyncResult> {
   let skippedNoMatch = 0
 
   for (const product of shopifyProducts) {
-    // Find codigo_modelo: check all variant SKUs, take first match
+    // Find codigo_modelo: match Shopify variant SKU against product_variants.slug
     let codigoModelo: string | null = null
     for (const variant of product.variants) {
       if (variant.sku && skuToModel.has(variant.sku)) {

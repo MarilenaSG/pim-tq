@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { syncMetabase } from '@/lib/metabase'
 import { syncShopify } from '@/lib/shopify'
+import { syncVentas } from '@/lib/ventas'
+import { syncReservas } from '@/lib/reservas'
 
 export const maxDuration = 60
 
 async function runSync(
   supabase: ReturnType<typeof createServiceClient>,
-  source: 'metabase' | 'shopify',
-  syncFn: () => Promise<{ errors: string[]; recordsUpdated?: number; shopifyDataUpserted?: number; imagesUpserted?: number }>
+  source: string,
+  syncFn: () => Promise<{ errors: string[]; recordsUpdated?: number; shopifyDataUpserted?: number; imagesUpserted?: number; rowsUpserted?: number; rowsInserted?: number }>
 ) {
   const { data: log } = await supabase
     .from('sync_log')
@@ -19,6 +21,7 @@ async function runSync(
   try {
     const result = await syncFn()
     const records = result.recordsUpdated ??
+      result.rowsUpserted ?? result.rowsInserted ??
       ((result.shopifyDataUpserted ?? 0) + (result.imagesUpserted ?? 0))
 
     await supabase.from('sync_log').update({
@@ -46,12 +49,14 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // Run syncs sequentially (Metabase first, then Shopify)
+  // Run syncs sequentially (Metabase first, then Shopify, then historical data)
   const metabaseResult = await runSync(supabase, 'metabase', syncMetabase)
   const shopifyResult  = await runSync(supabase, 'shopify', syncShopify)
+  const ventasResult   = await runSync(supabase, 'ventas', syncVentas)
+  const reservasResult = await runSync(supabase, 'reservas', syncReservas)
 
   return NextResponse.json({
     ok: true,
-    results: { metabase: metabaseResult, shopify: shopifyResult },
+    results: { metabase: metabaseResult, shopify: shopifyResult, ventas: ventasResult, reservas: reservasResult },
   })
 }

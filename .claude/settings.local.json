@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm install *)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\.claude\\\\worktrees\\\\elastic-sammet-7a917e\\\\app\\\\api\\\\campaigns\\\\[id]\\\\products\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\.claude\\\\worktrees\\\\elastic-sammet-7a917e\\\\app\\\\api\\\\products\\\\[codigo_modelo]\\\\comments\")"
+    ]
+  }
+}

@@ -122,7 +122,7 @@ export interface CustomFieldDefinition {
 
 // ── Sync ─────────────────────────────────────────────────────
 
-export type SyncSource = 'metabase' | 'shopify'
+export type SyncSource = 'metabase' | 'shopify' | 'ventas' | 'reservas'
 export type SyncStatus = 'success' | 'error' | 'running'
 export type SyncTrigger = 'cron' | 'manual'
 
@@ -162,6 +162,52 @@ export interface ActivityItem {
   description?: string
   timestamp: string
   type: 'sync' | 'edit' | 'export' | 'ai'
+}
+
+// ── Alerts ───────────────────────────────────────────────────
+
+export type AlertSeverity = 'critica' | 'media'
+export type AlertCategory = 'stock' | 'fichas' | 'ciclo_vida' | 'sync'
+
+export interface AlertItem {
+  id: string
+  categoria: AlertCategory
+  severidad: AlertSeverity
+  titulo: string
+  codigo_modelo: string | null
+  descripcion: string | null
+  href_accion: string
+  campo_problema: string | null
+}
+
+export interface AlertSummary {
+  total: number
+  criticas: number
+  medias: number
+  byCategory: Record<AlertCategory, number>
+}
+
+export interface AlertSetting {
+  id: string
+  key: string
+  value: string
+  updated_at: string
+}
+
+// ── Campaigns ─────────────────────────────────────────────────
+
+export interface Campaign {
+  id: string
+  nombre: string
+  slug: string
+  tipo: 'GTM' | 'Propia' | 'Estacional' | 'Liquidacion' | null
+  descripcion: string | null
+  fecha_inicio: string | null
+  fecha_fin: string | null
+  estado: 'borrador' | 'activa' | 'finalizada'
+  color: string | null
+  created_at: string
+  updated_at: string
 }
 
 // ── AI ────────────────────────────────────────────────────────

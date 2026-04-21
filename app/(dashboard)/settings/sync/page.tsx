@@ -20,12 +20,14 @@ async function getSyncData() {
   const logs = (logsResult.data ?? []) as SyncLog[]
   const lastMetabaseSync = logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null
   const lastShopifySync  = logs.find(l => l.source === 'shopify'  && l.status !== 'running') ?? null
+  const lastVentasSync   = logs.find(l => l.source === 'ventas'   && l.status !== 'running') ?? null
+  const lastReservasSync = logs.find(l => l.source === 'reservas' && l.status !== 'running') ?? null
 
-  return { logs, lastMetabaseSync, lastShopifySync, shopifyStatus }
+  return { logs, lastMetabaseSync, lastShopifySync, lastVentasSync, lastReservasSync, shopifyStatus }
 }
 
 export default async function SyncPage() {
-  const { logs, lastMetabaseSync, lastShopifySync, shopifyStatus } = await getSyncData()
+  const { logs, lastMetabaseSync, lastShopifySync, lastVentasSync, lastReservasSync, shopifyStatus } = await getSyncData()
 
   return (
     <div className="p-8 max-w-4xl">
@@ -39,6 +41,8 @@ export default async function SyncPage() {
         <SyncPanel
           lastMetabaseSync={lastMetabaseSync}
           lastShopifySync={lastShopifySync}
+          lastVentasSync={lastVentasSync}
+          lastReservasSync={lastReservasSync}
           recentLogs={logs}
           shopifyConnected={shopifyStatus.connected}
           shopifyShop={shopifyStatus.shop}
