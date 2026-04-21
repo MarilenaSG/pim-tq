@@ -55,8 +55,8 @@ export function SuppliersClient({
   }
 
   const sorted = [...suppliers].sort((a, b) => {
-    let av: number | string = sortKey === 'proveedor' ? a.proveedor : (a[sortKey] ?? 0)
-    let bv: number | string = sortKey === 'proveedor' ? b.proveedor : (b[sortKey] ?? 0)
+    const av: number | string = sortKey === 'proveedor' ? a.proveedor : (a[sortKey] ?? 0)
+    const bv: number | string = sortKey === 'proveedor' ? b.proveedor : (b[sortKey] ?? 0)
     const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number)
     return sortDir === 'asc' ? cmp : -cmp
   })
