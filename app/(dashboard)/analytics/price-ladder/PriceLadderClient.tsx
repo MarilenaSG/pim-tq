@@ -190,7 +190,8 @@ export function PriceLadderClient({
             </p>
             <ResponsiveContainer width="100%" height={280}>
               <ComposedChart data={chartData} margin={{ top: 5, right: 40, left: 0, bottom: 5 }}
-                onClick={(d: { activeLabel?: string } | null) => d?.activeLabel && setSelectedBucket(d.activeLabel === selectedBucket ? null : d.activeLabel)}>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                onClick={(d: any) => { if (d?.activeLabel) setSelectedBucket(String(d.activeLabel) === selectedBucket ? null : String(d.activeLabel)) }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,85,127,0.06)" />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#b2b2b2' }} />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#b2b2b2' }} allowDecimals={false} />

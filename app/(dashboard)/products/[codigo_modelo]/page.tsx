@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui'
 import { CustomFieldsEditor } from './CustomFieldsEditor'
 import { AiContentPanel } from './AiContentPanel'
+import { ProductComments } from './ProductComments'
 import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
 import type {
   Product, ProductVariant, ProductImage,
@@ -19,6 +21,7 @@ const TABS = [
   { key: 'shopify',   label: 'Shopify'       },
   { key: 'custom',    label: 'Campos custom' },
   { key: 'ia',        label: '✦ IA'          },
+  { key: 'notas',     label: 'Notas'         },
 ] as const
 
 type TabKey = typeof TABS[number]['key']
@@ -39,6 +42,7 @@ export default async function ProductPage({
   const tab: TabKey = (VALID_TABS.includes(rawTab as TabKey) ? rawTab : 'resumen') as TabKey
 
   const supabase = createServerClient()
+  const user = await getCurrentUser()
 
   const [productRes, variantsRes, imagesRes, shopifyRes, customFieldsRes, fieldDefsRes] =
     await Promise.all([
@@ -121,6 +125,7 @@ export default async function ProductPage({
       {tab === 'shopify'   && <TabShopify   shopify={shopify} />}
       {tab === 'custom'    && <CustomFieldsEditor fieldDefs={fieldDefs} customFields={customFields} codigo={codigo_modelo} />}
       {tab === 'ia'        && <AiContentPanel codigoModelo={codigo_modelo} />}
+      {tab === 'notas'     && <ProductComments codigo_modelo={codigo_modelo} userEmail={user?.email ?? null} />}
     </div>
   )
 }

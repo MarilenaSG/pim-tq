@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { ProductFilters } from './ProductFilters'
-import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
+import { ProductsTable } from './ProductsTable'
+import { calcularCompletitud } from '@/lib/completitud'
 
 const PAGE_SIZE = 60
 
@@ -123,9 +124,10 @@ export default async function ProductsPage({
 
   const paginatedQuery = productsQuery.range(offset, offset + PAGE_SIZE - 1)
 
-  const [productsResult, optionsResult] = await Promise.all([
+  const [productsResult, optionsResult, campaignsResult] = await Promise.all([
     paginatedQuery,
     supabase.from('products').select('metal, category, familia, karat, supplier_name'),
+    supabase.from('campaigns').select('id, nombre').eq('estado', 'activa').order('nombre'),
   ])
 
   const products   = (productsResult.data ?? []) as ProductRow[]
@@ -178,6 +180,28 @@ export default async function ProductsPage({
     })
   }
 
+  // Build pre-computed rows for client table
+  const productRows = products.map(p => {
+    const comp = getCompletitudForProduct(p.codigo_modelo)
+    return {
+      codigo_modelo:    p.codigo_modelo,
+      description:      p.description,
+      metal:            p.metal,
+      karat:            p.karat,
+      familia:          p.familia,
+      num_variantes:    p.num_variantes,
+      ingresos_12m:     p.ingresos_12m,
+      abc_ventas:       p.abc_ventas,
+      imageUrl:         imageMap[p.codigo_modelo]   ?? null,
+      shopifyStatus:    shopifyMap[p.codigo_modelo] ?? null,
+      leaderSlug:       slugMap[p.codigo_modelo]    ?? null,
+      completitudPct:   comp.score,
+      completitudNivel: comp.nivel,
+    }
+  })
+
+  const campaignOptions = (campaignsResult.data ?? []) as { id: string; nombre: string }[]
+
   // Distinct filter options
   const allOpts    = (optionsResult.data ?? []) as FilterOption[]
   const uniq       = (key: keyof FilterOption) =>
@@ -216,123 +240,7 @@ export default async function ProductsPage({
         />
       ) : (
         <>
-          {/* Table */}
-          <div
-            className="bg-white rounded-xl overflow-hidden"
-            style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}
-          >
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(0,85,127,0.08)' }}>
-                  <th className="w-14 px-3 py-3" />
-                  {(['Código', 'Descripción', 'Metal / Qt', 'Familia', 'ABC', 'Ingresos 12m', 'Vars', 'Shopify', 'Completitud'] as const).map(h => (
-                    <th
-                      key={h}
-                      className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase"
-                      style={{ color: '#b2b2b2' }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p, i) => (
-                  <tr
-                    key={p.codigo_modelo}
-                    className="hover:bg-[rgba(0,85,127,0.02)] transition-colors"
-                    style={{ borderBottom: i < products.length - 1 ? '1px solid rgba(0,85,127,0.05)' : 'none' }}
-                  >
-                    {/* Imagen */}
-                    <td className="px-3 py-2">
-                      {imageMap[p.codigo_modelo] ? (
-                        <img
-                          src={imageMap[p.codigo_modelo]}
-                          alt=""
-                          className="w-10 h-10 rounded-lg object-cover"
-                          style={{ background: '#f5f3f0' }}
-                        />
-                      ) : (
-                        <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center text-base"
-                          style={{ background: 'rgba(0,85,127,0.06)', color: '#d0cdc9' }}
-                        >
-                          ◫
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Código */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <Link
-                        href={`/products/${p.codigo_modelo}`}
-                        className="font-mono text-xs font-bold text-tq-sky hover:underline"
-                      >
-                        {p.codigo_modelo}
-                      </Link>
-                      {slugMap[p.codigo_modelo] && (
-                        <div className="font-mono text-[10px] mt-0.5" style={{ color: '#b2b2b2' }}>
-                          {slugMap[p.codigo_modelo]}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Descripción */}
-                    <td className="px-3 py-2 max-w-xs">
-                      <span className="line-clamp-2 text-xs leading-snug text-tq-snorkel">
-                        {p.description ?? '—'}
-                      </span>
-                    </td>
-
-                    {/* Metal / Quilates */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span className="text-xs font-medium text-tq-snorkel">{p.metal ?? '—'}</span>
-                      {p.karat && (
-                        <span
-                          className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold"
-                          style={{ background: 'rgba(200,161,100,0.15)', color: '#8a6830' }}
-                        >
-                          {p.karat}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Familia */}
-                    <td className="px-3 py-2 text-xs" style={{ color: '#b2b2b2' }}>
-                      {p.familia ?? '—'}
-                    </td>
-
-                    {/* ABC */}
-                    <td className="px-3 py-2">
-                      <AbcBadge abc={p.abc_ventas} />
-                    </td>
-
-                    {/* Ingresos 12m */}
-                    <td className="px-3 py-2 font-mono text-xs text-right text-tq-snorkel whitespace-nowrap">
-                      {p.ingresos_12m != null
-                        ? p.ingresos_12m.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €'
-                        : '—'}
-                    </td>
-
-                    {/* Variantes */}
-                    <td className="px-3 py-2 text-xs text-center" style={{ color: '#b2b2b2' }}>
-                      {p.num_variantes ?? '—'}
-                    </td>
-
-                    {/* Shopify */}
-                    <td className="px-3 py-2">
-                      <ShopifyCell status={shopifyMap[p.codigo_modelo] ?? null} />
-                    </td>
-
-                    {/* Completitud */}
-                    <td className="px-3 py-2 w-28">
-                      <CompletitudBar result={getCompletitudForProduct(p.codigo_modelo)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ProductsTable rows={productRows} campaigns={campaignOptions} />
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -351,54 +259,6 @@ export default async function ProductsPage({
 }
 
 // ── Sub-components ────────────────────────────────────────────────
-
-function AbcBadge({ abc }: { abc: string | null }) {
-  if (!abc) return <span style={{ color: '#d0cdc9' }}>—</span>
-  const cfg: Record<string, { bg: string; text: string }> = {
-    A: { bg: 'rgba(58,158,106,0.12)',  text: '#2d7a54' },
-    B: { bg: 'rgba(0,153,242,0.12)',   text: '#007acc' },
-    C: { bg: 'rgba(200,132,42,0.12)',  text: '#a06818' },
-  }
-  const { bg, text } = cfg[abc] ?? { bg: 'rgba(0,85,127,0.06)', text: '#b2b2b2' }
-  return (
-    <span
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold"
-      style={{ background: bg, color: text }}
-    >
-      {abc}
-    </span>
-  )
-}
-
-function CompletitudBar({ result }: { result: ReturnType<typeof calcularCompletitud> }) {
-  const { score, nivel } = result
-  const col = NIVEL_COLOR[nivel]
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold" style={{ color: col.text }}>{score}%</span>
-      </div>
-      <div className="w-full h-1.5 rounded-full" style={{ background: 'rgba(0,85,127,0.08)' }}>
-        <div
-          className="h-1.5 rounded-full transition-all"
-          style={{ width: `${score}%`, background: col.bar }}
-        />
-      </div>
-    </div>
-  )
-}
-
-function ShopifyCell({ status }: { status: string | null }) {
-  if (!status) return <span className="text-[10px]" style={{ color: '#d0cdc9' }}>—</span>
-  const color =
-    status === 'active' ? '#3A9E6A' :
-    status === 'draft'  ? '#C8842A' : '#b2b2b2'
-  return (
-    <span className="text-[10px] font-bold capitalize" style={{ color }}>
-      {status}
-    </span>
-  )
-}
 
 function PaginationBar({
   page, totalPages, total, pageSize, searchParams,
