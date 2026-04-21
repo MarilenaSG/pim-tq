@@ -299,7 +299,11 @@ function TabResumen({
           <DataRow label="Familia">{product.familia ?? '—'}</DataRow>
           <DataRow label="Metal">{product.metal ?? '—'}</DataRow>
           <DataRow label="Quilates">{product.karat ?? '—'}</DataRow>
-          <DataRow label="Proveedor">{product.supplier_name ?? '—'}</DataRow>
+          <DataRow label="Proveedor">
+            {product.supplier_name
+              ? <Link href={`/suppliers?highlight=${encodeURIComponent(product.supplier_name)}`} className="text-tq-sky hover:underline font-medium">{product.supplier_name}</Link>
+              : '—'}
+          </DataRow>
           <DataRow label="1ª entrada">{fmtDate(product.primera_entrada)}</DataRow>
           <DataRow label="Variante líder">
             <span className="font-mono text-xs">{product.variante_lider ?? '—'}</span>

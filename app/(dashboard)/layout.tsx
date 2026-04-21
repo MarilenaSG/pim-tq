@@ -32,6 +32,7 @@ const navSections = [
       { href: '/analytics/ciclo-vida',   label: 'Ciclo de vida', icon: '▣' },
       { href: '/analytics/rentabilidad', label: 'Rentabilidad', icon: '▧' },
       { href: '/analytics/stock',        label: 'Stock',        icon: '▥' },
+      { href: '/analytics/price-ladder', label: 'Price Ladder', icon: '▤' },
     ],
   },
   {

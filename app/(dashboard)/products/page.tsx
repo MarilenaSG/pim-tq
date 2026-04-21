@@ -24,10 +24,11 @@ type ProductRow = {
 }
 
 type FilterOption = {
-  metal:    string | null
-  category: string | null
-  familia:  string | null
-  karat:    string | null
+  metal:         string | null
+  category:      string | null
+  familia:       string | null
+  karat:         string | null
+  supplier_name: string | null
 }
 
 // ── Page ──────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export default async function ProductsPage({
   const karat       = str('karat')
   const abc         = str('abc')
   const completitud = str('completitud')
+  const supplier    = str('supplier')
   const page        = Math.max(1, Number(searchParams.page ?? 1))
   const offset      = (page - 1) * PAGE_SIZE
 
@@ -64,6 +66,7 @@ export default async function ProductsPage({
   if (familia)  productsQuery = productsQuery.eq('familia', familia)
   if (karat)    productsQuery = productsQuery.eq('karat', karat)
   if (abc)      productsQuery = productsQuery.eq('abc_ventas', abc)
+  if (supplier) productsQuery = productsQuery.eq('supplier_name', supplier)
 
   productsQuery = productsQuery
     .order('abc_ventas',   { ascending: true,  nullsFirst: false })
@@ -109,7 +112,7 @@ export default async function ProductsPage({
       return (
         <div className="p-6 max-w-[1400px] space-y-5">
           <PageHeader eyebrow="Catálogo" title="Productos" subtitle="0 modelos encontrados" />
-          <Suspense><ProductFilters metals={uniq('metal')} categories={uniq('category')} familias={uniq('familia')} karats={uniq('karat')} /></Suspense>
+          <Suspense><ProductFilters metals={uniq('metal')} categories={uniq('category')} familias={uniq('familia')} karats={uniq('karat')} suppliers={uniq('supplier_name')} /></Suspense>
           <EmptyState icon="◻" message="Sin resultados" description="Ningún modelo coincide con los filtros activos." />
         </div>
       )
@@ -122,7 +125,7 @@ export default async function ProductsPage({
 
   const [productsResult, optionsResult] = await Promise.all([
     paginatedQuery,
-    supabase.from('products').select('metal, category, familia, karat'),
+    supabase.from('products').select('metal, category, familia, karat, supplier_name'),
   ])
 
   const products   = (productsResult.data ?? []) as ProductRow[]
@@ -177,7 +180,7 @@ export default async function ProductsPage({
   const uniq       = (key: keyof FilterOption) =>
     Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
 
-  const hasFilters = search || metal || category || familia || karat || abc || completitud
+  const hasFilters = search || metal || category || familia || karat || abc || completitud || supplier
 
   return (
     <div className="p-6 max-w-[1400px] space-y-5">
@@ -193,6 +196,7 @@ export default async function ProductsPage({
           categories={uniq('category')}
           familias={uniq('familia')}
           karats={uniq('karat')}
+          suppliers={uniq('supplier_name')}
         />
       </Suspense>
 
