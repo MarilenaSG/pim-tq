@@ -393,9 +393,17 @@ export async function syncShopify(): Promise<ShopifySyncResult> {
     }
   }
 
-  // 5 · Upsert product_shopify_data
+  // 5 · Upsert product_shopify_data — deduplicate by codigo_modelo first
+  // (multiple Shopify products can match the same codigo_modelo via variant SKUs)
+  const seenModels = new Set<string>()
+  const uniqueShopifyDataRows = shopifyDataRows.filter(r => {
+    if (seenModels.has(r.codigo_modelo)) return false
+    seenModels.add(r.codigo_modelo)
+    return true
+  })
+
   let shopifyDataUpserted = 0
-  for (const batch of chunk(shopifyDataRows, 100)) {
+  for (const batch of chunk(uniqueShopifyDataRows, 100)) {
     const { error } = await supabase
       .from('product_shopify_data')
       .upsert(batch, { onConflict: 'codigo_modelo' })
@@ -408,7 +416,7 @@ export async function syncShopify(): Promise<ShopifySyncResult> {
   }
 
   // 6 · Replace Shopify images for matched models
-  const matchedModels = Array.from(new Set(shopifyDataRows.map(r => r.codigo_modelo as string)))
+  const matchedModels = Array.from(seenModels)
   for (const batch of chunk(matchedModels, 250)) {
     await supabase
       .from('product_images')
