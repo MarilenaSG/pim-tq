@@ -91,6 +91,48 @@ async function buildContext(lastMessage: string): Promise<string> {
     }
   }
 
+  // Ventas históricas context
+  if (/venta|vendid|ingreso|mes|mensual|histór|tendencia|evolución/.test(msg)) {
+    const { data: ventasMes } = await supabase
+      .from('ventas_mensuales')
+      .select('anyo, mes, unidades_vendidas, ingresos_netos')
+      .order('anyo', { ascending: false })
+      .order('mes', { ascending: false })
+      .limit(200)
+
+    if (ventasMes && ventasMes.length > 0) {
+      const byMonth = new Map<string, { unidades: number; ingresos: number }>()
+      for (const r of ventasMes) {
+        const key = `${r.anyo}-${String(r.mes).padStart(2, '0')}`
+        const ex = byMonth.get(key) ?? { unidades: 0, ingresos: 0 }
+        ex.unidades += Number(r.unidades_vendidas ?? 0)
+        ex.ingresos += Number(r.ingresos_netos ?? 0)
+        byMonth.set(key, ex)
+      }
+      const rows = Array.from(byMonth.entries())
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .slice(0, 12)
+        .map(([k, d]) => `  ${k}: ${d.unidades} uds, ${d.ingresos.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}`)
+        .join('\n')
+      sections.push(`VENTAS MENSUALES (últimos meses):\n${rows}`)
+    }
+  }
+
+  // Reservas context
+  if (/reserva|pedido pendiente|demanda/.test(msg)) {
+    const { data: reservas } = await supabase
+      .from('reservas_activas')
+      .select('codigo_interno, reservas_count, unidades_reservadas')
+      .order('reservas_count', { ascending: false })
+      .limit(10)
+
+    if (reservas && reservas.length > 0) {
+      const totalRes = reservas.reduce((s, r) => s + Number(r.reservas_count ?? 0), 0)
+      const rows = reservas.map(r => `  ${r.codigo_interno}: ${r.reservas_count} reservas`).join('\n')
+      sections.push(`RESERVAS ACTIVAS (top 10, total: ${totalRes}):\n${rows}`)
+    }
+  }
+
   // Specific product code mentioned
   const codeMatch = lastMessage.match(/\b([0-9]{3}[A-Z]{2}[0-9]*)\b/)
   if (codeMatch) {
