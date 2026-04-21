@@ -4,7 +4,8 @@
       "Bash(npx tsc *)",
       "Bash(npm install *)",
       "Bash(mkdir -p \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\.claude\\\\worktrees\\\\elastic-sammet-7a917e\\\\app\\\\api\\\\campaigns\\\\[id]\\\\products\")",
-      "Bash(mkdir -p \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\.claude\\\\worktrees\\\\elastic-sammet-7a917e\\\\app\\\\api\\\\products\\\\[codigo_modelo]\\\\comments\")"
+      "Bash(mkdir -p \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\.claude\\\\worktrees\\\\elastic-sammet-7a917e\\\\app\\\\api\\\\products\\\\[codigo_modelo]\\\\comments\")",
+      "Bash(gh pr create --title 'v2 completo: Fase 1-4 \\(completitud, alertas, campañas, comparador, ventas históricas\\)' --body ' *)"
     ]
   }
 }

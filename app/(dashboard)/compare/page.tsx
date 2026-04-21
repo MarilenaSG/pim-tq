@@ -25,7 +25,7 @@ export default async function ComparePage({
         <div className="mt-8 text-center py-20" style={{ color: '#b2b2b2' }}>
           <p className="text-4xl mb-3">◧</p>
           <p className="text-sm font-medium">Selecciona al menos 2 productos para comparar</p>
-          <p className="text-xs mt-1">Usa las casillas en la lista de productos y pulsa "Comparar".</p>
+          <p className="text-xs mt-1">Usa las casillas en la lista de productos y pulsa &ldquo;Comparar&rdquo;.</p>
           <Link href="/products" className="inline-block mt-4 px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: '#00557f' }}>
             Ir a productos
           </Link>

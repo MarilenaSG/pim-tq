@@ -7,6 +7,7 @@ import { CustomFieldsEditor } from './CustomFieldsEditor'
 import { AiContentPanel } from './AiContentPanel'
 import { ProductComments } from './ProductComments'
 import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
+import { VentasTab } from './VentasTab'
 import type {
   Product, ProductVariant, ProductImage,
   ProductShopifyData, ProductCustomField, CustomFieldDefinition, AbcRating,
@@ -21,6 +22,7 @@ const TABS = [
   { key: 'shopify',   label: 'Shopify'       },
   { key: 'custom',    label: 'Campos custom' },
   { key: 'ia',        label: '✦ IA'          },
+  { key: 'ventas',    label: 'Ventas'        },
   { key: 'notas',     label: 'Notas'         },
 ] as const
 
@@ -57,12 +59,31 @@ export default async function ProductPage({
 
   if (!productRes.data) return notFound()
 
+  // Fetch ventas + reservas only when needed (lazy after variants are known)
+  const variantCodes = (variantsRes.data ?? []).map((v: { codigo_interno: string }) => v.codigo_interno).filter(Boolean)
+  const [ventasRes, reservasRes] = await Promise.all([
+    variantCodes.length > 0
+      ? supabase.from('ventas_mensuales').select('*').in('codigo_interno', variantCodes).order('anyo').order('mes')
+      : Promise.resolve({ data: [] }),
+    variantCodes.length > 0
+      ? supabase.from('reservas_activas').select('*').in('codigo_interno', variantCodes).order('reservas_count', { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ])
+
   const product      = productRes.data      as Product
   const variants     = (variantsRes.data    ?? []) as ProductVariant[]
   const images       = (imagesRes.data      ?? []) as ProductImage[]
   const shopify      = (shopifyRes.data     ?? null) as ProductShopifyData | null
   const customFields = (customFieldsRes.data ?? []) as ProductCustomField[]
   const fieldDefs    = (fieldDefsRes.data   ?? []) as CustomFieldDefinition[]
+  const ventas       = (ventasRes.data       ?? []) as import('./VentasTab').VentaRow[]
+  const reservas     = (reservasRes.data     ?? []) as import('./VentasTab').ReservaRow[]
+
+  // slug map: codigo_interno → display label (slug or variante)
+  const variantSlugMap: Record<string, string> = {}
+  for (const v of variants) {
+    variantSlugMap[v.codigo_interno] = v.slug ?? v.codigo_interno
+  }
 
   const primaryImage = images.find(img => img.is_primary) ?? images[0] ?? null
 
@@ -125,6 +146,7 @@ export default async function ProductPage({
       {tab === 'shopify'   && <TabShopify   shopify={shopify} />}
       {tab === 'custom'    && <CustomFieldsEditor fieldDefs={fieldDefs} customFields={customFields} codigo={codigo_modelo} />}
       {tab === 'ia'        && <AiContentPanel codigoModelo={codigo_modelo} />}
+      {tab === 'ventas'    && <VentasTab ventas={ventas} reservas={reservas} variantSlugMap={variantSlugMap} />}
       {tab === 'notas'     && <ProductComments codigo_modelo={codigo_modelo} userEmail={user?.email ?? null} />}
     </div>
   )
