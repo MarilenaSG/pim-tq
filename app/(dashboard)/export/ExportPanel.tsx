@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 
 // ── Tab Bar ───────────────────────────────────────────────────
 
-const TABS = ['Exportar', 'Actualizar en lote'] as const
+const TABS = ['Exportar', 'Shopify CSV', 'Actualizar en lote'] as const
 type Tab = typeof TABS[number]
 
 // ── ExportPanel ───────────────────────────────────────────────
@@ -155,6 +155,9 @@ export function ExportPanel({ metals, familias, categories, abcs, marcas, produc
           marcas={marcas}
           products={products}
         />
+      )}
+      {activeTab === 'Shopify CSV' && (
+        <ShopifyCsvTab metals={metals} familias={familias} abcs={abcs} />
       )}
       {activeTab === 'Actualizar en lote' && <BatchUpdateTab products={products} />}
     </div>
@@ -731,6 +734,186 @@ function BatchUpdateTab({ products }: { products: ProductPickerItem[] }) {
             <p className="text-xs font-mono" style={{ color: '#C0392B' }}>{result.error}</p>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── ShopifyCsvTab ─────────────────────────────────────────────
+
+const IA_FIELDS = [
+  { key: 'title',       label: 'Título de producto',  field: 'shopify_title_ia',       warn: false },
+  { key: 'description', label: 'Descripción HTML',     field: 'shopify_description_ia', warn: false },
+  { key: 'seo_title',   label: 'Título SEO',           field: 'seo_title_ia',           warn: false },
+  { key: 'seo_desc',    label: 'Descripción SEO',      field: 'seo_desc_ia',            warn: false },
+  { key: 'tags',        label: 'Tags',                 field: 'tags_ia',                warn: false },
+  { key: 'precio',      label: 'Precio de venta',      field: 'precio_sugerido_ia',     warn: true  },
+  { key: 'precio',      label: 'Precio tachado',       field: 'precio_tachado_sugerido_ia', warn: true },
+] as const
+
+function ShopifyCsvTab({
+  metals, familias, abcs,
+}: {
+  metals: string[]
+  familias: string[]
+  abcs: string[]
+}) {
+  const [familia,   setFamilia]   = useState('')
+  const [metal,     setMetal]     = useState('')
+  const [abc,       setAbc]       = useState('')
+  const [soloIa,    setSoloIa]    = useState(true)
+  const [campos,    setCampos]    = useState<string[]>(['title', 'description', 'seo_title', 'seo_desc', 'tags'])
+  const [count,     setCount]     = useState<number | null>(null)
+  const [sinHandle, setSinHandle] = useState(0)
+  const [loading,   setLoading]   = useState(false)
+
+  // Fetch count when filters change
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (familia) params.set('familia', familia)
+    if (metal)   params.set('metal', metal)
+    if (abc)     params.set('abc', abc)
+    params.set('solo_ia', String(soloIa))
+
+    fetch(`/api/export/shopify-csv/count?${params}`)
+      .then(r => r.json())
+      .then(d => { setCount(d.count ?? 0); setSinHandle(d.sin_handle ?? 0) })
+      .catch(() => {})
+  }, [familia, metal, abc, soloIa])
+
+  function toggleCampo(key: string) {
+    setCampos(prev =>
+      prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key]
+    )
+  }
+
+  async function handleDownload() {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (familia)       params.set('familia', familia)
+    if (metal)         params.set('metal', metal)
+    if (abc)           params.set('abc', abc)
+    params.set('solo_ia', String(soloIa))
+    params.set('campos', Array.from(new Set(campos)).join(','))
+
+    const res = await fetch(`/api/export/shopify-csv?${params}`)
+    if (res.ok) {
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `shopify-import-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+    setLoading(false)
+  }
+
+  const uniqueFields = IA_FIELDS.filter((f, i, arr) => arr.findIndex(x => x.key === f.key) === i)
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="tq-card p-6 space-y-5">
+        <div>
+          <h2 className="text-sm font-semibold text-tq-snorkel mb-1">Shopify CSV — Importación nativa</h2>
+          <p className="text-xs" style={{ color: '#b2b2b2' }}>
+            Genera un CSV con el formato exacto de Shopify. Solo incluye productos con al menos un campo generado por IA.
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>Filtros</p>
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={familia}
+              onChange={e => setFamilia(e.target.value)}
+              className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+              style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+            >
+              <option value="">Familia: todas</option>
+              {familias.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+            <select
+              value={metal}
+              onChange={e => setMetal(e.target.value)}
+              className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+              style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+            >
+              <option value="">Metal: todos</option>
+              {metals.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select
+              value={abc}
+              onChange={e => setAbc(e.target.value)}
+              className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+              style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+            >
+              <option value="">ABC: todos</option>
+              {abcs.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: '#00557f' }}>
+              <input
+                type="checkbox"
+                checked={soloIa}
+                onChange={e => setSoloIa(e.target.checked)}
+                style={{ accentColor: '#00557f' }}
+              />
+              Solo con contenido IA
+            </label>
+          </div>
+        </div>
+
+        {/* Fields */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>Campos a incluir</p>
+          <div className="space-y-2">
+            {uniqueFields.map(f => (
+              <label key={f.key + f.field} className="flex items-center gap-3 text-sm cursor-pointer" style={{ color: '#00557f' }}>
+                <input
+                  type="checkbox"
+                  checked={campos.includes(f.key)}
+                  onChange={() => toggleCampo(f.key)}
+                  style={{ accentColor: '#00557f' }}
+                />
+                <span>{f.label}</span>
+                <span className="text-[10px] font-mono" style={{ color: '#b2b2b2' }}>{f.field}</span>
+                {f.warn && (
+                  <span className="text-[10px] font-semibold" style={{ color: '#C8842A' }}>⚠ revisar antes</span>
+                )}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Count + warnings */}
+        <div className="space-y-2">
+          {count !== null && count > 30 && (
+            <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(200,132,42,0.08)', color: '#a06818' }}>
+              ⚠ Estás exportando {count} productos. Por SEO, recomendamos importar en lotes de máximo 30 al día.
+            </p>
+          )}
+          {sinHandle > 0 && (
+            <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(192,57,43,0.06)', color: '#992d22' }}>
+              {sinHandle} producto{sinHandle !== 1 ? 's' : ''} sin Shopify handle serán omitidos del CSV.
+            </p>
+          )}
+        </div>
+
+        {/* CTA */}
+        <div className="flex items-center gap-4 pt-1">
+          <span className="text-sm font-medium text-tq-snorkel">
+            {count === null ? '…' : count} productos con contenido IA listo
+          </span>
+          <button
+            onClick={handleDownload}
+            disabled={loading || count === 0}
+            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+            style={{ background: '#C8842A' }}
+          >
+            {loading ? 'Generando…' : 'Descargar CSV para Shopify ↓'}
+          </button>
+        </div>
       </div>
     </div>
   )

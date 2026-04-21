@@ -81,6 +81,19 @@ export function ProductFilters({ metals, categories, familias, karats }: Props) 
         <option value="C">C — Baja rotación</option>
       </select>
 
+      {/* Completitud */}
+      <select
+        value={sp.get('completitud') ?? ''}
+        onChange={e => setParam('completitud', e.target.value)}
+        className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+        style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+      >
+        <option value="">Completitud: todas</option>
+        <option value="alta">Alta (≥ 80%)</option>
+        <option value="media">Media (40–79%)</option>
+        <option value="baja">Baja (&lt; 40%)</option>
+      </select>
+
       {/* Clear */}
       {hasFilters && (
         <button

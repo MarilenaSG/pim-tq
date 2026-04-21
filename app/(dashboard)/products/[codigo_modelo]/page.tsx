@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui'
 import { CustomFieldsEditor } from './CustomFieldsEditor'
 import { AiContentPanel } from './AiContentPanel'
+import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
 import type {
   Product, ProductVariant, ProductImage,
   ProductShopifyData, ProductCustomField, CustomFieldDefinition, AbcRating,
@@ -114,7 +115,7 @@ export default async function ProductPage({
       </nav>
 
       {/* Tab content */}
-      {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} variants={variants} shopify={shopify} />}
+      {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} images={images} variants={variants} shopify={shopify} customFields={customFields} fieldDefs={fieldDefs} />}
       {tab === 'variantes' && <TabVariantes variants={variants} />}
       {tab === 'imagenes'  && <TabImagenes  images={images} />}
       {tab === 'shopify'   && <TabShopify   shopify={shopify} />}
@@ -171,12 +172,34 @@ function DataRow({ label, children }: { label: string; children: React.ReactNode
 // ── Tab: Resumen ──────────────────────────────────────────────────
 
 function TabResumen({
-  product, primaryImage, variants, shopify,
+  product, primaryImage, images, variants, shopify, customFields, fieldDefs,
 }: {
-  product: Product; primaryImage: ProductImage | null
-  variants: ProductVariant[]; shopify: ProductShopifyData | null
+  product: Product
+  primaryImage: ProductImage | null
+  images: ProductImage[]
+  variants: ProductVariant[]
+  shopify: ProductShopifyData | null
+  customFields: ProductCustomField[]
+  fieldDefs: CustomFieldDefinition[]
 }) {
   const leader = variants.find(v => v.es_variante_lider)
+
+  const activeDefs = fieldDefs.filter(d => d.is_active)
+  const filledKeys = new Set(customFields.filter(f => f.field_value).map(f => f.field_key))
+  const camposRatio = activeDefs.length > 0
+    ? activeDefs.filter(d => filledKeys.has(d.field_key)).length / activeDefs.length
+    : 0
+
+  const completitud = calcularCompletitud({
+    hasImagenPrimaria:       images.some(i => i.is_primary),
+    hasDescripcionShopify:   !!(shopify?.shopify_description),
+    hasTituloSEO:            !!(shopify?.shopify_seo_title),
+    hasTags:                 !!(shopify?.shopify_tags?.length),
+    hasImagenAdicional:      images.length >= 2,
+    camposCustomRellenos:    camposRatio,
+    totalCamposCustomActivos: activeDefs.length,
+  })
+  const col = NIVEL_COLOR[completitud.nivel]
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -225,6 +248,49 @@ function TabResumen({
               <div className="text-base font-bold text-tq-snorkel">{kpi.value}</div>
             </div>
           ))}
+        </div>
+
+        {/* Completitud card */}
+        <div
+          className="rounded-xl px-5 py-4"
+          style={{ background: col.bg, border: `1px solid ${col.bar}30` }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold" style={{ color: col.text }}>
+              Completitud de ficha — {completitud.score}%
+            </span>
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-bold capitalize"
+              style={{ background: col.bar, color: '#fff' }}
+            >
+              {completitud.nivel}
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full mb-4" style={{ background: 'rgba(0,0,0,0.08)' }}>
+            <div
+              className="h-2 rounded-full transition-all"
+              style={{ width: `${completitud.score}%`, background: col.bar }}
+            />
+          </div>
+          <ul className="space-y-1.5">
+            {completitud.detalles.map(d => (
+              <li key={d.criterio} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2" style={{ color: d.cumplido ? col.text : '#b2b2b2' }}>
+                  <span>{d.cumplido ? '✓' : '✗'}</span>
+                  {d.criterio}
+                </span>
+                {!d.cumplido && d.tab && (
+                  <Link
+                    href={`/products/${product.codigo_modelo}?tab=${d.tab}${d.generacion ? `&gen=${d.generacion}` : ''}`}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors"
+                    style={{ background: 'rgba(0,153,242,0.1)', color: '#0099f2' }}
+                  >
+                    {d.generacion ? 'Generar con IA' : 'Ir →'}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* Product fields */}

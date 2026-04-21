@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { ProductFilters } from './ProductFilters'
+import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
 
 const PAGE_SIZE = 60
 
@@ -37,14 +38,15 @@ export default async function ProductsPage({
   searchParams: { [key: string]: string | string[] | undefined }
 }) {
   const str = (k: string) => String(searchParams[k] ?? '')
-  const search   = str('search')
-  const metal    = str('metal')
-  const category = str('category')
-  const familia  = str('familia')
-  const karat    = str('karat')
-  const abc      = str('abc')
-  const page     = Math.max(1, Number(searchParams.page ?? 1))
-  const offset   = (page - 1) * PAGE_SIZE
+  const search      = str('search')
+  const metal       = str('metal')
+  const category    = str('category')
+  const familia     = str('familia')
+  const karat       = str('karat')
+  const abc         = str('abc')
+  const completitud = str('completitud')
+  const page        = Math.max(1, Number(searchParams.page ?? 1))
+  const offset      = (page - 1) * PAGE_SIZE
 
   const supabase = createServerClient()
 
@@ -64,48 +66,118 @@ export default async function ProductsPage({
   if (abc)      productsQuery = productsQuery.eq('abc_ventas', abc)
 
   productsQuery = productsQuery
-    .order('abc_ventas',          { ascending: true,  nullsFirst: false })
+    .order('abc_ventas',   { ascending: true,  nullsFirst: false })
     .order('ingresos_12m', { ascending: false, nullsFirst: false })
-    .range(offset, offset + PAGE_SIZE - 1)
+
+  // For completitud filter, we need to check all products before paginating
+  let allCodesForCompletitud: string[] | null = null
+  if (completitud) {
+    const { data: allProds } = await productsQuery.select('codigo_modelo')
+    const allCodes = (allProds ?? []).map((p: { codigo_modelo: string }) => p.codigo_modelo)
+
+    if (allCodes.length > 0) {
+      const [imgRes, shopRes] = await Promise.all([
+        supabase.from('product_images').select('codigo_modelo, is_primary').in('codigo_modelo', allCodes),
+        supabase.from('product_shopify_data').select('codigo_modelo, shopify_description, shopify_seo_title, shopify_tags').in('codigo_modelo', allCodes),
+      ])
+      const primarySet   = new Set((imgRes.data ?? []).filter(r => r.is_primary).map(r => r.codigo_modelo))
+      const additionalSet = new Set((imgRes.data ?? []).filter(r => !r.is_primary).map(r => r.codigo_modelo))
+      const shopByModel  = Object.fromEntries((shopRes.data ?? []).map(r => [r.codigo_modelo, r]))
+
+      allCodesForCompletitud = allCodes.filter(code => {
+        const score = calcularCompletitud({
+          hasImagenPrimaria:      primarySet.has(code),
+          hasDescripcionShopify:  !!(shopByModel[code]?.shopify_description),
+          hasTituloSEO:           !!(shopByModel[code]?.shopify_seo_title),
+          hasTags:                !!(shopByModel[code]?.shopify_tags?.length),
+          hasImagenAdicional:     additionalSet.has(code),
+          camposCustomRellenos:   0,
+          totalCamposCustomActivos: 0,
+        }).nivel === completitud
+        return score
+      })
+    } else {
+      allCodesForCompletitud = []
+    }
+
+    if (allCodesForCompletitud.length === 0) {
+      // No products match — short-circuit
+      const optionsResult = await supabase.from('products').select('metal, category, familia, karat')
+      const allOpts = (optionsResult.data ?? []) as FilterOption[]
+      const uniq = (key: keyof FilterOption) =>
+        Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
+      return (
+        <div className="p-6 max-w-[1400px] space-y-5">
+          <PageHeader eyebrow="Catálogo" title="Productos" subtitle="0 modelos encontrados" />
+          <Suspense><ProductFilters metals={uniq('metal')} categories={uniq('category')} familias={uniq('familia')} karats={uniq('karat')} /></Suspense>
+          <EmptyState icon="◻" message="Sin resultados" description="Ningún modelo coincide con los filtros activos." />
+        </div>
+      )
+    }
+
+    productsQuery = productsQuery.in('codigo_modelo', allCodesForCompletitud)
+  }
+
+  const paginatedQuery = productsQuery.range(offset, offset + PAGE_SIZE - 1)
 
   const [productsResult, optionsResult] = await Promise.all([
-    productsQuery,
+    paginatedQuery,
     supabase.from('products').select('metal, category, familia, karat'),
   ])
 
   const products   = (productsResult.data ?? []) as ProductRow[]
-  const total      = productsResult.count ?? 0
+  const total      = allCodesForCompletitud ? allCodesForCompletitud.length : (productsResult.count ?? 0)
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
-  // Phase 2: images + shopify status for visible products
+  // Phase 2: images + shopify status + completitud data for visible products
   const codes = products.map(p => p.codigo_modelo)
-  const [imagesResult, shopifyResult] =
+  const [imagesResult, shopifyResult, imgCountResult, shopifyFullResult, fieldDefsResult] =
     codes.length > 0
       ? await Promise.all([
-          supabase
-            .from('product_images')
-            .select('codigo_modelo, url')
-            .in('codigo_modelo', codes)
-            .eq('is_primary', true),
-          supabase
-            .from('product_shopify_data')
-            .select('codigo_modelo, shopify_status')
-            .in('codigo_modelo', codes),
+          supabase.from('product_images').select('codigo_modelo, url').in('codigo_modelo', codes).eq('is_primary', true),
+          supabase.from('product_shopify_data').select('codigo_modelo, shopify_status').in('codigo_modelo', codes),
+          supabase.from('product_images').select('codigo_modelo').in('codigo_modelo', codes),
+          supabase.from('product_shopify_data').select('codigo_modelo, shopify_description, shopify_seo_title, shopify_tags').in('codigo_modelo', codes),
+          supabase.from('custom_field_definitions').select('field_key').eq('is_active', true),
         ])
       : [
           { data: [] as { codigo_modelo: string; url: string }[] },
           { data: [] as { codigo_modelo: string; shopify_status: string }[] },
+          { data: [] as { codigo_modelo: string }[] },
+          { data: [] as { codigo_modelo: string; shopify_description: string | null; shopify_seo_title: string | null; shopify_tags: string[] | null }[] },
+          { data: [] as { field_key: string }[] },
         ]
 
   const imageMap   = Object.fromEntries((imagesResult.data ?? []).map(r => [r.codigo_modelo, r.url]))
   const shopifyMap = Object.fromEntries((shopifyResult.data ?? []).map(r => [r.codigo_modelo, r.shopify_status]))
+
+  // Build completitud data per product
+  const primarySet = new Set((imagesResult.data ?? []).map(r => r.codigo_modelo))
+  const imgCounts: Record<string, number> = {}
+  for (const r of imgCountResult.data ?? []) {
+    imgCounts[r.codigo_modelo] = (imgCounts[r.codigo_modelo] ?? 0) + 1
+  }
+  const shopifyFullMap = Object.fromEntries((shopifyFullResult.data ?? []).map(r => [r.codigo_modelo, r]))
+  const totalActiveDefs = (fieldDefsResult.data ?? []).length
+
+  function getCompletitudForProduct(codigo: string) {
+    return calcularCompletitud({
+      hasImagenPrimaria:       primarySet.has(codigo),
+      hasDescripcionShopify:   !!(shopifyFullMap[codigo]?.shopify_description),
+      hasTituloSEO:            !!(shopifyFullMap[codigo]?.shopify_seo_title),
+      hasTags:                 !!(shopifyFullMap[codigo]?.shopify_tags?.length),
+      hasImagenAdicional:      (imgCounts[codigo] ?? 0) >= 2,
+      camposCustomRellenos:    0,
+      totalCamposCustomActivos: totalActiveDefs,
+    })
+  }
 
   // Distinct filter options
   const allOpts    = (optionsResult.data ?? []) as FilterOption[]
   const uniq       = (key: keyof FilterOption) =>
     Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
 
-  const hasFilters = search || metal || category || familia || karat || abc
+  const hasFilters = search || metal || category || familia || karat || abc || completitud
 
   return (
     <div className="p-6 max-w-[1400px] space-y-5">
@@ -146,7 +218,7 @@ export default async function ProductsPage({
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(0,85,127,0.08)' }}>
                   <th className="w-14 px-3 py-3" />
-                  {(['Código', 'Descripción', 'Metal / Qt', 'Familia', 'ABC', 'Ingresos 12m', 'Vars', 'Shopify'] as const).map(h => (
+                  {(['Código', 'Descripción', 'Metal / Qt', 'Familia', 'ABC', 'Ingresos 12m', 'Vars', 'Shopify', 'Completitud'] as const).map(h => (
                     <th
                       key={h}
                       className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase"
@@ -239,6 +311,11 @@ export default async function ProductsPage({
                     <td className="px-3 py-2">
                       <ShopifyCell status={shopifyMap[p.codigo_modelo] ?? null} />
                     </td>
+
+                    {/* Completitud */}
+                    <td className="px-3 py-2 w-28">
+                      <CompletitudBar result={getCompletitudForProduct(p.codigo_modelo)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -278,6 +355,24 @@ function AbcBadge({ abc }: { abc: string | null }) {
     >
       {abc}
     </span>
+  )
+}
+
+function CompletitudBar({ result }: { result: ReturnType<typeof calcularCompletitud> }) {
+  const { score, nivel } = result
+  const col = NIVEL_COLOR[nivel]
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold" style={{ color: col.text }}>{score}%</span>
+      </div>
+      <div className="w-full h-1.5 rounded-full" style={{ background: 'rgba(0,85,127,0.08)' }}>
+        <div
+          className="h-1.5 rounded-full transition-all"
+          style={{ width: `${score}%`, background: col.bar }}
+        />
+      </div>
+    </div>
   )
 }
 
