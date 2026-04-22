@@ -210,49 +210,7 @@ export async function syncMetabase(): Promise<SyncResult> {
   const now = new Date().toISOString()
   const errors: string[] = []
 
-  // 3 · Upsert product_variants (all rows)
-  const variantRows = rows.map(r => ({
-    codigo_interno:              r.codigo_interno,
-    slug:                        r.slug,
-    codigo_modelo:               r.codigo_modelo,
-    variante:                    r.variante,
-    es_variante_lider:           r.es_variante_lider,
-    precio_venta:                r.precio_venta,
-    precio_tachado:              r.precio_tachado,
-    descuento_aplicado:          r.descuento_aplicado,
-    cost_price_medio:            r.cost_price_medio,
-    ultimo_coste_compra:         r.ultimo_coste_compra,
-    ultimo_precio_venta:         r.ultimo_precio_venta,
-    margen_bruto:                r.margen_bruto,
-    pct_margen_bruto:            r.pct_margen_bruto,
-    abc_ventas:                  r.abc_ventas,
-    abc_unidades:                r.abc_unidades,
-    ingresos_slug_12m:           r.ingresos_slug_12m,
-    ingresos_variante_lider_12m: r.ingresos_variante_lider_12m,
-    unidades_mes_anterior:       r.unidades_mes_anterior,
-    stock_variante:              r.stock_variante !== null ? Math.round(r.stock_variante) : null,
-    num_tiendas_activo:          r.num_tiendas_activo !== null ? Math.round(r.num_tiendas_activo) : null,
-    metabase_synced_at:          now,
-  }))
-
-  // Deduplicate by codigo_interno — the CSV can have repeated rows for the same SKU,
-  // which causes "ON CONFLICT DO UPDATE command cannot affect row a second time"
-  const uniqueVariantMap = new Map(variantRows.map(r => [r.codigo_interno, r]))
-  const deduplicatedVariants = Array.from(uniqueVariantMap.values())
-
-  let variantsUpserted = 0
-  for (const batch of chunk(deduplicatedVariants, 250)) {
-    const { error } = await supabase
-      .from('product_variants')
-      .upsert(batch, { onConflict: 'codigo_interno' })
-    if (error) {
-      errors.push(`Variantes batch error: ${error.message}`)
-    } else {
-      variantsUpserted += batch.length
-    }
-  }
-
-  // 4 · Build products from leader variants
+  // 3 · Build products from leader variants (must run BEFORE variants due to FK)
   // Use a Map to deduplicate by codigo_modelo (take first leader found)
   const productMap = new Map<string, typeof rows[number]>()
   for (const r of rows) {
@@ -297,6 +255,48 @@ export async function syncMetabase(): Promise<SyncResult> {
       errors.push(`Productos batch error: ${error.message}`)
     } else {
       modelsUpserted += batch.length
+    }
+  }
+
+  // 4 · Upsert product_variants (after products, to satisfy FK constraint)
+  const variantRows = rows.map(r => ({
+    codigo_interno:              r.codigo_interno,
+    slug:                        r.slug,
+    codigo_modelo:               r.codigo_modelo,
+    variante:                    r.variante,
+    es_variante_lider:           r.es_variante_lider,
+    precio_venta:                r.precio_venta,
+    precio_tachado:              r.precio_tachado,
+    descuento_aplicado:          r.descuento_aplicado,
+    cost_price_medio:            r.cost_price_medio,
+    ultimo_coste_compra:         r.ultimo_coste_compra,
+    ultimo_precio_venta:         r.ultimo_precio_venta,
+    margen_bruto:                r.margen_bruto,
+    pct_margen_bruto:            r.pct_margen_bruto,
+    abc_ventas:                  r.abc_ventas,
+    abc_unidades:                r.abc_unidades,
+    ingresos_slug_12m:           r.ingresos_slug_12m,
+    ingresos_variante_lider_12m: r.ingresos_variante_lider_12m,
+    unidades_mes_anterior:       r.unidades_mes_anterior,
+    stock_variante:              r.stock_variante !== null ? Math.round(r.stock_variante) : null,
+    num_tiendas_activo:          r.num_tiendas_activo !== null ? Math.round(r.num_tiendas_activo) : null,
+    metabase_synced_at:          now,
+  }))
+
+  // Deduplicate by codigo_interno — the CSV can have repeated rows for the same SKU,
+  // which causes "ON CONFLICT DO UPDATE command cannot affect row a second time"
+  const uniqueVariantMap = new Map(variantRows.map(r => [r.codigo_interno, r]))
+  const deduplicatedVariants = Array.from(uniqueVariantMap.values())
+
+  let variantsUpserted = 0
+  for (const batch of chunk(deduplicatedVariants, 250)) {
+    const { error } = await supabase
+      .from('product_variants')
+      .upsert(batch, { onConflict: 'codigo_interno' })
+    if (error) {
+      errors.push(`Variantes batch error: ${error.message}`)
+    } else {
+      variantsUpserted += batch.length
     }
   }
 
