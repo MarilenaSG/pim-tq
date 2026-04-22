@@ -76,20 +76,28 @@ async function getCatalogData(params: SearchParams) {
     Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
 
   const enriched = products.map(p => {
-    const variants   = variantMap.get(p.codigo_modelo) ?? []
+    const variants = variantMap.get(p.codigo_modelo) ?? []
+    const shopify  = shopifyMap[p.codigo_modelo]
+
+    // Model is discontinued only when ALL variants are discontinued
+    const allDiscontinued = variants.length > 0 && variants.every(v => v.is_discontinued)
+
+    // Visible: active variants (any stock) + discontinued variants with stock > 0
+    const visible = variants.filter(v => !v.is_discontinued || (v.stock_variante ?? 0) > 0)
+
     const leader     = variants.find(v => v.es_variante_lider) ?? variants[0]
-    const shopify    = shopifyMap[p.codigo_modelo]
-    const stockTotal = variants.reduce((acc, v) => acc + (v.stock_variante ?? 0), 0)
+    const stockTotal = visible.reduce((acc, v) => acc + (v.stock_variante ?? 0), 0)
 
     return {
       ...p,
-      image_url:    imageMap[p.codigo_modelo] ?? null,
-      precio_venta: leader?.precio_venta      ?? null,
-      slug_lider:   leader?.slug              ?? null,
-      marca:        shopify?.shopify_vendor   ?? null,
-      activo:       shopify?.shopify_status === 'active',
-      stock_total:  stockTotal,
-      variants: variants.map(v => ({
+      image_url:       imageMap[p.codigo_modelo] ?? null,
+      precio_venta:    leader?.precio_venta      ?? null,
+      slug_lider:      leader?.slug              ?? null,
+      marca:           shopify?.shopify_vendor   ?? null,
+      activo:          shopify?.shopify_status === 'active',
+      stock_total:     stockTotal,
+      is_discontinued: allDiscontinued,
+      variants: visible.map(v => ({
         variante:        v.variante,
         precio_venta:    v.precio_venta,
         stock:           v.stock_variante,
@@ -98,12 +106,14 @@ async function getCatalogData(params: SearchParams) {
     }
   })
   .filter(p => {
-    // "En catálogo": al menos una variante con stock (cubre modelos con is_discontinued mixto)
-    if (params.estado === 'catalogo')      return p.stock_total > 0
-    // "Descatalogado": marcado a nivel modelo
+    // No visible variants → hide completely
+    if (p.variants.length === 0) return false
+    // "En catálogo": at least one active (non-discontinued) variant
+    if (params.estado === 'catalogo')      return !p.is_discontinued
+    // "Descatalogado": all variants are discontinued (but some may still have stock)
     if (params.estado === 'descatalogado') return p.is_discontinued
-    // Por defecto: ocultar solo los completamente descatalogados sin stock
-    return !(p.is_discontinued && p.stock_total === 0)
+    // Default: show all models that have at least one visible variant
+    return true
   })
 
   return {
