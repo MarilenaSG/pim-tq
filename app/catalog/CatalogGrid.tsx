@@ -388,7 +388,7 @@ export function CatalogGrid({ products, filterOptions, activeFilters }: Props) {
           <p className="text-xs mt-1" style={{ color: '#b2b2b2' }}>Prueba con otros filtros</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {products.map(p => <ProductCard key={p.codigo_modelo} p={p} />)}
         </div>
       )}

@@ -137,7 +137,7 @@ export default async function CatalogPage({
     <div className="min-h-screen" style={{ background: '#f4f1ee' }}>
       {/* Header */}
       <header style={{ background: '#00557f' }} className="px-4 py-4 sticky top-0 z-20 shadow-md">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
+        <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Image
               src="/brand/icon_cream.png"
@@ -168,7 +168,7 @@ export default async function CatalogPage({
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-5">
+      <div className="max-w-screen-2xl mx-auto px-4 py-5">
         <Suspense>
           <CatalogGrid
             products={products}
