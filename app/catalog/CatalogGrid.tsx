@@ -48,22 +48,41 @@ interface Props {
   activeFilters: ActiveFilters
 }
 
+function sortVariante(a: string | null, b: string | null): number {
+  const na = parseFloat(a ?? ''), nb = parseFloat(b ?? '')
+  if (!isNaN(na) && !isNaN(nb)) return na - nb
+  return (a ?? '').localeCompare(b ?? '', 'es')
+}
+
 function ProductCard({ p }: { p: CatalogProduct }) {
   const [expanded, setExpanded] = useState(false)
-  const totalStock = p.stock_total
-  const hasStock   = totalStock > 0
+  const totalStock    = p.stock_total
+  const hasStock      = totalStock > 0
+  // Badge "Descatalogado" solo si TODAS las variantes están descatalogadas
+  const allDiscontinued = p.variants.length > 0 && p.variants.every(v => v.is_discontinued)
+
+  // Variantes a mostrar: con stock O descatalogadas (las sin stock no descatalogadas se ocultan)
+  // Orden: activas primero (por talla), descatalogadas al final (por talla)
+  const visibleVariants = [
+    ...p.variants
+      .filter(v => !v.is_discontinued && (v.stock ?? 0) > 0)
+      .sort((a, b) => sortVariante(a.variante, b.variante)),
+    ...p.variants
+      .filter(v => v.is_discontinued)
+      .sort((a, b) => sortVariante(a.variante, b.variante)),
+  ]
 
   return (
     <div
       className="bg-white rounded-2xl overflow-hidden"
       style={{
         boxShadow: '0 2px 8px rgba(0,32,60,0.08)',
-        opacity: p.is_discontinued && !hasStock ? 0.6 : 1,
+        opacity: allDiscontinued && !hasStock ? 0.6 : 1,
       }}
     >
       {/* Image */}
       <div className="relative aspect-square bg-[#f5f3f0]">
-        {p.is_discontinued && (
+        {allDiscontinued && (
           <div
             className="absolute top-0 left-0 right-0 text-center text-[10px] font-black tracking-widest uppercase py-1 z-10"
             style={{ background: 'rgba(80,80,80,0.88)', color: '#ffffff' }}
@@ -77,7 +96,7 @@ function ProductCard({ p }: { p: CatalogProduct }) {
             alt={p.description ?? p.codigo_modelo}
             className="w-full h-full object-cover"
             loading="lazy"
-            style={{ filter: p.is_discontinued ? 'grayscale(30%)' : 'none' }}
+            style={{ filter: allDiscontinued ? 'grayscale(30%)' : 'none' }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-3xl" style={{ color: '#d0cdc9' }}>
@@ -157,7 +176,7 @@ function ProductCard({ p }: { p: CatalogProduct }) {
         )}
 
         {/* Variants toggle */}
-        {p.variants.length > 0 && (
+        {visibleVariants.length > 0 && (
           <button
             onClick={() => setExpanded(e => !e)}
             className="w-full text-xs font-semibold py-1.5 rounded-lg transition-colors"
@@ -166,16 +185,14 @@ function ProductCard({ p }: { p: CatalogProduct }) {
               color: '#00557f',
             }}
           >
-            {expanded ? '▲ Ocultar tallas' : `▼ Ver ${p.variants.length} talla${p.variants.length !== 1 ? 's' : ''}`}
+            {expanded ? '▲ Ocultar tallas' : `▼ Ver ${visibleVariants.length} talla${visibleVariants.length !== 1 ? 's' : ''}`}
           </button>
         )}
 
         {/* Variants list */}
         {expanded && (
           <div className="mt-2 space-y-1">
-            {p.variants.map((v, i) => {
-              const variantHasStock = (v.stock ?? 0) > 0
-              return (
+            {visibleVariants.map((v, i) => (
               <div
                 key={i}
                 className="flex items-center justify-between text-xs px-2 py-1 rounded-lg"
@@ -203,14 +220,13 @@ function ProductCard({ p }: { p: CatalogProduct }) {
                   )}
                   <span
                     className="font-medium"
-                    style={{ color: v.is_discontinued ? '#999999' : variantHasStock ? '#3A9E6A' : '#C0392B' }}
+                    style={{ color: v.is_discontinued ? '#999999' : '#3A9E6A' }}
                   >
                     {v.stock ?? 0} uds
                   </span>
                 </div>
               </div>
-              )
-            })}
+            ))}
           </div>
         )}
       </div>
