@@ -82,11 +82,10 @@ async function getCatalogData(params: SearchParams) {
     // Model is discontinued only when ALL variants are discontinued
     const allDiscontinued = variants.length > 0 && variants.every(v => v.is_discontinued)
 
-    // Visible: active variants (any stock) + discontinued variants with stock > 0
-    const visible = variants.filter(v => !v.is_discontinued || (v.stock_variante ?? 0) > 0)
-
+    // All variants are shown: active (normal) + discontinued (gray in CatalogGrid)
+    // Only the MODEL card is hidden when fully discontinued with 0 stock (filter below)
     const leader     = variants.find(v => v.es_variante_lider) ?? variants[0]
-    const stockTotal = visible.reduce((acc, v) => acc + (v.stock_variante ?? 0), 0)
+    const stockTotal = variants.reduce((acc, v) => acc + (v.stock_variante ?? 0), 0)
 
     return {
       ...p,
@@ -97,7 +96,7 @@ async function getCatalogData(params: SearchParams) {
       activo:          shopify?.shopify_status === 'active',
       stock_total:     stockTotal,
       is_discontinued: allDiscontinued,
-      variants: visible.map(v => ({
+      variants: variants.map(v => ({
         variante:        v.variante,
         precio_venta:    v.precio_venta,
         stock:           v.stock_variante,
@@ -106,8 +105,8 @@ async function getCatalogData(params: SearchParams) {
     }
   })
   .filter(p => {
-    // No visible variants → hide completely
-    if (p.variants.length === 0) return false
+    // Hide model only when ALL variants are discontinued AND total stock = 0
+    if (p.is_discontinued && p.stock_total === 0) return false
     // "En catálogo": at least one active (non-discontinued) variant
     if (params.estado === 'catalogo')      return !p.is_discontinued
     // "Descatalogado": all variants are discontinued (but some may still have stock)
