@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { CampaignsClient } from './CampaignsClient'
 
 export type CampaignRow = {
@@ -19,7 +19,7 @@ export type CampaignRow = {
 }
 
 export default async function CampaignsPage() {
-  const supabase = createServerClient()
+  const supabase = createServiceClient()
 
   const { data: raw } = await supabase
     .from('campaigns')

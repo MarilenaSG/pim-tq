@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui'
 import { CustomFieldsEditor } from './CustomFieldsEditor'
@@ -45,7 +45,7 @@ export default async function ProductPage({
   const rawTab = searchParams.tab as string | undefined
   const tab: TabKey = (VALID_TABS.includes(rawTab as TabKey) ? rawTab : 'resumen') as TabKey
 
-  const supabase = createServerClient()
+  const supabase = createServiceClient()
   const user = await getCurrentUser()
 
   const [productRes, variantsRes, imagesRes, shopifyRes, customFieldsRes, fieldDefsRes, campaignProductsRes, activeCampaignsRes] =

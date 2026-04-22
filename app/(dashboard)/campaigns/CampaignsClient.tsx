@@ -309,7 +309,7 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
         onClick={closeModal}
       />
       <div
-        className="relative bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-10 flex flex-col"
+        className="relative bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] z-10 flex flex-col"
         style={{ boxShadow: '0 24px 80px rgba(0,32,60,0.22)' }}
       >
         {/* Modal header */}
@@ -326,7 +326,7 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
         </div>
 
         {/* Modal body */}
-        <div className="p-7 space-y-5">
+        <div className="p-7 space-y-5 overflow-y-auto flex-1">
 
           {/* Nombre + Tipo + Estado */}
           <div>
@@ -466,7 +466,7 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
         </div>
 
         {/* Modal footer */}
-        <div className="px-7 pb-7 flex gap-3">
+        <div className="px-7 pb-7 pt-4 flex gap-3 border-t shrink-0" style={{ borderColor: 'rgba(0,85,127,0.08)' }}>
           <button
             onClick={handleSave}
             disabled={saving}
@@ -484,7 +484,7 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
           </button>
         </div>
         {mode === 'edit' && (
-          <div className="px-7 pb-7 -mt-4">
+          <div className="px-7 pb-5 shrink-0">
             <button
               onClick={handleDelete}
               disabled={deleting}
