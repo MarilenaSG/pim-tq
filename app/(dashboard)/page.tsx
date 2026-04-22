@@ -183,14 +183,14 @@ export default async function DashboardPage() {
                 {alertSummary.byCategory.stock > 0 && (
                   <span style={{ color: '#C0392B' }}>🔴 Stock: {alertSummary.byCategory.stock}</span>
                 )}
-                {alertSummary.byCategory.fichas > 0 && (
-                  <span style={{ color: '#C8842A' }}>🟠 Fichas: {alertSummary.byCategory.fichas}</span>
+                {alertSummary.byCategory.sin_venta > 0 && (
+                  <span style={{ color: '#C0392B' }}>🔴 Sin ventas: {alertSummary.byCategory.sin_venta}</span>
                 )}
-                {alertSummary.byCategory.ciclo_vida > 0 && (
-                  <span style={{ color: '#C8842A' }}>🟠 Ciclo vida: {alertSummary.byCategory.ciclo_vida}</span>
+                {alertSummary.byCategory.familias_sin_new > 0 && (
+                  <span style={{ color: '#C8842A' }}>🟠 Familias: {alertSummary.byCategory.familias_sin_new}</span>
                 )}
-                {alertSummary.byCategory.sync > 0 && (
-                  <span style={{ color: '#C0392B' }}>🔴 Sync: {alertSummary.byCategory.sync}</span>
+                {alertSummary.byCategory.shopify_inactivo > 0 && (
+                  <span style={{ color: '#C8842A' }}>🟠 Shopify: {alertSummary.byCategory.shopify_inactivo}</span>
                 )}
               </div>
             </>
