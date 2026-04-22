@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, createAuthServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const body = await req.json()
   const supabase = createServiceClient()
   const { data, error } = await supabase
@@ -31,10 +27,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const supabase = createServiceClient()
   const { error } = await supabase.from('campaigns').delete().eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
