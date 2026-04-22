@@ -25,6 +25,10 @@ export interface Product {
   abc_ventas: AbcRating
   abc_unidades: AbcRating
 
+  // Descatalogado
+  // true = sin stock en almacén central; visible en catálogo mientras haya stock en tiendas
+  is_discontinued: boolean
+
   // Control
   metabase_synced_at: string | null
   shopify_synced_at: string | null
@@ -154,7 +158,7 @@ export interface PricingRule {
 // ── UI helpers ────────────────────────────────────────────────
 
 export type KpiColor = 'blue' | 'green' | 'amber' | 'red' | 'neutral'
-export type StatusVariant = 'ok' | 'warn' | 'error' | 'info' | 'shopify' | 'imagen'
+export type StatusVariant = 'ok' | 'warn' | 'error' | 'info' | 'shopify' | 'imagen' | 'discontinued' | 'liquidacion'
 
 export interface ActivityItem {
   id: string

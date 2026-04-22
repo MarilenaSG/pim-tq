@@ -47,6 +47,7 @@ export interface MetabaseRow {
   ingresos_slug_12m: number | null
   unidades_mes_anterior: number | null
   num_tiendas_activo: number | null
+  is_discontinued: boolean
 }
 
 export interface SyncResult {
@@ -154,6 +155,7 @@ export function parseCsv(text: string): MetabaseRow[] {
       lista_variantes:           parseStr(raw['lista_variantes']),
       variante_lider:            parseStr(raw['variante_lider']),
       es_variante_lider:         parseBool(raw['es_variante_lider']),
+      is_discontinued:           raw['estado_catalogo']?.trim() === 'Descatalogado',
       ingresos_variante_lider_12m: parseEuNum(raw['ingresos_variante_lider_12m']),
       stock_variante:            parseEuNum(raw['stock_variante']),
       precio_venta:              parseEuNum(raw['precio_venta']),
@@ -281,6 +283,7 @@ export async function syncMetabase(): Promise<SyncResult> {
     unidades_12m:       r.unidades_12m !== null ? Math.round(r.unidades_12m) : null,
     abc_ventas:         r.abc_ventas,
     abc_unidades:       r.abc_unidades,
+    is_discontinued:    r.is_discontinued,
     metabase_synced_at: now,
     updated_at:         now,
   }))

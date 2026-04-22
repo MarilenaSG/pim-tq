@@ -11,8 +11,10 @@ const variantMap: Record<StatusVariant, { bg: string; text: string; label: strin
   warn:    { bg: 'rgba(200,132,42,0.12)',  text: '#a06818', label: 'Atención' },
   error:   { bg: 'rgba(192,57,43,0.12)',   text: '#992d22', label: 'Error' },
   info:    { bg: 'rgba(0,153,242,0.12)',   text: '#007acc', label: 'Info' },
-  shopify: { bg: 'rgba(150,191,71,0.15)',  text: '#4a7c1c', label: 'Shopify' },
-  imagen:  { bg: 'rgba(200,161,100,0.15)', text: '#8a6020', label: 'Imagen' },
+  shopify:      { bg: 'rgba(150,191,71,0.15)',  text: '#4a7c1c', label: 'Shopify' },
+  imagen:       { bg: 'rgba(200,161,100,0.15)', text: '#8a6020', label: 'Imagen' },
+  discontinued: { bg: 'rgba(100,100,100,0.12)', text: '#555555', label: 'Descatalogado' },
+  liquidacion:  { bg: 'rgba(192,57,43,0.08)',   text: '#8b2018', label: 'Próx. descatalogado' },
 }
 
 const dotColor: Record<StatusVariant, string> = {
@@ -20,8 +22,10 @@ const dotColor: Record<StatusVariant, string> = {
   warn:    '#C8842A',
   error:   '#C0392B',
   info:    '#0099f2',
-  shopify: '#6fa830',
-  imagen:  '#c8a164',
+  shopify:      '#6fa830',
+  imagen:       '#c8a164',
+  discontinued: '#888888',
+  liquidacion:  '#C0392B',
 }
 
 export function StatusBadge({ status, label, dot = false }: StatusBadgeProps) {

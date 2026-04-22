@@ -21,7 +21,7 @@ async function getCatalogData(params: SearchParams) {
     .from('products')
     .select(`
       codigo_modelo, description, category, familia, metal, karat,
-      num_variantes, lista_variantes
+      num_variantes, lista_variantes, is_discontinued
     `)
     .order('familia',       { ascending: true,  nullsFirst: false })
     .order('description',   { ascending: true,  nullsFirst: false })
@@ -80,9 +80,10 @@ async function getCatalogData(params: SearchParams) {
     Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
 
   const enriched = products.map(p => {
-    const variants  = variantMap.get(p.codigo_modelo) ?? []
-    const leader    = variants.find(v => v.es_variante_lider) ?? variants[0]
-    const shopify   = shopifyMap[p.codigo_modelo]
+    const variants   = variantMap.get(p.codigo_modelo) ?? []
+    const leader     = variants.find(v => v.es_variante_lider) ?? variants[0]
+    const shopify    = shopifyMap[p.codigo_modelo]
+    const stockTotal = variants.reduce((acc, v) => acc + (v.stock_variante ?? 0), 0)
 
     return {
       ...p,
@@ -91,6 +92,7 @@ async function getCatalogData(params: SearchParams) {
       slug_lider:   leader?.slug                 ?? null,
       marca:        shopify?.shopify_vendor       ?? null,
       activo:       shopify?.shopify_status === 'active',
+      stock_total:  stockTotal,
       variants:     variants.map(v => ({
         variante:     v.variante,
         precio_venta: v.precio_venta,
@@ -98,6 +100,7 @@ async function getCatalogData(params: SearchParams) {
       })),
     }
   })
+  .filter(p => !(p.is_discontinued && p.stock_total === 0))
 
   return {
     products: enriched,

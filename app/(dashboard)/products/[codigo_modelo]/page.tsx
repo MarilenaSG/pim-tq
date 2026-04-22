@@ -89,6 +89,24 @@ export default async function ProductPage({
   return (
     <div className="p-6 max-w-6xl space-y-5">
 
+      {/* Descatalogado — banner destacado */}
+      {product.is_discontinued && (
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(80,80,80,0.08)', border: '1.5px solid rgba(80,80,80,0.2)' }}
+        >
+          <span className="text-lg">🚫</span>
+          <div>
+            <p className="text-sm font-black tracking-wide uppercase" style={{ color: '#444444' }}>
+              Producto descatalogado
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: '#888888' }}>
+              Sin stock en almacén central. Visible en catálogo mientras haya stock en tiendas.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Back link + header */}
       <div>
         <Link

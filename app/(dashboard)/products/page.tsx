@@ -22,6 +22,7 @@ type ProductRow = {
   abc_ventas:         string | null
   metabase_synced_at: string | null
   shopify_synced_at:  string | null
+  is_discontinued:    boolean
 }
 
 type FilterOption = {
@@ -57,7 +58,7 @@ export default async function ProductsPage({
   let productsQuery = supabase
     .from('products')
     .select(
-      'codigo_modelo, description, category, familia, metal, karat, num_variantes, ingresos_12m, abc_ventas, metabase_synced_at, shopify_synced_at',
+      'codigo_modelo, description, category, familia, metal, karat, num_variantes, ingresos_12m, abc_ventas, metabase_synced_at, shopify_synced_at, is_discontinued',
       { count: 'exact' }
     )
 
@@ -197,6 +198,7 @@ export default async function ProductsPage({
       leaderSlug:       slugMap[p.codigo_modelo]    ?? null,
       completitudPct:   comp.score,
       completitudNivel: comp.nivel,
+      is_discontinued:  p.is_discontinued ?? false,
     }
   })
 

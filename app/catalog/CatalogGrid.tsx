@@ -21,8 +21,10 @@ interface CatalogProduct {
   precio_venta:  number | null
   slug_lider:    string | null
   marca:         string | null
-  activo:        boolean
-  variants:      Variant[]
+  activo:          boolean
+  is_discontinued: boolean
+  stock_total:     number
+  variants:        Variant[]
 }
 
 interface FilterOptions {
@@ -46,22 +48,34 @@ interface Props {
 
 function ProductCard({ p }: { p: CatalogProduct }) {
   const [expanded, setExpanded] = useState(false)
-  const totalStock = p.variants.reduce((acc, v) => acc + (v.stock ?? 0), 0)
+  const totalStock = p.stock_total
   const hasStock   = totalStock > 0
 
   return (
     <div
       className="bg-white rounded-2xl overflow-hidden"
-      style={{ boxShadow: '0 2px 8px rgba(0,32,60,0.08)' }}
+      style={{
+        boxShadow: '0 2px 8px rgba(0,32,60,0.08)',
+        opacity: p.is_discontinued && !hasStock ? 0.6 : 1,
+      }}
     >
       {/* Image */}
       <div className="relative aspect-square bg-[#f5f3f0]">
+        {p.is_discontinued && (
+          <div
+            className="absolute top-0 left-0 right-0 text-center text-[10px] font-black tracking-widest uppercase py-1 z-10"
+            style={{ background: 'rgba(80,80,80,0.88)', color: '#ffffff' }}
+          >
+            ✕ Descatalogado
+          </div>
+        )}
         {p.image_url ? (
           <img
             src={p.image_url}
             alt={p.description ?? p.codigo_modelo}
             className="w-full h-full object-cover"
             loading="lazy"
+            style={{ filter: p.is_discontinued ? 'grayscale(30%)' : 'none' }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-3xl" style={{ color: '#d0cdc9' }}>
@@ -71,11 +85,11 @@ function ProductCard({ p }: { p: CatalogProduct }) {
 
         {/* Stock badge */}
         <span
-          className="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+          className="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
           style={
             hasStock
-              ? { background: 'rgba(58,158,106,0.15)', color: '#2d7a54' }
-              : { background: 'rgba(192,57,43,0.12)',  color: '#992d22' }
+              ? { background: 'rgba(58,158,106,0.9)', color: '#fff' }
+              : { background: 'rgba(80,80,80,0.75)',  color: '#fff' }
           }
         >
           {hasStock ? `${totalStock} uds` : 'Sin stock'}

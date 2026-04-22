@@ -19,6 +19,7 @@ export type ProductTableRow = {
   leaderSlug:         string | null
   completitudPct:     number
   completitudNivel:   'alta' | 'media' | 'baja'
+  is_discontinued:    boolean
 }
 
 export type CampaignOption = { id: string; nombre: string }
@@ -168,7 +169,17 @@ export function ProductsTable({
 
                 {/* Descripción */}
                 <td className="px-3 py-2 max-w-xs">
-                  <span className="line-clamp-2 text-xs leading-snug text-tq-snorkel">{p.description ?? '—'}</span>
+                  <div className="flex flex-col gap-1">
+                    {p.is_discontinued && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase w-fit"
+                        style={{ background: 'rgba(80,80,80,0.1)', color: '#555555', border: '1px solid rgba(80,80,80,0.2)' }}
+                      >
+                        ✕ Descatalogado
+                      </span>
+                    )}
+                    <span className="line-clamp-2 text-xs leading-snug text-tq-snorkel">{p.description ?? '—'}</span>
+                  </div>
                 </td>
 
                 {/* Metal / Quilates */}
