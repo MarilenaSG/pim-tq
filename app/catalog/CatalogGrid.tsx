@@ -39,6 +39,7 @@ interface ActiveFilters {
   metal?:    string
   familia?:  string
   category?: string
+  estado?:   string
 }
 
 interface Props {
@@ -225,10 +226,11 @@ export function CatalogGrid({ products, filterOptions, activeFilters }: Props) {
 
   function applyFilter(key: string, value: string) {
     const params = new URLSearchParams()
-    if (search)                       params.set('search',   search)
-    if (key !== 'metal'    && activeFilters.metal)    params.set('metal',    activeFilters.metal)
-    if (key !== 'familia'  && activeFilters.familia)  params.set('familia',  activeFilters.familia)
-    if (key !== 'category' && activeFilters.category) params.set('category', activeFilters.category)
+    if (search)                                        params.set('search',   search)
+    if (key !== 'metal'    && activeFilters.metal)     params.set('metal',    activeFilters.metal)
+    if (key !== 'familia'  && activeFilters.familia)   params.set('familia',  activeFilters.familia)
+    if (key !== 'category' && activeFilters.category)  params.set('category', activeFilters.category)
+    if (key !== 'estado'   && activeFilters.estado)    params.set('estado',   activeFilters.estado)
     if (value) params.set(key, value)
     startTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
@@ -239,10 +241,11 @@ export function CatalogGrid({ products, filterOptions, activeFilters }: Props) {
     if (activeFilters.metal)          params.set('metal',    activeFilters.metal)
     if (activeFilters.familia)        params.set('familia',  activeFilters.familia)
     if (activeFilters.category)       params.set('category', activeFilters.category)
+    if (activeFilters.estado)         params.set('estado',   activeFilters.estado)
     startTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
-  const hasFilters = activeFilters.search || activeFilters.metal || activeFilters.familia || activeFilters.category
+  const hasFilters = activeFilters.search || activeFilters.metal || activeFilters.familia || activeFilters.category || activeFilters.estado
 
   return (
     <>
@@ -319,6 +322,28 @@ export function CatalogGrid({ products, filterOptions, activeFilters }: Props) {
           <option value="">Categoría</option>
           {filterOptions.categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+
+        {/* Estado */}
+        {(['catalogo', 'descatalogado'] as const).map(val => {
+          const active = activeFilters.estado === val
+          const label  = val === 'catalogo' ? '✓ En catálogo' : '✕ Descatalogado'
+          return (
+            <button
+              key={val}
+              onClick={() => applyFilter('estado', active ? '' : val)}
+              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+              style={{
+                background: active
+                  ? val === 'descatalogado' ? 'rgba(80,80,80,0.75)' : '#00557f'
+                  : '#fff',
+                color:      active ? '#fff' : '#00557f',
+                boxShadow:  '0 1px 4px rgba(0,32,60,0.1)',
+              }}
+            >
+              {label}
+            </button>
+          )
+        })}
 
         {/* Clear */}
         {hasFilters && (

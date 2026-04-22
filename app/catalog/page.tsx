@@ -11,6 +11,7 @@ interface SearchParams {
   metal?:    string
   familia?:  string
   category?: string
+  estado?:   'catalogo' | 'descatalogado'
 }
 
 async function getCatalogData(params: SearchParams) {
@@ -26,10 +27,12 @@ async function getCatalogData(params: SearchParams) {
     .order('familia',       { ascending: true,  nullsFirst: false })
     .order('description',   { ascending: true,  nullsFirst: false })
 
-  if (params.search)   query = query.or(`description.ilike.%${params.search}%,codigo_modelo.ilike.%${params.search}%`)
-  if (params.metal)    query = query.eq('metal',    params.metal)
-  if (params.familia)  query = query.eq('familia',  params.familia)
-  if (params.category) query = query.eq('category', params.category)
+  if (params.search)                      query = query.or(`description.ilike.%${params.search}%,codigo_modelo.ilike.%${params.search}%`)
+  if (params.metal)                       query = query.eq('metal',             params.metal)
+  if (params.familia)                     query = query.eq('familia',           params.familia)
+  if (params.category)                    query = query.eq('category',          params.category)
+  if (params.estado === 'catalogo')       query = query.eq('is_discontinued',   false)
+  if (params.estado === 'descatalogado')  query = query.eq('is_discontinued',   true)
 
   const { data: products } = await query
   if (!products?.length) return { products: [], filterOptions: { metals: [], familias: [], categories: [] } }
@@ -101,7 +104,7 @@ async function getCatalogData(params: SearchParams) {
       })),
     }
   })
-  .filter(p => !(p.is_discontinued && p.stock_total === 0))
+  .filter(p => params.estado === 'descatalogado' || !(p.is_discontinued && p.stock_total === 0))
 
   return {
     products: enriched,
@@ -119,11 +122,13 @@ export default async function CatalogPage({
   searchParams: { [key: string]: string | string[] | undefined }
 }) {
   const str = (k: string) => String(searchParams[k] ?? '')
+  const rawEstado = str('estado')
   const params: SearchParams = {
     search:   str('search')   || undefined,
     metal:    str('metal')    || undefined,
     familia:  str('familia')  || undefined,
     category: str('category') || undefined,
+    estado:   (rawEstado === 'catalogo' || rawEstado === 'descatalogado') ? rawEstado : undefined,
   }
 
   const { products, filterOptions } = await getCatalogData(params)
