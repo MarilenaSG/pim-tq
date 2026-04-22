@@ -2,7 +2,7 @@
 
 import {
   ResponsiveContainer, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea,
 } from 'recharts'
 
 const MESES_CORTO = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -23,10 +23,21 @@ export interface ReservaRow {
   unidades_reservadas: number | null
 }
 
+export interface CampaignRef {
+  id: string
+  nombre: string
+  color: string | null
+  fecha_inicio: string | null
+  fecha_fin: string | null
+  tipo?: string | null
+  estado?: string
+}
+
 interface Props {
   ventas: VentaRow[]
   reservas: ReservaRow[]
   variantSlugMap: Record<string, string>
+  campaigns?: CampaignRef[]
 }
 
 function fmtEuro(n: number) {
@@ -41,7 +52,7 @@ function lastNMonths(
   return data.slice(-n)
 }
 
-export function VentasTab({ ventas, reservas, variantSlugMap }: Props) {
+export function VentasTab({ ventas, reservas, variantSlugMap, campaigns = [] }: Props) {
   // Aggregate by (anyo, mes) across all variants of this model
   const byMonthMap = new Map<string, { anyo: number; mes: number; unidades: number; ingresos: number; margen: number }>()
   for (const row of ventas) {
@@ -58,11 +69,22 @@ export function VentasTab({ ventas, reservas, variantSlugMap }: Props) {
   const allMonths = Array.from(byMonthMap.values())
     .sort((a, b) => a.anyo !== b.anyo ? a.anyo - b.anyo : a.mes - b.mes)
 
+  // chartData keeps month key for campaign overlap detection
   const chartData = lastNMonths(allMonths, 18).map(d => ({
+    key:      `${d.anyo}-${String(d.mes).padStart(2, '0')}`,
     label:    `${MESES_CORTO[d.mes]} ${String(d.anyo).slice(2)}`,
     unidades: d.unidades,
     ingresos: Math.round(d.ingresos),
   }))
+
+  // Find chart label range for each campaign
+  const campaignRanges = campaigns.flatMap(c => {
+    const start = c.fecha_inicio ? c.fecha_inicio.slice(0, 7) : '0000-00'
+    const end   = c.fecha_fin   ? c.fecha_fin.slice(0, 7)   : '9999-99'
+    const inRange = chartData.filter(d => d.key >= start && d.key <= end)
+    if (inRange.length === 0) return []
+    return [{ x1: inRange[0].label, x2: inRange[inRange.length - 1].label, nombre: c.nombre, color: c.color ?? '#C8842A' }]
+  })
 
   // KPIs
   const totalUnidades = allMonths.reduce((s, d) => s + d.unidades, 0)
@@ -107,50 +129,80 @@ export function VentasTab({ ventas, reservas, variantSlugMap }: Props) {
           )}
         </div>
         {hasVentas ? (
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={chartData} margin={{ top: 4, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,85,127,0.06)" />
-              <XAxis dataKey="label" tick={axisStyle} axisLine={false} tickLine={false} />
-              <YAxis
-                yAxisId="left"
-                tick={axisStyle} axisLine={false} tickLine={false} width={28}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                tick={axisStyle} axisLine={false} tickLine={false} width={52}
-                tickFormatter={v => `${Math.round(v / 1000)}k`}
-              />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(value, name) => {
-                  const n = Number(value)
-                  return name === 'Ingresos' ? [fmtEuro(n), name as string] : [n, name as string]
-                }}
-              />
-              <Legend iconSize={10} wrapperStyle={{ fontSize: 11, color: '#b2b2b2', paddingTop: 8 }} />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="unidades"
-                name="Unidades"
-                stroke="#0099f2"
-                strokeWidth={2.5}
-                dot={{ fill: '#0099f2', r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="ingresos"
-                name="Ingresos"
-                stroke="#C8842A"
-                strokeWidth={2}
-                dot={false}
-                strokeDasharray="5 3"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={chartData} margin={{ top: 4, right: 20, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,85,127,0.06)" />
+                <XAxis dataKey="label" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis
+                  yAxisId="left"
+                  tick={axisStyle} axisLine={false} tickLine={false} width={28}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={axisStyle} axisLine={false} tickLine={false} width={52}
+                  tickFormatter={v => `${Math.round(v / 1000)}k`}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(value, name) => {
+                    const n = Number(value)
+                    return name === 'Ingresos' ? [fmtEuro(n), name as string] : [n, name as string]
+                  }}
+                />
+                <Legend iconSize={10} wrapperStyle={{ fontSize: 11, color: '#b2b2b2', paddingTop: 8 }} />
+
+                {/* Campaign shading */}
+                {campaignRanges.map((r, i) => (
+                  <ReferenceArea
+                    key={i}
+                    yAxisId="left"
+                    x1={r.x1}
+                    x2={r.x2}
+                    fill={r.color}
+                    fillOpacity={0.12}
+                    stroke={r.color}
+                    strokeOpacity={0.4}
+                    strokeWidth={1}
+                  />
+                ))}
+
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="unidades"
+                  name="Unidades"
+                  stroke="#0099f2"
+                  strokeWidth={2.5}
+                  dot={{ fill: '#0099f2', r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="ingresos"
+                  name="Ingresos"
+                  stroke="#C8842A"
+                  strokeWidth={2}
+                  dot={false}
+                  strokeDasharray="5 3"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+
+            {/* Campaign legend */}
+            {campaignRanges.length > 0 && (
+              <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t" style={{ borderColor: 'rgba(0,85,127,0.06)' }}>
+                {campaignRanges.map((r, i) => (
+                  <span key={i} className="flex items-center gap-1.5 text-[10px]" style={{ color: '#777' }}>
+                    <span className="w-3 h-3 rounded-sm" style={{ background: r.color, opacity: 0.5 }} />
+                    {r.nombre}
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <div className="h-40 flex items-center justify-center text-sm" style={{ color: '#b2b2b2' }}>
             Sin datos de ventas. Ejecuta el sync de Ventas mensuales en /settings/sync.

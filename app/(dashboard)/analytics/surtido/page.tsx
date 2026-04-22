@@ -10,6 +10,7 @@ export default async function SurtidoPage() {
   const { data: products } = await supabase
     .from('products')
     .select('codigo_modelo, familia, category, metal, num_variantes, ingresos_12m, abc_ventas')
+    .eq('is_discontinued', false)
     .not('familia', 'is', null)
 
   const rows = products ?? []

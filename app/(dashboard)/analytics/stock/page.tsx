@@ -10,10 +10,12 @@ export default async function StockPage() {
   const [productsRes, variantsRes] = await Promise.all([
     supabase
       .from('products')
-      .select('codigo_modelo, description, familia, abc_ventas'),
+      .select('codigo_modelo, description, familia, abc_ventas')
+      .eq('is_discontinued', false),
     supabase
       .from('product_variants')
-      .select('codigo_modelo, stock_variante, unidades_mes_anterior, precio_venta, es_variante_lider'),
+      .select('codigo_modelo, stock_variante, unidades_mes_anterior, precio_venta, es_variante_lider')
+      .eq('is_discontinued', false),
   ])
 
   const products = productsRes.data ?? []

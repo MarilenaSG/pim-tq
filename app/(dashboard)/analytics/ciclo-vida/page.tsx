@@ -19,6 +19,7 @@ export default async function CicloVidaPage() {
   const { data: products } = await supabase
     .from('products')
     .select('codigo_modelo, description, familia, abc_ventas, ingresos_12m, primera_entrada, num_variantes')
+    .eq('is_discontinued', false)
 
   const rows = products ?? []
   const now  = new Date()

@@ -24,6 +24,7 @@ export async function fetchAlerts(category?: AlertCategory | null): Promise<Aler
       .from('product_variants')
       .select('codigo_modelo, stock_variante')
       .eq('abc_ventas', 'A')
+      .eq('is_discontinued', false)
 
     const stockByModel: Record<string, number> = {}
     for (const v of variants ?? []) {
@@ -37,6 +38,7 @@ export async function fetchAlerts(category?: AlertCategory | null): Promise<Aler
       const { data: prods } = await supabase
         .from('products')
         .select('codigo_modelo, description')
+        .eq('is_discontinued', false)
         .in('codigo_modelo', lowStock.map(([m]) => m))
       const descMap = Object.fromEntries((prods ?? []).map(p => [p.codigo_modelo, p.description]))
 

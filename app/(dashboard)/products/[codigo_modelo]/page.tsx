@@ -8,6 +8,8 @@ import { AiContentPanel } from './AiContentPanel'
 import { ProductComments } from './ProductComments'
 import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
 import { VentasTab } from './VentasTab'
+import { AddToCampaignButton } from './AddToCampaignButton'
+import type { CampaignRef } from './VentasTab'
 import type {
   Product, ProductVariant, ProductImage,
   ProductShopifyData, ProductCustomField, CustomFieldDefinition, AbcRating,
@@ -46,7 +48,7 @@ export default async function ProductPage({
   const supabase = createServerClient()
   const user = await getCurrentUser()
 
-  const [productRes, variantsRes, imagesRes, shopifyRes, customFieldsRes, fieldDefsRes] =
+  const [productRes, variantsRes, imagesRes, shopifyRes, customFieldsRes, fieldDefsRes, campaignProductsRes, activeCampaignsRes] =
     await Promise.all([
       supabase.from('products').select('*').eq('codigo_modelo', codigo_modelo).single(),
       supabase.from('product_variants').select('*').eq('codigo_modelo', codigo_modelo).order('codigo_interno'),
@@ -55,6 +57,10 @@ export default async function ProductPage({
       supabase.from('product_shopify_data').select('*').eq('codigo_modelo', codigo_modelo).maybeSingle(),
       supabase.from('product_custom_fields').select('*').eq('codigo_modelo', codigo_modelo),
       supabase.from('custom_field_definitions').select('*').eq('is_active', true).order('field_key'),
+      supabase.from('campaign_products')
+        .select('campaign_id, campaigns(id, nombre, color, fecha_inicio, fecha_fin, estado, tipo)')
+        .eq('codigo_modelo', codigo_modelo),
+      supabase.from('campaigns').select('id, nombre, color').neq('estado', 'finalizada').order('nombre'),
     ])
 
   if (!productRes.data) return notFound()
@@ -77,6 +83,15 @@ export default async function ProductPage({
   const fieldDefs    = (fieldDefsRes.data   ?? []) as CustomFieldDefinition[]
   const ventas       = (ventasRes.data       ?? []) as import('./VentasTab').VentaRow[]
   const reservas     = (reservasRes.data     ?? []) as import('./VentasTab').ReservaRow[]
+
+  // Campaigns this product belongs to
+  type CampaignJoin = { campaign_id: string; campaigns: { id: string; nombre: string; color: string | null; fecha_inicio: string | null; fecha_fin: string | null; estado: string; tipo: string | null } | null }
+  const productCampaigns: CampaignRef[] = ((campaignProductsRes.data ?? []) as unknown as CampaignJoin[])
+    .map(cp => cp.campaigns)
+    .filter((c): c is NonNullable<typeof c> => c !== null)
+
+  const activeCampaigns = (activeCampaignsRes.data ?? []) as { id: string; nombre: string; color: string | null }[]
+  const alreadyInIds = new Set(productCampaigns.map(c => c.id))
 
   // Map slug → variante label for display in ventas tab
   const variantSlugMap: Record<string, string> = {}
@@ -157,13 +172,13 @@ export default async function ProductPage({
       </nav>
 
       {/* Tab content */}
-      {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} images={images} variants={variants} shopify={shopify} customFields={customFields} fieldDefs={fieldDefs} />}
+      {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} images={images} variants={variants} shopify={shopify} customFields={customFields} fieldDefs={fieldDefs} productCampaigns={productCampaigns} activeCampaigns={activeCampaigns} alreadyInIds={alreadyInIds} />}
       {tab === 'variantes' && <TabVariantes variants={variants} />}
       {tab === 'imagenes'  && <TabImagenes  images={images} />}
       {tab === 'shopify'   && <TabShopify   shopify={shopify} />}
       {tab === 'custom'    && <CustomFieldsEditor fieldDefs={fieldDefs} customFields={customFields} codigo={codigo_modelo} />}
       {tab === 'ia'        && <AiContentPanel codigoModelo={codigo_modelo} />}
-      {tab === 'ventas'    && <VentasTab ventas={ventas} reservas={reservas} variantSlugMap={variantSlugMap} />}
+      {tab === 'ventas'    && <VentasTab ventas={ventas} reservas={reservas} variantSlugMap={variantSlugMap} campaigns={productCampaigns} />}
       {tab === 'notas'     && <ProductComments codigo_modelo={codigo_modelo} userEmail={user?.email ?? null} />}
     </div>
   )
@@ -217,6 +232,7 @@ function DataRow({ label, children }: { label: string; children: React.ReactNode
 
 function TabResumen({
   product, primaryImage, images, variants, shopify, customFields, fieldDefs,
+  productCampaigns, activeCampaigns, alreadyInIds,
 }: {
   product: Product
   primaryImage: ProductImage | null
@@ -225,6 +241,9 @@ function TabResumen({
   shopify: ProductShopifyData | null
   customFields: ProductCustomField[]
   fieldDefs: CustomFieldDefinition[]
+  productCampaigns: CampaignRef[]
+  activeCampaigns: { id: string; nombre: string; color: string | null }[]
+  alreadyInIds: Set<string>
 }) {
   const leader = variants.find(v => v.es_variante_lider)
 
@@ -363,6 +382,48 @@ function TabResumen({
               <span style={{ color: '#d0cdc9' }}>Sin datos de Shopify</span>
             )}
           </DataRow>
+        </div>
+
+        {/* Campaigns */}
+        <div className="bg-white rounded-xl px-5 py-4" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
+              Campañas {productCampaigns.length > 0 && <span style={{ color: '#C8842A' }}>({productCampaigns.length})</span>}
+            </p>
+            <AddToCampaignButton
+              codigoModelo={product.codigo_modelo}
+              campaigns={activeCampaigns}
+              alreadyIn={alreadyInIds}
+            />
+          </div>
+          {productCampaigns.length === 0 ? (
+            <p className="text-xs" style={{ color: '#b2b2b2' }}>Este producto no está en ninguna campaña activa.</p>
+          ) : (
+            <div className="space-y-2">
+              {productCampaigns.map(c => (
+                <div key={c.id} className="flex items-center gap-2">
+                  {c.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />}
+                  <Link
+                    href="/campaigns"
+                    className="text-sm font-semibold hover:underline"
+                    style={{ color: '#00557f' }}
+                  >
+                    {c.nombre}
+                  </Link>
+                  {c.tipo && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(200,132,42,0.1)', color: '#8B5E1A' }}>
+                      {c.tipo}
+                    </span>
+                  )}
+                  <span className="text-[10px] ml-auto" style={{ color: '#b2b2b2' }}>
+                    {c.fecha_inicio ? new Date(c.fecha_inicio + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : ''}
+                    {c.fecha_inicio && c.fecha_fin ? ' → ' : ''}
+                    {c.fecha_fin ? new Date(c.fecha_fin + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }) : c.fecha_inicio ? '(en curso)' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Sync timestamps */}
