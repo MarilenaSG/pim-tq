@@ -25,7 +25,7 @@ async function getPedidosData(): Promise<PedidoRow[]> {
 
   if (!variants?.length) return []
 
-  const codes = [...new Set(variants.map(v => v.codigo_modelo))]
+  const codes = Array.from(new Set(variants.map(v => v.codigo_modelo)))
 
   const [productsRes, imagesRes] = await Promise.all([
     supabase
