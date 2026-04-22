@@ -280,6 +280,7 @@ export async function syncMetabase(): Promise<SyncResult> {
     unidades_mes_anterior:       r.unidades_mes_anterior,
     stock_variante:              r.stock_variante !== null ? Math.round(r.stock_variante) : null,
     num_tiendas_activo:          r.num_tiendas_activo !== null ? Math.round(r.num_tiendas_activo) : null,
+    is_discontinued:             r.is_discontinued,
     metabase_synced_at:          now,
   }))
 

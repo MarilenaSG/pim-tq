@@ -4,9 +4,10 @@ import { useState, useTransition } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
 interface Variant {
-  variante:     string | null
-  precio_venta: number | null
-  stock:        number | null
+  variante:        string | null
+  precio_venta:    number | null
+  stock:           number | null
+  is_discontinued: boolean
 }
 
 interface CatalogProduct {
@@ -179,17 +180,17 @@ function ProductCard({ p }: { p: CatalogProduct }) {
                 className="flex items-center justify-between text-xs px-2 py-1 rounded-lg"
                 style={{
                   background: 'rgba(0,85,127,0.03)',
-                  opacity: p.is_discontinued && !variantHasStock ? 0.5 : 1,
+                  opacity: v.is_discontinued ? 0.5 : 1,
                 }}
               >
                 <div className="flex items-center gap-1.5">
                   <span className="font-medium text-tq-snorkel">Talla {v.variante ?? '—'}</span>
-                  {p.is_discontinued && !variantHasStock && (
+                  {v.is_discontinued && (
                     <span
                       className="text-[9px] font-black tracking-wide uppercase px-1 py-px rounded"
                       style={{ background: 'rgba(80,80,80,0.12)', color: '#666666' }}
                     >
-                      Sin stock
+                      Descatalogada
                     </span>
                   )}
                 </div>
@@ -201,7 +202,7 @@ function ProductCard({ p }: { p: CatalogProduct }) {
                   )}
                   <span
                     className="font-medium"
-                    style={{ color: variantHasStock ? '#3A9E6A' : '#C0392B' }}
+                    style={{ color: v.is_discontinued ? '#999999' : variantHasStock ? '#3A9E6A' : '#C0392B' }}
                   >
                     {v.stock ?? 0} uds
                   </span>

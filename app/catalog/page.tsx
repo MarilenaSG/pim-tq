@@ -46,7 +46,7 @@ async function getCatalogData(params: SearchParams) {
       .order('source'), // shopify before s3
     supabase
       .from('product_variants')
-      .select('codigo_modelo, slug, variante, precio_venta, stock_variante, es_variante_lider')
+      .select('codigo_modelo, slug, variante, precio_venta, stock_variante, es_variante_lider, is_discontinued')
       .in('codigo_modelo', codes)
       .order('es_variante_lider', { ascending: false }),
     supabase
@@ -94,9 +94,10 @@ async function getCatalogData(params: SearchParams) {
       activo:       shopify?.shopify_status === 'active',
       stock_total:  stockTotal,
       variants:     variants.map(v => ({
-        variante:     v.variante,
-        precio_venta: v.precio_venta,
-        stock:        v.stock_variante,
+        variante:        v.variante,
+        precio_venta:    v.precio_venta,
+        stock:           v.stock_variante,
+        is_discontinued: v.is_discontinued ?? false,
       })),
     }
   })
