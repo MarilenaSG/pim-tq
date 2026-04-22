@@ -98,8 +98,16 @@ function ProductCard({ p }: { p: CatalogProduct }) {
 
       {/* Info */}
       <div className="px-3 pt-3 pb-2">
-        {/* Marca + familia */}
+        {/* Categoría + marca + familia */}
         <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+          {p.category && (
+            <span
+              className="text-[10px] font-black tracking-widest uppercase px-1.5 py-0.5 rounded"
+              style={{ background: 'rgba(0,85,127,0.07)', color: '#00557f' }}
+            >
+              {p.category}
+            </span>
+          )}
           {p.marca && (
             <span className="text-[10px] font-bold tracking-wide uppercase" style={{ color: '#C8842A' }}>
               {p.marca}
@@ -163,13 +171,28 @@ function ProductCard({ p }: { p: CatalogProduct }) {
         {/* Variants list */}
         {expanded && (
           <div className="mt-2 space-y-1">
-            {p.variants.map((v, i) => (
+            {p.variants.map((v, i) => {
+              const variantHasStock = (v.stock ?? 0) > 0
+              return (
               <div
                 key={i}
                 className="flex items-center justify-between text-xs px-2 py-1 rounded-lg"
-                style={{ background: 'rgba(0,85,127,0.03)' }}
+                style={{
+                  background: 'rgba(0,85,127,0.03)',
+                  opacity: p.is_discontinued && !variantHasStock ? 0.5 : 1,
+                }}
               >
-                <span className="font-medium text-tq-snorkel">Talla {v.variante ?? '—'}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medium text-tq-snorkel">Talla {v.variante ?? '—'}</span>
+                  {p.is_discontinued && !variantHasStock && (
+                    <span
+                      className="text-[9px] font-black tracking-wide uppercase px-1 py-px rounded"
+                      style={{ background: 'rgba(80,80,80,0.12)', color: '#666666' }}
+                    >
+                      Sin stock
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
                   {v.precio_venta != null && (
                     <span className="font-bold" style={{ color: '#00557f' }}>
@@ -178,12 +201,13 @@ function ProductCard({ p }: { p: CatalogProduct }) {
                   )}
                   <span
                     className="font-medium"
-                    style={{ color: (v.stock ?? 0) > 0 ? '#3A9E6A' : '#C0392B' }}
+                    style={{ color: variantHasStock ? '#3A9E6A' : '#C0392B' }}
                   >
                     {v.stock ?? 0} uds
                   </span>
                 </div>
               </div>
+              )})
             ))}
           </div>
         )}
