@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     return new Response('Sin datos', { status: 404 })
   }
 
-  const codes = [...new Set(variants.map(v => v.codigo_modelo))]
+  const codes = Array.from(new Set(variants.map(v => v.codigo_modelo)))
 
   let productsQuery = supabase
     .from('products')
