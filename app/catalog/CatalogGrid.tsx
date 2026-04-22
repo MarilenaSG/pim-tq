@@ -209,8 +209,8 @@ function ProductCard({ p }: { p: CatalogProduct }) {
                   </span>
                 </div>
               </div>
-              )})
-            ))}
+              )}
+            })}
           </div>
         )}
       </div>
