@@ -6,9 +6,10 @@ type ProductResult = {
   codigo_modelo: string
   description: string | null
   familia: string | null
-  supplier_name: string | null
+  category: string | null
   abc_ventas: string | null
   is_discontinued: boolean
+  shopify_vendor: string | null
 }
 
 interface Props {
@@ -36,7 +37,7 @@ function FilterSelect({
       style={{
         borderColor: 'rgba(0,85,127,0.2)',
         color: value ? '#00557f' : '#b2b2b2',
-        minWidth: 120,
+        minWidth: 130,
       }}
     >
       <option value="">{placeholder}</option>
@@ -48,69 +49,67 @@ function FilterSelect({
 export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
   const [search, setSearch]     = useState('')
   const [familia, setFamilia]   = useState('')
+  const [category, setCategory] = useState('')
   const [abc, setAbc]           = useState('')
-  const [supplier, setSupplier] = useState('')
+  const [vendor, setVendor]     = useState('')
 
   const [products, setProducts] = useState<ProductResult[]>([])
   const [loading, setLoading]   = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [adding, setAdding]     = useState(false)
 
-  const [familias, setFamilias]   = useState<string[]>([])
-  const [suppliers, setSuppliers] = useState<string[]>([])
+  const [familias, setFamilias]     = useState<string[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [vendors, setVendors]       = useState<string[]>([])
   const [optionsLoaded, setOptionsLoaded] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
-  // Load filter options once on mount
   useEffect(() => {
     fetch('/api/products/filter-options')
       .then(r => r.json())
       .then(d => {
         setFamilias(d.familias ?? [])
-        setSuppliers(d.suppliers ?? [])
+        setCategories(d.categories ?? [])
+        setVendors(d.vendors ?? [])
         setOptionsLoaded(true)
       })
   }, [])
 
-  const doSearch = useCallback(async (q: string, f: string, a: string, s: string) => {
+  const doSearch = useCallback(async (q: string, f: string, cat: string, a: string, v: string) => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    if (f) params.set('familia', f)
-    if (a) params.set('abc', a)
-    if (s) params.set('supplier', s)
+    if (q)   params.set('q', q)
+    if (f)   params.set('familia', f)
+    if (cat) params.set('category', cat)
+    if (a)   params.set('abc', a)
+    if (v)   params.set('vendor', v)
     const res = await fetch(`/api/products/search?${params}`)
     const data = await res.json()
     setProducts(Array.isArray(data) ? data : [])
     setLoading(false)
   }, [])
 
-  // Debounced re-search whenever filters change
   useEffect(() => {
     if (!optionsLoaded) return
     clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => doSearch(search, familia, abc, supplier), 280)
+    debounceRef.current = setTimeout(() => doSearch(search, familia, category, abc, vendor), 280)
     return () => clearTimeout(debounceRef.current)
-  }, [search, familia, abc, supplier, optionsLoaded, doSearch])
+  }, [search, familia, category, abc, vendor, optionsLoaded, doSearch])
 
-  // Initial load when options are ready
   useEffect(() => {
-    if (optionsLoaded) doSearch('', '', '', '')
+    if (optionsLoaded) doSearch('', '', '', '', '')
   }, [optionsLoaded, doSearch])
 
   const available = products.filter(p => !alreadyAdded.has(p.codigo_modelo))
   const allSelected = available.length > 0 && available.every(p => selected.has(p.codigo_modelo))
-  const hasFilters = search || familia || abc || supplier
+  const hasFilters = search || familia || category || abc || vendor
 
   function toggleAll() {
     setSelected(prev => {
       const next = new Set(prev)
-      if (allSelected) {
-        available.forEach(p => next.delete(p.codigo_modelo))
-      } else {
-        available.forEach(p => next.add(p.codigo_modelo))
-      }
+      if (allSelected) available.forEach(p => next.delete(p.codigo_modelo))
+      else available.forEach(p => next.add(p.codigo_modelo))
       return next
     })
   }
@@ -125,7 +124,7 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
   }
 
   function clearFilters() {
-    setSearch(''); setFamilia(''); setAbc(''); setSupplier('')
+    setSearch(''); setFamilia(''); setCategory(''); setAbc(''); setVendor('')
   }
 
   async function handleAdd() {
@@ -140,17 +139,17 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
 
-      {/* Modal */}
+      {/* Modal — más grande */}
       <div
-        className="relative bg-white rounded-xl flex flex-col w-full max-w-2xl"
+        className="relative bg-white rounded-xl flex flex-col w-full max-w-5xl"
         style={{
           boxShadow: '0 20px 60px rgba(0,32,60,0.22)',
-          maxHeight: 'min(85vh, 700px)',
+          maxHeight: 'min(90vh, 780px)',
         }}
       >
         {/* Header */}
         <div
-          className="px-5 py-4 flex items-center justify-between shrink-0 border-b"
+          className="px-6 py-4 flex items-center justify-between shrink-0 border-b"
           style={{ borderColor: 'rgba(0,85,127,0.1)' }}
         >
           <div>
@@ -163,7 +162,7 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
         </div>
 
         {/* Filters */}
-        <div className="px-5 py-3 shrink-0 space-y-2 border-b" style={{ borderColor: 'rgba(0,85,127,0.08)' }}>
+        <div className="px-6 py-3 shrink-0 space-y-2 border-b" style={{ borderColor: 'rgba(0,85,127,0.08)' }}>
           <input
             type="search"
             autoFocus
@@ -174,16 +173,17 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
             style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
           />
           <div className="flex flex-wrap gap-2 items-center">
-            <FilterSelect value={familia}  onChange={setFamilia}  placeholder="Familia: todas"   options={familias} />
-            <FilterSelect value={abc}      onChange={setAbc}      placeholder="ABC: todos"        options={['A', 'B', 'C']} />
-            <FilterSelect value={supplier} onChange={setSupplier} placeholder="Marca: todas"      options={suppliers} />
+            <FilterSelect value={category}   onChange={setCategory}  placeholder="Categoría: todas"  options={categories} />
+            <FilterSelect value={familia}    onChange={setFamilia}   placeholder="Familia: todas"     options={familias} />
+            <FilterSelect value={abc}        onChange={setAbc}       placeholder="ABC: todos"          options={['A', 'B', 'C']} />
+            <FilterSelect value={vendor}     onChange={setVendor}    placeholder="Marca: todas"        options={vendors} />
             {hasFilters && (
               <button
                 onClick={clearFilters}
                 className="text-xs px-3 py-2 rounded-lg transition-colors"
                 style={{ color: '#b2b2b2', background: 'rgba(0,85,127,0.04)' }}
               >
-                Limpiar filtros
+                Limpiar
               </button>
             )}
           </div>
@@ -213,7 +213,7 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
                       className="rounded cursor-pointer"
                     />
                   </th>
-                  {['Código', 'Descripción', 'Familia', 'Marca', 'ABC'].map(h => (
+                  {['Código', 'Descripción', 'Categoría', 'Familia', 'Marca', 'ABC'].map(h => (
                     <th
                       key={h}
                       className="px-3 py-2.5 text-left text-[10px] font-bold tracking-widest uppercase"
@@ -263,14 +263,17 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-xs max-w-[200px]" style={{ color: '#00557f' }}>
+                      <td className="px-3 py-2 text-xs max-w-[220px]" style={{ color: '#00557f' }}>
                         <span className="line-clamp-1">{p.description ?? '—'}</span>
+                      </td>
+                      <td className="px-3 py-2 text-xs" style={{ color: '#b2b2b2' }}>
+                        {p.category ?? '—'}
                       </td>
                       <td className="px-3 py-2 text-xs" style={{ color: '#b2b2b2' }}>
                         {p.familia ?? '—'}
                       </td>
                       <td className="px-3 py-2 text-xs" style={{ color: '#b2b2b2' }}>
-                        {p.supplier_name ?? '—'}
+                        {p.shopify_vendor ?? '—'}
                       </td>
                       <td className="px-3 py-2">
                         <AbcDot abc={p.abc_ventas} />
@@ -285,16 +288,14 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
 
         {/* Footer */}
         <div
-          className="px-5 py-3 shrink-0 flex items-center justify-between border-t"
+          className="px-6 py-3 shrink-0 flex items-center justify-between border-t"
           style={{ borderColor: 'rgba(0,85,127,0.1)' }}
         >
           <p className="text-xs" style={{ color: '#b2b2b2' }}>
             {selected.size > 0
               ? `${selected.size} producto${selected.size !== 1 ? 's' : ''} seleccionado${selected.size !== 1 ? 's' : ''}`
               : `${products.length} resultado${products.length !== 1 ? 's' : ''}`}
-            {alreadyAdded.size > 0 && (
-              <span> · {alreadyAdded.size} ya en campaña</span>
-            )}
+            {alreadyAdded.size > 0 && <span> · {alreadyAdded.size} ya en campaña</span>}
           </p>
           <div className="flex gap-2">
             <button

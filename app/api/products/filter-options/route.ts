@@ -3,17 +3,18 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET() {
   const supabase = createServiceClient()
-  const { data, error } = await supabase
-    .from('products')
-    .select('familia, supplier_name')
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const [prodRes, shopRes] = await Promise.all([
+    supabase.from('products').select('familia, category'),
+    supabase.from('product_shopify_data').select('shopify_vendor'),
+  ])
 
-  const uniq = (field: 'familia' | 'supplier_name') =>
-    Array.from(new Set((data ?? []).map(p => p[field]).filter(Boolean) as string[])).sort()
+  const uniqStr = (vals: (string | null | undefined)[]) =>
+    Array.from(new Set(vals.filter(Boolean) as string[])).sort()
 
   return NextResponse.json({
-    familias:  uniq('familia'),
-    suppliers: uniq('supplier_name'),
+    familias:   uniqStr((prodRes.data ?? []).map(p => p.familia)),
+    categories: uniqStr((prodRes.data ?? []).map(p => p.category)),
+    vendors:    uniqStr((shopRes.data ?? []).map(p => p.shopify_vendor)),
   })
 }

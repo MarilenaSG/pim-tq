@@ -1,32 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
-const SELECT = 'codigo_modelo, description, familia, supplier_name, abc_ventas, is_discontinued'
+const SELECT = 'codigo_modelo, description, familia, category, abc_ventas, is_discontinued'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const q        = searchParams.get('q')?.trim() ?? ''
   const familia  = searchParams.get('familia') ?? ''
+  const category = searchParams.get('category') ?? ''
   const abc      = searchParams.get('abc') ?? ''
-  const supplier = searchParams.get('supplier') ?? ''
+  const vendor   = searchParams.get('vendor') ?? ''
 
   const supabase = createServiceClient()
 
+  // If vendor filter, resolve matching codigo_modelo from shopify data first
+  let vendorCodes: string[] | null = null
+  if (vendor) {
+    const { data: vd } = await supabase
+      .from('product_shopify_data')
+      .select('codigo_modelo')
+      .eq('shopify_vendor', vendor)
+    vendorCodes = (vd ?? []).map(r => r.codigo_modelo as string)
+    // If vendor has no matches, return empty immediately
+    if (vendorCodes.length === 0) return NextResponse.json([])
+  }
+
   function base() {
     let q2 = supabase.from('products').select(SELECT)
-    if (familia)  q2 = q2.eq('familia', familia)
-    if (abc)      q2 = q2.eq('abc_ventas', abc)
-    if (supplier) q2 = q2.eq('supplier_name', supplier)
+    if (familia)        q2 = q2.eq('familia', familia)
+    if (category)       q2 = q2.eq('category', category)
+    if (abc)            q2 = q2.eq('abc_ventas', abc)
+    if (vendorCodes)    q2 = q2.in('codigo_modelo', vendorCodes)
     return q2
   }
 
   if (!q) {
     const { data, error } = await base().order('codigo_modelo').limit(200)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data ?? [])
+    return NextResponse.json(await attachVendors(supabase, data ?? []))
   }
 
-  // Gather extra codigo_modelo matches from variants and shopify
+  // Gather extra codigo_modelo matches from variants and shopify title
   const [variantRes, shopifyRes] = await Promise.all([
     supabase
       .from('product_variants')
@@ -69,5 +83,16 @@ export async function GET(req: NextRequest) {
     return true
   })
 
-  return NextResponse.json(merged)
+  return NextResponse.json(await attachVendors(supabase, merged))
+}
+
+async function attachVendors(supabase: ReturnType<typeof import('@/lib/supabase/server').createServiceClient>, products: any[]) {
+  if (products.length === 0) return products
+  const codes = products.map(p => p.codigo_modelo as string)
+  const { data } = await supabase
+    .from('product_shopify_data')
+    .select('codigo_modelo, shopify_vendor')
+    .in('codigo_modelo', codes)
+  const vendorMap = new Map((data ?? []).map(r => [r.codigo_modelo as string, r.shopify_vendor as string | null]))
+  return products.map(p => ({ ...p, shopify_vendor: vendorMap.get(p.codigo_modelo) ?? null }))
 }
