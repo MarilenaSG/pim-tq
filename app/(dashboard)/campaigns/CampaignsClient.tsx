@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/components/ui'
+import { ProductSelectorModal } from './ProductSelectorModal'
 import type { CampaignRow } from './page'
 
 // ── helpers ───────────────────────────────────────────────────────
@@ -69,8 +70,7 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
   // Products in selected campaign
   const [products, setProducts] = useState<ProductInCampaign[]>([])
   const [loadingProducts, setLoadingProducts] = useState(false)
-  const [addCode, setAddCode] = useState('')
-  const [addingProduct, setAddingProduct] = useState(false)
+  const [showSelector, setShowSelector] = useState(false)
 
   const loadProducts = useCallback(async (id: string) => {
     setLoadingProducts(true)
@@ -139,21 +139,24 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
     toast('Campaña eliminada', 'success')
   }
 
-  async function handleAddProduct() {
-    if (!addCode.trim() || !selected) return
-    setAddingProduct(true)
+  async function handleBatchAdd(codigos: string[]) {
+    if (!selected || codigos.length === 0) return
     const res = await fetch(`/api/campaigns/${selected.id}/products`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ codigos: [addCode.trim().toUpperCase()] }),
+      body: JSON.stringify({ codigos }),
     })
     const data = await res.json()
-    setAddingProduct(false)
     if (!res.ok) { toast(data.error ?? 'Error', 'error'); return }
-    setAddCode('')
+    setShowSelector(false)
     loadProducts(selected.id)
-    setCampaigns(prev => prev.map(c => c.id === selected.id ? { ...c, numProductos: c.numProductos + 1 } : c))
-    toast('Producto añadido', 'success')
+    setCampaigns(prev => prev.map(c =>
+      c.id === selected.id ? { ...c, numProductos: c.numProductos + codigos.length } : c
+    ))
+    toast(
+      codigos.length === 1 ? 'Producto añadido' : `${codigos.length} productos añadidos`,
+      'success'
+    )
   }
 
   async function handleRemoveProduct(codigo: string) {
@@ -174,6 +177,7 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
   )
 
   return (
+    <>
     <div className="flex h-full">
       {/* Main */}
       <div className="flex-1 p-6 max-w-[1200px] space-y-5 overflow-auto">
@@ -412,24 +416,13 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
                     <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>Productos en campaña</p>
 
                     {/* Add product */}
-                    <div className="flex gap-2 mb-3">
-                      <input
-                        value={addCode}
-                        onChange={e => setAddCode(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleAddProduct()}
-                        placeholder="Código modelo (ej: 002AA)"
-                        className="flex-1 px-3 py-2 rounded-lg text-sm border focus:outline-none"
-                        style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
-                      />
-                      <button
-                        onClick={handleAddProduct}
-                        disabled={addingProduct || !addCode.trim()}
-                        className="px-3 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
-                        style={{ background: '#00557f' }}
-                      >
-                        {addingProduct ? '…' : '+'}
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setShowSelector(true)}
+                      className="w-full mb-3 py-2 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90"
+                      style={{ background: '#00557f' }}
+                    >
+                      <span>＋</span> Buscar y añadir productos
+                    </button>
 
                     {loadingProducts ? (
                       <p className="text-xs text-center py-4" style={{ color: '#b2b2b2' }}>Cargando…</p>
@@ -477,5 +470,15 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
         </>
       )}
     </div>
+
+    {/* Product selector modal */}
+    {showSelector && selected && (
+      <ProductSelectorModal
+        alreadyAdded={new Set(products.map(p => p.codigo_modelo))}
+        onAdd={handleBatchAdd}
+        onClose={() => setShowSelector(false)}
+      />
+    )}
+    </>
   )
 }
