@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, createAuthServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const body = await req.json()
   const supabase = createServiceClient()
   const { data, error } = await supabase
@@ -14,6 +10,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       nombre:       body.nombre?.trim(),
       tipo:         body.tipo         || null,
       descripcion:  body.descripcion?.trim() || null,
+      narrativa:    body.narrativa?.trim()   || null,
+      objetivos:    body.objetivos?.trim()   || null,
+      canales:      body.canales?.trim()     || null,
+      soportes:     body.soportes?.trim()    || null,
       fecha_inicio: body.fecha_inicio || null,
       fecha_fin:    body.fecha_fin    || null,
       estado:       body.estado,
@@ -27,10 +27,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const supabase = createServiceClient()
   const { error } = await supabase.from('campaigns').delete().eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

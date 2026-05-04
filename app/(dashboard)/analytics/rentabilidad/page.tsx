@@ -10,11 +10,13 @@ export default async function RentabilidadPage() {
   const [productsRes, variantsRes] = await Promise.all([
     supabase
       .from('products')
-      .select('codigo_modelo, description, familia, metal, supplier_name, abc_ventas, ingresos_12m'),
+      .select('codigo_modelo, description, familia, metal, supplier_name, abc_ventas, ingresos_12m')
+      .eq('is_discontinued', false),
     supabase
       .from('product_variants')
       .select('codigo_modelo, pct_margen_bruto, precio_venta, es_variante_lider')
-      .eq('es_variante_lider', true),
+      .eq('es_variante_lider', true)
+      .eq('is_discontinued', false),
   ])
 
   const products = productsRes.data ?? []

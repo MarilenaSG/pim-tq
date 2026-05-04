@@ -16,10 +16,12 @@ export type ProductTableRow = {
   abc_ventas:         string | null
   imageUrl:           string | null
   shopifyStatus:      string | null
+  shopifyVendor:      string | null
   leaderSlug:         string | null
   completitudPct:     number
   completitudNivel:   'alta' | 'media' | 'baja'
   is_discontinued:    boolean
+  stock_total:        number
 }
 
 export type CampaignOption = { id: string; nombre: string }
@@ -203,8 +205,13 @@ export function ProductsTable({
                   {p.ingresos_12m != null ? p.ingresos_12m.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €' : '—'}
                 </td>
 
-                {/* Variantes */}
-                <td className="px-3 py-2 text-xs text-center" style={{ color: '#b2b2b2' }}>{p.num_variantes ?? '—'}</td>
+                {/* Variantes / Stock */}
+                <td className="px-3 py-2 text-xs text-center whitespace-nowrap" style={{ color: '#b2b2b2' }}>
+                  <span>{p.num_variantes ?? '—'}</span>
+                  {p.stock_total > 0 && (
+                    <span className="ml-1 text-[10px] font-bold" style={{ color: '#3A9E6A' }}>/ {p.stock_total}</span>
+                  )}
+                </td>
 
                 {/* Shopify */}
                 <td className="px-3 py-2"><ShopifyCell status={p.shopifyStatus} /></td>

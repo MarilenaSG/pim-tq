@@ -6,51 +6,52 @@ import type { SyncLog, AlertSummary } from '@/types'
 async function getDashboardData() {
   const supabase = createServerClient()
 
+  // Only active (non-discontinued) products — base for all KPIs
+  const { data: activeProducts, count: totalProducts } = await supabase
+    .from('products')
+    .select('codigo_modelo, ingresos_12m, abc_ventas', { count: 'exact' })
+    .eq('is_discontinued', false)
+
+  const codes         = (activeProducts ?? []).map(p => p.codigo_modelo as string)
+  const totalIngresos = (activeProducts ?? []).reduce((acc, p) => acc + (Number(p.ingresos_12m) || 0), 0)
+  const abcACount     = (activeProducts ?? []).filter(p => p.abc_ventas === 'A').length
+  const total         = totalProducts ?? 0
+
   const [
-    productsResult,
     variantsResult,
     shopifyResult,
     imagesResult,
-    abcAResult,
     syncLogsResult,
-    revenueResult,
+    withPrimaryResult,
   ] = await Promise.all([
-    supabase.from('products').select('*', { count: 'exact', head: true }),
-    supabase.from('product_variants').select('*', { count: 'exact', head: true }),
-    supabase.from('product_shopify_data').select('*', { count: 'exact', head: true }),
-    supabase.from('product_images').select('codigo_modelo').eq('source', 'shopify'),
-    supabase.from('products').select('codigo_modelo').eq('abc_ventas', 'A'),
+    supabase.from('product_variants').select('*', { count: 'exact', head: true }).eq('is_discontinued', false),
+    codes.length > 0
+      ? supabase.from('product_shopify_data').select('codigo_modelo').in('codigo_modelo', codes)
+      : Promise.resolve({ data: [] as { codigo_modelo: string }[] }),
+    codes.length > 0
+      ? supabase.from('product_images').select('codigo_modelo').eq('source', 'shopify').in('codigo_modelo', codes)
+      : Promise.resolve({ data: [] as { codigo_modelo: string }[] }),
     supabase.from('sync_log').select('*').order('started_at', { ascending: false }).limit(10),
-    supabase.from('products').select('ingresos_12m'),
+    codes.length > 0
+      ? supabase.from('product_images').select('codigo_modelo', { count: 'exact', head: true }).eq('is_primary', true).in('codigo_modelo', codes)
+      : Promise.resolve({ count: 0 }),
   ])
 
-  const totalProducts = productsResult.count ?? 0
-  const totalVariants = variantsResult.count ?? 0
-  const totalShopify  = shopifyResult.count ?? 0
+  const totalVariants     = variantsResult.count ?? 0
+  const totalShopify      = (shopifyResult.data ?? []).length
   const withShopifyImages = new Set((imagesResult.data ?? []).map(r => r.codigo_modelo)).size
-  const sinImagenShopify  = Math.max(0, totalProducts - withShopifyImages)
-  const abcACount     = abcAResult.data?.length ?? 0
-  const sinShopify    = Math.max(0, totalProducts - totalShopify)
+  const sinImagenShopify  = Math.max(0, total - withShopifyImages)
+  const sinShopify        = Math.max(0, total - totalShopify)
 
-  const totalIngresos = (revenueResult.data ?? []).reduce(
-    (acc, p) => acc + (Number(p.ingresos_12m) || 0), 0
-  )
-
-  const logs = (syncLogsResult.data ?? []) as SyncLog[]
+  const logs         = (syncLogsResult.data ?? []) as SyncLog[]
   const lastMetabase = logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null
   const lastShopify  = logs.find(l => l.source === 'shopify'  && l.status !== 'running') ?? null
 
-  // Completitud aproximada: products without primary image
-  const { count: withPrimary } = await supabase
-    .from('product_images')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_primary', true)
-  const sinImagenPrimaria = Math.max(0, totalProducts - (withPrimary ?? 0))
-  const pctIncompletas = totalProducts > 0
-    ? Math.round((sinImagenPrimaria / totalProducts) * 100)
-    : 0
+  const withPrimary       = withPrimaryResult.count ?? 0
+  const sinImagenPrimaria = Math.max(0, total - withPrimary)
+  const pctIncompletas    = total > 0 ? Math.round((sinImagenPrimaria / total) * 100) : 0
 
-  return { totalProducts, totalVariants, totalShopify, sinImagenShopify, abcACount, sinShopify, totalIngresos, lastMetabase, lastShopify, sinImagenPrimaria, pctIncompletas }
+  return { totalProducts: total, totalVariants, totalShopify, sinImagenShopify, abcACount, sinShopify, totalIngresos, lastMetabase, lastShopify, sinImagenPrimaria, pctIncompletas }
 }
 
 export default async function DashboardPage() {
@@ -183,14 +184,14 @@ export default async function DashboardPage() {
                 {alertSummary.byCategory.stock > 0 && (
                   <span style={{ color: '#C0392B' }}>🔴 Stock: {alertSummary.byCategory.stock}</span>
                 )}
-                {alertSummary.byCategory.fichas > 0 && (
-                  <span style={{ color: '#C8842A' }}>🟠 Fichas: {alertSummary.byCategory.fichas}</span>
+                {alertSummary.byCategory.sin_venta > 0 && (
+                  <span style={{ color: '#C0392B' }}>🔴 Sin ventas: {alertSummary.byCategory.sin_venta}</span>
                 )}
-                {alertSummary.byCategory.ciclo_vida > 0 && (
-                  <span style={{ color: '#C8842A' }}>🟠 Ciclo vida: {alertSummary.byCategory.ciclo_vida}</span>
+                {alertSummary.byCategory.familias_sin_new > 0 && (
+                  <span style={{ color: '#C8842A' }}>🟠 Familias: {alertSummary.byCategory.familias_sin_new}</span>
                 )}
-                {alertSummary.byCategory.sync > 0 && (
-                  <span style={{ color: '#C0392B' }}>🔴 Sync: {alertSummary.byCategory.sync}</span>
+                {alertSummary.byCategory.shopify_inactivo > 0 && (
+                  <span style={{ color: '#C8842A' }}>🟠 Shopify: {alertSummary.byCategory.shopify_inactivo}</span>
                 )}
               </div>
             </>

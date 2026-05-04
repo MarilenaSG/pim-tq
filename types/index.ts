@@ -171,7 +171,7 @@ export interface ActivityItem {
 // ── Alerts ───────────────────────────────────────────────────
 
 export type AlertSeverity = 'critica' | 'media'
-export type AlertCategory = 'stock' | 'fichas' | 'ciclo_vida' | 'sync'
+export type AlertCategory = 'stock' | 'sin_venta' | 'familias_sin_new' | 'shopify_inactivo'
 
 export interface AlertItem {
   id: string

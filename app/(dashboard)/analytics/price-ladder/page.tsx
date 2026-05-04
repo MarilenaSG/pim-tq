@@ -19,6 +19,7 @@ export default async function PriceLadderPage({
         descuento_aplicado, pct_margen_bruto, es_variante_lider, abc_ventas
       )
     `)
+    .eq('is_discontinued', false)
 
   // Load ladder ranges from alert_settings
   const { data: settings } = await supabase

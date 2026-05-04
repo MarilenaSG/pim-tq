@@ -56,16 +56,16 @@ function sortVariante(a: string | null, b: string | null): number {
 
 function ProductCard({ p }: { p: CatalogProduct }) {
   const [expanded, setExpanded] = useState(false)
-  const totalStock    = p.stock_total
-  const hasStock      = totalStock > 0
-  // Badge "Descatalogado" solo si TODAS las variantes están descatalogadas
-  const allDiscontinued = p.variants.length > 0 && p.variants.every(v => v.is_discontinued)
+  const totalStock      = p.stock_total
+  const hasStock        = totalStock > 0
+  // Computed server-side: true when ALL variants are discontinued
+  const allDiscontinued = p.is_discontinued
 
-  // Variantes a mostrar: con stock O descatalogadas (las sin stock no descatalogadas se ocultan)
-  // Orden: activas primero (por talla), descatalogadas al final (por talla)
+  // Server already filtered out discontinued-with-no-stock variants.
+  // Here we just split: active first, then discontinued-with-stock in gray.
   const visibleVariants = [
     ...p.variants
-      .filter(v => !v.is_discontinued && (v.stock ?? 0) > 0)
+      .filter(v => !v.is_discontinued)
       .sort((a, b) => sortVariante(a.variante, b.variante)),
     ...p.variants
       .filter(v => v.is_discontinued)

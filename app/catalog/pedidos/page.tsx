@@ -2,82 +2,93 @@ import { createServerClient } from '@/lib/supabase/server'
 import { PedidosTable } from './PedidosTable'
 
 export interface PedidoRow {
-  codigo_modelo:   string
-  description:     string | null
-  category:        string | null
-  familia:         string | null
-  metal:           string | null
-  karat:           string | null
-  lista_variantes: string | null
-  image_url:       string | null
-  precio_venta:    number | null
-  is_discontinued: boolean
+  codigo_modelo: string
+  description:   string | null
+  category:      string | null
+  familia:       string | null
+  metal:         string | null
+  karat:         string | null
+  image_url:     string | null
+  precio_venta:  number | null
+  stock_total:   number
+  variantes:     string[]   // active variant sizes, sorted
 }
 
 async function getPedidosData(): Promise<PedidoRow[]> {
   const supabase = createServerClient()
 
-  const { data: products } = await supabase
-    .from('products')
-    .select(`
-      codigo_modelo,
-      description,
-      category,
-      familia,
-      metal,
-      karat,
-      num_variantes,
-      lista_variantes,
-      is_discontinued
-    `)
-    .order('metal',        { ascending: true, nullsFirst: false })
-    .order('familia',      { ascending: true, nullsFirst: false })
-    .order('description',  { ascending: true, nullsFirst: false })
+  // Only active (non-discontinued) variants
+  const { data: variants } = await supabase
+    .from('product_variants')
+    .select('codigo_modelo, variante, precio_venta, stock_variante, es_variante_lider')
+    .eq('is_discontinued', false)
 
-  if (!products?.length) return []
+  if (!variants?.length) return []
 
-  const codes = products.map(p => p.codigo_modelo)
+  const codes = Array.from(new Set(variants.map(v => v.codigo_modelo)))
 
-  const [imagesRes, variantsRes] = await Promise.all([
+  const [productsRes, imagesRes] = await Promise.all([
+    supabase
+      .from('products')
+      .select('codigo_modelo, description, category, familia, metal, karat')
+      .in('codigo_modelo', codes),
     supabase
       .from('product_images')
       .select('codigo_modelo, url')
       .in('codigo_modelo', codes)
       .eq('is_primary', true),
-    supabase
-      .from('product_variants')
-      .select('codigo_modelo, precio_venta, es_variante_lider')
-      .in('codigo_modelo', codes)
-      .order('es_variante_lider', { ascending: false }),
   ])
 
+  const productMap = Object.fromEntries(
+    (productsRes.data ?? []).map(p => [p.codigo_modelo, p])
+  )
   const imageMap = Object.fromEntries(
     (imagesRes.data ?? []).map(r => [r.codigo_modelo, r.url])
   )
 
-  const leaderPriceMap = Object.fromEntries(
-    (variantsRes.data ?? [])
-      .filter(v => v.es_variante_lider)
-      .map(v => [v.codigo_modelo, v.precio_venta])
-  )
+  // Group variants by model
+  const variantsByModel: Record<string, typeof variants> = {}
+  for (const v of variants) {
+    if (!variantsByModel[v.codigo_modelo]) variantsByModel[v.codigo_modelo] = []
+    variantsByModel[v.codigo_modelo].push(v)
+  }
 
-  return products.map(p => ({
-    codigo_modelo:   p.codigo_modelo,
-    description:     p.description,
-    category:        p.category,
-    familia:         p.familia,
-    metal:           p.metal,
-    karat:           p.karat,
-    lista_variantes: p.lista_variantes,
-    image_url:       imageMap[p.codigo_modelo]    ?? null,
-    precio_venta:    leaderPriceMap[p.codigo_modelo] ?? null,
-    is_discontinued: p.is_discontinued ?? false,
-  }))
+  return Object.entries(variantsByModel)
+    .map(([codigo_modelo, vars]) => {
+      const p      = productMap[codigo_modelo]
+      const leader = vars.find(v => v.es_variante_lider) ?? vars[0]
+      const stock  = vars.reduce((acc, v) => acc + (v.stock_variante ?? 0), 0)
+
+      const sorted = [...vars].sort((a, b) => {
+        const na = parseFloat(a.variante ?? ''), nb = parseFloat(b.variante ?? '')
+        if (!isNaN(na) && !isNaN(nb)) return na - nb
+        return (a.variante ?? '').localeCompare(b.variante ?? '', 'es')
+      })
+
+      return {
+        codigo_modelo,
+        description:  p?.description ?? null,
+        category:     p?.category    ?? null,
+        familia:      p?.familia     ?? null,
+        metal:        p?.metal       ?? null,
+        karat:        p?.karat       ?? null,
+        image_url:    imageMap[codigo_modelo] ?? null,
+        precio_venta: leader?.precio_venta    ?? null,
+        stock_total:  stock,
+        variantes:    sorted.map(v => v.variante).filter(Boolean) as string[],
+      }
+    })
+    .sort((a, b) => {
+      const mc = (a.metal ?? '').localeCompare(b.metal ?? '', 'es')
+      if (mc !== 0) return mc
+      const fc = (a.familia ?? '').localeCompare(b.familia ?? '', 'es')
+      if (fc !== 0) return fc
+      return (a.description ?? '').localeCompare(b.description ?? '', 'es')
+    })
 }
 
 export default async function PedidosPage() {
   const rows = await getPedidosData()
-
   return (
     <div className="max-w-screen-2xl mx-auto px-4 py-5">
       <PedidosTable rows={rows} />

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, createAuthServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 function toSlug(nombre: string) {
   return nombre
@@ -20,12 +20,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const body = await req.json()
-  const { nombre, tipo, descripcion, fecha_inicio, fecha_fin, estado, color } = body
+  const { nombre, tipo, descripcion, narrativa, objetivos, canales, soportes, fecha_inicio, fecha_fin, estado, color } = body
   if (!nombre?.trim()) return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 })
 
   const supabase = createServiceClient()
@@ -36,6 +32,10 @@ export async function POST(req: NextRequest) {
       slug: toSlug(nombre),
       tipo: tipo || null,
       descripcion: descripcion?.trim() || null,
+      narrativa: narrativa?.trim() || null,
+      objetivos: objetivos?.trim() || null,
+      canales: canales?.trim() || null,
+      soportes: soportes?.trim() || null,
       fecha_inicio: fecha_inicio || null,
       fecha_fin: fecha_fin || null,
       estado: estado || 'borrador',

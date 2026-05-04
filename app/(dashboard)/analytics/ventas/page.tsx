@@ -12,8 +12,8 @@ export default async function VentasAnalyticsPage() {
 
   const [ventasRes, variantsRes, productsRes] = await Promise.all([
     supabase.from('ventas_mensuales').select('slug, anyo, mes, unidades_vendidas, ingresos_netos, coste_total'),
-    supabase.from('product_variants').select('slug, codigo_modelo'),
-    supabase.from('products').select('codigo_modelo, description, familia, metal'),
+    supabase.from('product_variants').select('slug, codigo_modelo').eq('is_discontinued', false),
+    supabase.from('products').select('codigo_modelo, description, familia, metal').eq('is_discontinued', false),
   ])
 
   const ventas   = ventasRes.data   ?? []

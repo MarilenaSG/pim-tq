@@ -24,12 +24,14 @@ export default async function PrecioPage() {
     .from('product_variants')
     .select('codigo_modelo, precio_venta, precio_tachado, descuento_aplicado, pct_margen_bruto, es_variante_lider')
     .eq('es_variante_lider', true)
+    .eq('is_discontinued', false)
     .not('precio_venta', 'is', null)
 
   // Products for familia mapping
   const { data: products } = await supabase
     .from('products')
     .select('codigo_modelo, familia, metal')
+    .eq('is_discontinued', false)
 
   const familiaByCode = new Map<string, string>(
     (products ?? []).map(p => [p.codigo_modelo as string, p.familia as string ?? ''])

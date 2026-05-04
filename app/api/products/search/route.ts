@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // Helper: build a base query with optional filters
   function base() {
     let q2 = supabase.from('products').select(SELECT)
     if (familia)  q2 = q2.eq('familia', familia)
@@ -46,7 +45,6 @@ export async function GET(req: NextRequest) {
     ...(shopifyRes.data?.map(s => s.codigo_modelo as string) ?? []),
   ]))
 
-  // Text search query
   const textResult = await base()
     .or(`description.ilike.%${q}%,codigo_modelo.ilike.%${q}%`)
     .order('codigo_modelo')
@@ -54,7 +52,6 @@ export async function GET(req: NextRequest) {
 
   if (textResult.error) return NextResponse.json({ error: textResult.error.message }, { status: 500 })
 
-  // Extra codes query (variants / shopify matches)
   let codesData: typeof textResult.data = []
   if (extraCodes.length > 0) {
     const codesResult = await base()
@@ -65,7 +62,6 @@ export async function GET(req: NextRequest) {
     codesData = codesResult.data ?? []
   }
 
-  // Merge and deduplicate preserving text-match order first
   const seen = new Set<string>()
   const merged = [...(textResult.data ?? []), ...codesData].filter(p => {
     if (seen.has(p.codigo_modelo)) return false

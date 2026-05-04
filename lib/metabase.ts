@@ -225,6 +225,17 @@ export async function syncMetabase(): Promise<SyncResult> {
     }
   }
 
+  // A model is discontinued only if ALL its variants are discontinued.
+  // This prevents a model from appearing discontinued when only some sizes are.
+  const allDiscontinuedByModel = new Map<string, boolean>()
+  for (const r of rows) {
+    const prev = allDiscontinuedByModel.get(r.codigo_modelo)
+    allDiscontinuedByModel.set(
+      r.codigo_modelo,
+      prev === undefined ? r.is_discontinued : prev && r.is_discontinued
+    )
+  }
+
   const productRows = Array.from(productMap.values()).map(r => ({
     codigo_modelo:      r.codigo_modelo,
     description:        r.description,
@@ -241,7 +252,7 @@ export async function syncMetabase(): Promise<SyncResult> {
     unidades_12m:       r.unidades_12m !== null ? Math.round(r.unidades_12m) : null,
     abc_ventas:         r.abc_ventas,
     abc_unidades:       r.abc_unidades,
-    is_discontinued:    r.is_discontinued,
+    is_discontinued:    allDiscontinuedByModel.get(r.codigo_modelo) ?? r.is_discontinued,
     metabase_synced_at: now,
     updated_at:         now,
   }))
