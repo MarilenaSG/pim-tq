@@ -3,6 +3,16 @@
 import { useState, useTransition } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
+function buildPdfUrl(filters: ActiveFilters): string {
+  const params = new URLSearchParams()
+  if (filters.search)   params.set('search',   filters.search)
+  if (filters.metal)    params.set('metal',    filters.metal)
+  if (filters.familia)  params.set('familia',  filters.familia)
+  if (filters.category) params.set('category', filters.category)
+  if (filters.estado)   params.set('estado',   filters.estado)
+  return `/api/catalog/export-pdf?${params.toString()}`
+}
+
 interface Variant {
   variante:        string | null
   precio_venta:    number | null
@@ -238,7 +248,29 @@ export function CatalogGrid({ products, filterOptions, activeFilters }: Props) {
   const router   = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
-  const [search, setSearch] = useState(activeFilters.search ?? '')
+  const [search,        setSearch]        = useState(activeFilters.search ?? '')
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  async function downloadPDF() {
+    if (isDownloading) return
+    setIsDownloading(true)
+    try {
+      const url = buildPdfUrl(activeFilters)
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(await res.text())
+      const blob = await res.blob()
+      const link = document.createElement('a')
+      link.href  = URL.createObjectURL(blob)
+      link.download = `catalogo-tq-${new Date().toISOString().slice(0, 10)}.pdf`
+      link.click()
+      URL.revokeObjectURL(link.href)
+    } catch (err) {
+      console.error('Error generando PDF:', err)
+      alert('No se pudo generar el PDF. Inténtalo de nuevo.')
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   function applyFilter(key: string, value: string) {
     const params = new URLSearchParams()
@@ -373,12 +405,41 @@ export function CatalogGrid({ products, filterOptions, activeFilters }: Props) {
         )}
       </div>
 
-      {/* Results count */}
-      {hasFilters && (
-        <p className="text-xs mb-4" style={{ color: '#b2b2b2' }}>
-          {products.length} modelo{products.length !== 1 ? 's' : ''} encontrado{products.length !== 1 ? 's' : ''}
+      {/* Results count + PDF download */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs" style={{ color: '#b2b2b2' }}>
+          {hasFilters
+            ? `${products.length} modelo${products.length !== 1 ? 's' : ''} encontrado${products.length !== 1 ? 's' : ''}`
+            : `${products.length} modelo${products.length !== 1 ? 's' : ''} en catálogo`
+          }
         </p>
-      )}
+        {products.length > 0 && (
+          <button
+            onClick={downloadPDF}
+            disabled={isDownloading}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+            style={{
+              background:    isDownloading ? 'rgba(0,85,127,0.06)' : 'rgba(0,85,127,0.10)',
+              color:         isDownloading ? '#aaaaaa' : '#00557f',
+              cursor:        isDownloading ? 'wait' : 'pointer',
+              opacity:       isDownloading ? 0.7 : 1,
+              boxShadow:     '0 1px 4px rgba(0,32,60,0.08)',
+            }}
+          >
+            {isDownloading ? (
+              <>
+                <span
+                  className="inline-block w-3 h-3 rounded-full border-2 animate-spin"
+                  style={{ borderColor: '#aaaaaa', borderTopColor: 'transparent' }}
+                />
+                Generando PDF…
+              </>
+            ) : (
+              <>↓ Descargar catálogo PDF</>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Grid */}
       {products.length === 0 ? (

@@ -56,10 +56,11 @@ const s = StyleSheet.create({
     backgroundColor: TQ_BLUE,
   },
   coverBody: {
+    // Sin flexGrow: 1 para que el contenido fluya a páginas nuevas
+    // cuando supera el alto de la primera página
     paddingHorizontal: 48,
     paddingTop:        40,
     paddingBottom:     40,
-    flexGrow:          1,
   },
   coverBrand: {
     fontSize:    11,
@@ -94,20 +95,28 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,85,127,0.12)',
     marginBottom:    24,
   },
+  coverSection: {
+    marginBottom: 18,
+  },
   coverNarrLabel: {
     fontSize:        8,
     color:           '#999999',
     fontFamily:      'Helvetica-Bold',
     letterSpacing:   1.5,
-    marginBottom:    10,
+    marginBottom:    6,
   },
   coverNarr: {
     fontSize:    11,
     color:       TQ_BLUE,
     lineHeight:  1.7,
   },
+  coverFooterDivider: {
+    height:          1,
+    backgroundColor: 'rgba(0,85,127,0.12)',
+    marginTop:       28,
+    marginBottom:    14,
+  },
   coverFooter: {
-    marginTop:   'auto' as unknown as number,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems:  'center',
@@ -141,6 +150,53 @@ const s = StyleSheet.create({
   productsBody: {
     paddingHorizontal: 32,
     paddingTop:        8,
+  },
+
+  // Metal group header
+  metalHeader: {
+    backgroundColor:   TQ_BLUE,
+    paddingHorizontal: 10,
+    paddingVertical:   7,
+    marginTop:         18,
+    marginBottom:      0,
+    borderRadius:      3,
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+  },
+  metalHeaderText: {
+    fontSize:    10,
+    color:       '#ffffff',
+    fontFamily:  'Helvetica-Bold',
+    letterSpacing: 1.2,
+  },
+  metalHeaderCount: {
+    fontSize:  8,
+    color:     'rgba(255,255,255,0.7)',
+    fontFamily: 'Helvetica',
+  },
+
+  // Familia subgroup header
+  familiaHeader: {
+    borderLeftWidth:   3,
+    borderLeftColor:   TQ_GOLD,
+    paddingHorizontal: 8,
+    paddingVertical:   5,
+    marginTop:         12,
+    marginBottom:      0,
+    backgroundColor:   'rgba(200,132,42,0.06)',
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+  },
+  familiaHeaderText: {
+    fontSize:   9,
+    color:      TQ_BLUE,
+    fontFamily: 'Helvetica-Bold',
+  },
+  familiaHeaderCount: {
+    fontSize:  8,
+    color:     '#999999',
   },
 
   // Product row
@@ -276,6 +332,41 @@ function fmtEur(n: number) {
   return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
+// Orden de prioridad de metales (el resto va al final ordenado alfabéticamente)
+const METAL_ORDER = ['oro', 'oro blanco', 'oro rosa', 'vermeil', 'plata', 'acero']
+
+function metalSortKey(metal: string): string {
+  const lower = metal.toLowerCase()
+  const idx = METAL_ORDER.findIndex(m => lower.includes(m) || lower === m)
+  return idx >= 0 ? String(idx).padStart(2, '0') + metal : '99' + metal
+}
+
+type FamiliaGroup = { familia: string; items: ProductPDFRow[] }
+type MetalGroup   = { metal: string; familias: FamiliaGroup[]; total: number }
+
+function groupProducts(products: ProductPDFRow[]): MetalGroup[] {
+  const metalMap = new Map<string, Map<string, ProductPDFRow[]>>()
+
+  for (const p of products) {
+    const metal   = p.metal   || 'Sin especificar'
+    const familia = p.familia || 'Sin familia'
+    if (!metalMap.has(metal)) metalMap.set(metal, new Map())
+    const familiaMap = metalMap.get(metal)!
+    if (!familiaMap.has(familia)) familiaMap.set(familia, [])
+    familiaMap.get(familia)!.push(p)
+  }
+
+  return Array.from(metalMap.keys())
+    .sort((a, b) => metalSortKey(a).localeCompare(metalSortKey(b), 'es'))
+    .map(metal => {
+      const familiaMap = metalMap.get(metal)!
+      const familias: FamiliaGroup[] = Array.from(familiaMap.keys())
+        .sort((a, b) => a.localeCompare(b, 'es'))
+        .map(familia => ({ familia, items: familiaMap.get(familia)! }))
+      return { metal, familias, total: Array.from(familiaMap.values()).reduce((n, arr) => n + arr.length, 0) }
+    })
+}
+
 // ── Sub-components ─────────────────────────────────────────────────
 
 function ProductRow({ p }: { p: ProductPDFRow }) {
@@ -337,6 +428,43 @@ function ProductRow({ p }: { p: ProductPDFRow }) {
   )
 }
 
+// Encabezado de metal + primera fila en bloque inseparable para evitar
+// que el header quede huérfano al final de una página
+function MetalSection({ group }: { group: MetalGroup }) {
+  return (
+    <>
+      {group.familias.map((fg, fi) => (
+        <React.Fragment key={fg.familia}>
+          {/* Metal header: solo delante de la primera familia */}
+          {fi === 0 ? (
+            <View wrap={false}>
+              <View style={s.metalHeader}>
+                <Text style={s.metalHeaderText}>{group.metal.toUpperCase()}</Text>
+                <Text style={s.metalHeaderCount}>{group.total} ref.</Text>
+              </View>
+              <View style={s.familiaHeader}>
+                <Text style={s.familiaHeaderText}>{fg.familia}</Text>
+                <Text style={s.familiaHeaderCount}>{fg.items.length} ref.</Text>
+              </View>
+              {fg.items[0] && <ProductRow p={fg.items[0]} />}
+            </View>
+          ) : (
+            <View wrap={false}>
+              <View style={s.familiaHeader}>
+                <Text style={s.familiaHeaderText}>{fg.familia}</Text>
+                <Text style={s.familiaHeaderCount}>{fg.items.length} ref.</Text>
+              </View>
+              {fg.items[0] && <ProductRow p={fg.items[0]} />}
+            </View>
+          )}
+          {/* Resto de productos de esta familia (pueden paginar libremente) */}
+          {fg.items.slice(1).map(p => <ProductRow key={p.codigo} p={p} />)}
+        </React.Fragment>
+      ))}
+    </>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────
 
 export function CampaignPDF({
@@ -353,70 +481,89 @@ export function CampaignPDF({
   if (campaign.fecha_inicio) metaChips.push(`Inicio: ${fmtDate(campaign.fecha_inicio)}`)
   if (campaign.fecha_fin)    metaChips.push(`Fin: ${fmtDate(campaign.fecha_fin)}`)
 
+  const metalGroups = groupProducts(products)
+
   return (
     <Document title={`Te Quiero Jewels — ${campaign.nombre}`} author="Te Quiero Jewels">
 
-      {/* ── Cover page ── */}
+      {/* ── Cover page (puede paginar si el texto es largo) ── */}
       <Page size="A4" style={s.page}>
-        <View style={s.coverAccent} />
-        <View style={s.coverBody}>
-          <Text style={s.coverBrand}>TE QUIERO JEWELS</Text>
-          <Text style={s.coverTitle}>{campaign.nombre}</Text>
+        {/* Franja azul — fija en cada página de la portada */}
+        <View style={s.coverAccent} fixed />
 
-          {metaChips.length > 0 && (
-            <View style={s.coverMeta}>
-              {metaChips.map(chip => (
-                <Text key={chip} style={s.coverChip}>{chip}</Text>
-              ))}
-              <Text style={s.coverChip}>{products.length} referencia{products.length !== 1 ? 's' : ''}</Text>
+        <View style={s.coverBody}>
+          {/* Cabecera con marca y título — se mantiene unida */}
+          <View wrap={false}>
+            <Text style={s.coverBrand}>TE QUIERO JEWELS</Text>
+            <Text style={s.coverTitle}>{campaign.nombre}</Text>
+
+            {metaChips.length > 0 && (
+              <View style={s.coverMeta}>
+                {metaChips.map(chip => (
+                  <Text key={chip} style={s.coverChip}>{chip}</Text>
+                ))}
+                <Text style={s.coverChip}>{products.length} referencia{products.length !== 1 ? 's' : ''}</Text>
+              </View>
+            )}
+
+            <View style={s.coverDivider} />
+
+            {campaign.canales && (
+              <Text style={{ ...s.coverNarrLabel, marginBottom: 16 }}>
+                CANALES: {campaign.canales.split(',').filter(Boolean).map(c => c.trim() === 'online' ? 'Online' : 'Tiendas').join('  ·  ')}
+              </Text>
+            )}
+          </View>
+
+          {/* Secciones de texto — cada una puede fluir a la siguiente página */}
+          {campaign.descripcion && (
+            <View style={s.coverSection}>
+              <Text style={s.coverNarrLabel}>DESCRIPCIÓN</Text>
+              <Text style={s.coverNarr}>{campaign.descripcion}</Text>
             </View>
           )}
 
-          <View style={s.coverDivider} />
-
-          {campaign.canales && (
-            <Text style={{ ...s.coverNarrLabel, marginBottom: 6 }}>
-              CANALES: {campaign.canales.split(',').filter(Boolean).map(c => c === 'online' ? 'Online' : 'Tiendas').join('  ·  ')}
-            </Text>
-          )}
-
           {campaign.objetivos && (
-            <>
+            <View style={s.coverSection}>
               <Text style={s.coverNarrLabel}>OBJETIVOS</Text>
-              <Text style={{ ...s.coverNarr, marginBottom: 14 }}>{campaign.objetivos}</Text>
-            </>
+              <Text style={s.coverNarr}>{campaign.objetivos}</Text>
+            </View>
           )}
 
           {campaign.soportes && (
-            <>
+            <View style={s.coverSection}>
               <Text style={s.coverNarrLabel}>SOPORTES</Text>
-              <Text style={{ ...s.coverNarr, marginBottom: 14 }}>{campaign.soportes}</Text>
-            </>
+              <Text style={s.coverNarr}>{campaign.soportes}</Text>
+            </View>
           )}
 
           {campaign.narrativa && (
-            <>
+            <View style={s.coverSection}>
               <Text style={s.coverNarrLabel}>CONCEPTO DE CAMPAÑA</Text>
               <Text style={s.coverNarr}>{campaign.narrativa}</Text>
-            </>
+            </View>
           )}
 
-          <View style={s.coverFooter}>
-            <Text style={s.coverFooterText}>Generado el {fecha} · Uso interno y para agencias</Text>
-            <Text style={s.coverCount}>{products.length} ref.</Text>
+          {/* Footer — al final del contenido, sin marginTop: auto */}
+          <View wrap={false}>
+            <View style={s.coverFooterDivider} />
+            <View style={s.coverFooter}>
+              <Text style={s.coverFooterText}>Generado el {fecha} · Uso interno y para agencias</Text>
+              <Text style={s.coverCount}>{products.length} ref.</Text>
+            </View>
           </View>
         </View>
       </Page>
 
-      {/* ── Products pages ── */}
+      {/* ── Products pages — agrupados por metal y familia ── */}
       <Page size="A4" style={s.page}>
         <View style={s.productsHeader} fixed>
           <Text style={s.productsHeaderText}>TE QUIERO JEWELS  ·  {campaign.nombre.toUpperCase()}</Text>
           <Text style={s.productsHeaderText}>{products.length} REFERENCIAS</Text>
         </View>
         <View style={s.productsBody}>
-          {products.map(p => (
-            <ProductRow key={p.codigo} p={p} />
+          {metalGroups.map(group => (
+            <MetalSection key={group.metal} group={group} />
           ))}
         </View>
       </Page>
