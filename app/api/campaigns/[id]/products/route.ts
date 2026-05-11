@@ -45,14 +45,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   const { searchParams } = new URL(req.url)
   const codigo = searchParams.get('codigo_modelo')
-  if (!codigo) return NextResponse.json({ error: 'codigo_modelo requerido' }, { status: 400 })
 
   const supabase = createServiceClient()
-  const { error } = await supabase
-    .from('campaign_products')
-    .delete()
-    .eq('campaign_id', params.id)
-    .eq('codigo_modelo', codigo)
+  let query = supabase.from('campaign_products').delete().eq('campaign_id', params.id)
+  if (codigo) query = query.eq('codigo_modelo', codigo)
+
+  const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

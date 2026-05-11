@@ -5,32 +5,58 @@ const SELECT = 'codigo_modelo, description, familia, category, abc_ventas, is_di
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const q        = searchParams.get('q')?.trim() ?? ''
-  const familia  = searchParams.get('familia') ?? ''
-  const category = searchParams.get('category') ?? ''
-  const abc      = searchParams.get('abc') ?? ''
-  const vendor   = searchParams.get('vendor') ?? ''
+  const q            = searchParams.get('q')?.trim() ?? ''
+  const familia      = searchParams.get('familia') ?? ''
+  const category     = searchParams.get('category') ?? ''
+  const abc          = searchParams.get('abc') ?? ''
+  const vendor       = searchParams.get('vendor') ?? ''
+  const discontinued = searchParams.get('discontinued') ?? ''
+  const stock        = searchParams.get('stock') ?? ''
 
   const supabase = createServiceClient()
 
-  // If vendor filter, resolve matching codigo_modelo from shopify data first
+  // Pre-queries for join-like filters (vendor, stock) run in parallel
   let vendorCodes: string[] | null = null
+  let withStockCodes: string[] | null = null
+  let noStockExclude: string[] | null = null
+
+  const preQueries: Promise<void>[] = []
+
   if (vendor) {
-    const { data: vd } = await supabase
-      .from('product_shopify_data')
-      .select('codigo_modelo')
-      .eq('shopify_vendor', vendor)
-    vendorCodes = (vd ?? []).map(r => r.codigo_modelo as string)
-    // If vendor has no matches, return empty immediately
-    if (vendorCodes.length === 0) return NextResponse.json([])
+    preQueries.push(
+      supabase.from('product_shopify_data').select('codigo_modelo').eq('shopify_vendor', vendor)
+        .then(({ data }) => { vendorCodes = (data ?? []).map(r => r.codigo_modelo as string) })
+    )
   }
+  if (stock === 'con') {
+    preQueries.push(
+      supabase.from('product_variants').select('codigo_modelo').gt('stock_variante', 0)
+        .then(({ data }) => { withStockCodes = Array.from(new Set((data ?? []).map(r => r.codigo_modelo as string))) })
+    )
+  }
+  if (stock === 'sin') {
+    preQueries.push(
+      supabase.from('product_variants').select('codigo_modelo').gt('stock_variante', 0)
+        .then(({ data }) => { noStockExclude = Array.from(new Set((data ?? []).map(r => r.codigo_modelo as string))) })
+    )
+  }
+
+  await Promise.all(preQueries)
+
+  if (vendorCodes !== null && vendorCodes.length === 0) return NextResponse.json([])
+  if (withStockCodes !== null && withStockCodes.length === 0) return NextResponse.json([])
 
   function base() {
     let q2 = supabase.from('products').select(SELECT)
     if (familia)        q2 = q2.eq('familia', familia)
     if (category)       q2 = q2.eq('category', category)
     if (abc)            q2 = q2.eq('abc_ventas', abc)
+    if (discontinued === 'catalogado')    q2 = q2.eq('is_discontinued', false)
+    if (discontinued === 'descatalogado') q2 = q2.eq('is_discontinued', true)
     if (vendorCodes)    q2 = q2.in('codigo_modelo', vendorCodes)
+    if (withStockCodes) q2 = q2.in('codigo_modelo', withStockCodes)
+    if (noStockExclude !== null && noStockExclude.length > 0)
+      q2 = q2.not('codigo_modelo', 'in', `(${noStockExclude.join(',')})`)
     return q2
   }
 

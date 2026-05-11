@@ -219,6 +219,16 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
     toast(codigos.length === 1 ? 'Producto añadido' : `${codigos.length} productos añadidos`, 'success')
   }
 
+  async function handleDeleteAll() {
+    if (!selected || products.length === 0) return
+    if (!confirm(`¿Quitar todos los ${products.length} productos de la campaña "${selected.nombre}"?`)) return
+    const res = await fetch(`/api/campaigns/${selected.id}/products`, { method: 'DELETE' })
+    if (!res.ok) { toast('Error al borrar productos', 'error'); return }
+    setProducts([])
+    setCampaigns(prev => prev.map(c => c.id === selected.id ? { ...c, numProductos: 0 } : c))
+    toast('Todos los productos eliminados', 'success')
+  }
+
   async function handleRemoveProduct(codigo: string) {
     if (!selected) return
     setRemovingCode(codigo)
@@ -457,13 +467,24 @@ export function CampaignsClient({ campaigns: initial }: { campaigns: CampaignRow
                 <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#b2b2b2' }}>
                   Productos en campaña <span style={{ color: '#00557f' }}>({selected.numProductos})</span>
                 </p>
-                <button
-                  onClick={() => setShowSelector(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                  style={{ background: '#00557f' }}
-                >
-                  ＋ Añadir productos
-                </button>
+                <div className="flex items-center gap-2">
+                  {products.length > 0 && (
+                    <button
+                      onClick={handleDeleteAll}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-90"
+                      style={{ background: 'rgba(192,57,43,0.08)', color: '#992d22' }}
+                    >
+                      Borrar todo
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowSelector(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                    style={{ background: '#00557f' }}
+                  >
+                    ＋ Añadir productos
+                  </button>
+                </div>
               </div>
             </div>
 

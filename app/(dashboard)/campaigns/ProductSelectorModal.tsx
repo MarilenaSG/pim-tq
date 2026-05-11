@@ -47,11 +47,13 @@ function FilterSelect({
 }
 
 export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
-  const [search, setSearch]     = useState('')
-  const [familia, setFamilia]   = useState('')
-  const [category, setCategory] = useState('')
-  const [abc, setAbc]           = useState('')
-  const [vendor, setVendor]     = useState('')
+  const [search, setSearch]           = useState('')
+  const [familia, setFamilia]         = useState('')
+  const [category, setCategory]       = useState('')
+  const [abc, setAbc]                 = useState('')
+  const [vendor, setVendor]           = useState('')
+  const [discontinued, setDiscontinued] = useState('')
+  const [stock, setStock]             = useState('')
 
   const [products, setProducts] = useState<ProductResult[]>([])
   const [loading, setLoading]   = useState(false)
@@ -76,14 +78,16 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
       })
   }, [])
 
-  const doSearch = useCallback(async (q: string, f: string, cat: string, a: string, v: string) => {
+  const doSearch = useCallback(async (q: string, f: string, cat: string, a: string, v: string, disc: string, stk: string) => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (q)   params.set('q', q)
-    if (f)   params.set('familia', f)
-    if (cat) params.set('category', cat)
-    if (a)   params.set('abc', a)
-    if (v)   params.set('vendor', v)
+    if (q)    params.set('q', q)
+    if (f)    params.set('familia', f)
+    if (cat)  params.set('category', cat)
+    if (a)    params.set('abc', a)
+    if (v)    params.set('vendor', v)
+    if (disc) params.set('discontinued', disc)
+    if (stk)  params.set('stock', stk)
     const res = await fetch(`/api/products/search?${params}`)
     const data = await res.json()
     setProducts(Array.isArray(data) ? data : [])
@@ -93,17 +97,17 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
   useEffect(() => {
     if (!optionsLoaded) return
     clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => doSearch(search, familia, category, abc, vendor), 280)
+    debounceRef.current = setTimeout(() => doSearch(search, familia, category, abc, vendor, discontinued, stock), 280)
     return () => clearTimeout(debounceRef.current)
-  }, [search, familia, category, abc, vendor, optionsLoaded, doSearch])
+  }, [search, familia, category, abc, vendor, discontinued, stock, optionsLoaded, doSearch])
 
   useEffect(() => {
-    if (optionsLoaded) doSearch('', '', '', '', '')
+    if (optionsLoaded) doSearch('', '', '', '', '', '', '')
   }, [optionsLoaded, doSearch])
 
   const available = products.filter(p => !alreadyAdded.has(p.codigo_modelo))
   const allSelected = available.length > 0 && available.every(p => selected.has(p.codigo_modelo))
-  const hasFilters = search || familia || category || abc || vendor
+  const hasFilters = search || familia || category || abc || vendor || discontinued || stock
 
   function toggleAll() {
     setSelected(prev => {
@@ -124,7 +128,7 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
   }
 
   function clearFilters() {
-    setSearch(''); setFamilia(''); setCategory(''); setAbc(''); setVendor('')
+    setSearch(''); setFamilia(''); setCategory(''); setAbc(''); setVendor(''); setDiscontinued(''); setStock('')
   }
 
   async function handleAdd() {
@@ -177,6 +181,26 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
             <FilterSelect value={familia}    onChange={setFamilia}   placeholder="Familia: todas"     options={familias} />
             <FilterSelect value={abc}        onChange={setAbc}       placeholder="ABC: todos"          options={['A', 'B', 'C']} />
             <FilterSelect value={vendor}     onChange={setVendor}    placeholder="Marca: todas"        options={vendors} />
+            <select
+              value={discontinued}
+              onChange={e => setDiscontinued(e.target.value)}
+              className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+              style={{ borderColor: 'rgba(0,85,127,0.2)', color: discontinued ? '#00557f' : '#b2b2b2', minWidth: 130 }}
+            >
+              <option value="">Catálogo: todos</option>
+              <option value="catalogado">Catalogado</option>
+              <option value="descatalogado">Descatalogado</option>
+            </select>
+            <select
+              value={stock}
+              onChange={e => setStock(e.target.value)}
+              className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+              style={{ borderColor: 'rgba(0,85,127,0.2)', color: stock ? '#00557f' : '#b2b2b2', minWidth: 120 }}
+            >
+              <option value="">Stock: todos</option>
+              <option value="con">Con stock</option>
+              <option value="sin">Sin stock</option>
+            </select>
             {hasFilters && (
               <button
                 onClick={clearFilters}
