@@ -35,16 +35,57 @@ export type CatalogPDFFilters = {
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const TQ_BLUE       = '#00557f'
-const TQ_GOLD       = '#C8842A'
-const H_PAD         = 28       // page horizontal padding
-const HEADER_H      = 46       // fixed header height
-const FOOTER_H      = 30       // fixed footer height
-const COL_GAP       = 10       // gap between columns
-const ROW_GAP       = 10       // gap between rows
-const CARD_PAD      = 11       // card internal padding
-const IMG_SIZE      = 96       // product image size (square)
-const MAX_VARIANTS  = 10       // max variants shown per card
+const TQ_BLUE      = '#00557f'
+const TQ_GOLD      = '#C8842A'
+const H_PAD        = 28
+const HEADER_H     = 46
+const FOOTER_H     = 28
+const COL_GAP      = 10
+const ROW_GAP      = 8
+const CARD_PAD     = 10
+const IMG_SIZE     = 90
+// Mostramos hasta 16 variantes en 2 columnas (8 filas)
+const MAX_VARIANTS = 16
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+// Formateo manual de precios — no depende de toLocaleString (falla en Node sin ICU completo)
+function fmtEur(n: number): string {
+  const fixed = Math.abs(n).toFixed(2)           // "440.99"
+  const [intPart, dec] = fixed.split('.')
+  const intFmt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')  // separador de miles
+  return `${intFmt},${dec} €`               // "440,99 €"
+}
+
+function fmtDate(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0')
+  const months = ['enero','febrero','marzo','abril','mayo','junio',
+                  'julio','agosto','septiembre','octubre','noviembre','diciembre']
+  return `${dd} de ${months[d.getMonth()]} de ${d.getFullYear()}`
+}
+
+function sortVar(a: string | null, b: string | null): number {
+  const na = parseFloat(a ?? ''), nb = parseFloat(b ?? '')
+  if (!isNaN(na) && !isNaN(nb)) return na - nb
+  return (a ?? '').localeCompare(b ?? '', 'es')
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
+function buildFilterSummary(filters: CatalogPDFFilters): string | null {
+  const parts: string[] = []
+  if (filters.search)   parts.push(`"${filters.search}"`)
+  if (filters.metal)    parts.push(filters.metal)
+  if (filters.familia)  parts.push(filters.familia)
+  if (filters.category) parts.push(filters.category)
+  if (filters.estado === 'catalogo')      parts.push('En catalogo')
+  if (filters.estado === 'descatalogado') parts.push('Descatalogados')
+  return parts.length > 0 ? parts.join('  /  ') : null
+}
 
 // ── Styles ─────────────────────────────────────────────────────────
 
@@ -59,24 +100,23 @@ const s = StyleSheet.create({
 
   // Fixed header
   header: {
-    position:   'absolute',
-    top:        0,
-    left:       0,
-    right:      0,
-    height:     HEADER_H,
+    position: 'absolute',
+    top:      0,
+    left:     0,
+    right:    0,
   },
   headerBar: {
-    backgroundColor:  TQ_BLUE,
+    backgroundColor:   TQ_BLUE,
     paddingHorizontal: H_PAD,
     paddingVertical:   8,
-    flexDirection:    'row',
-    alignItems:       'center',
-    justifyContent:   'space-between',
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
   },
   headerBrand: {
-    fontSize:     9,
-    color:        '#ffffff',
-    fontFamily:   'Helvetica-Bold',
+    fontSize:      9,
+    color:         '#ffffff',
+    fontFamily:    'Helvetica-Bold',
     letterSpacing: 1.8,
   },
   headerMeta: {
@@ -84,12 +124,12 @@ const s = StyleSheet.create({
     color:    'rgba(255,255,255,0.7)',
   },
   headerFilterBar: {
-    backgroundColor:  '#deeaf2',
+    backgroundColor:   '#deeaf2',
     paddingHorizontal: H_PAD,
     paddingVertical:   5,
-    flexDirection:    'row',
-    alignItems:       'center',
-    gap:              6,
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               5,
   },
   headerFilterKey: {
     fontSize:   7.5,
@@ -100,25 +140,21 @@ const s = StyleSheet.create({
     fontSize: 7.5,
     color:    '#004466',
   },
-  headerFilterSep: {
-    fontSize: 7.5,
-    color:    '#9bbdd0',
-  },
 
   // Fixed footer
   footer: {
-    position:         'absolute',
-    bottom:           0,
-    left:             0,
-    right:            0,
-    height:           FOOTER_H,
-    backgroundColor:  '#f5f3f0',
-    borderTopWidth:   1,
-    borderTopColor:   'rgba(0,85,127,0.10)',
+    position:          'absolute',
+    bottom:            0,
+    left:              0,
+    right:             0,
+    backgroundColor:   '#f5f3f0',
+    borderTopWidth:    1,
+    borderTopColor:    'rgba(0,85,127,0.10)',
     paddingHorizontal: H_PAD,
-    flexDirection:    'row',
-    alignItems:       'center',
-    justifyContent:   'space-between',
+    paddingVertical:   8,
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
   },
   footerText: {
     fontSize: 7,
@@ -136,12 +172,8 @@ const s = StyleSheet.create({
     gap:           COL_GAP,
     marginBottom:  ROW_GAP,
   },
-  col: {
-    flex: 1,
-  },
-  colEmpty: {
-    flex: 1,
-  },
+  col:      { flex: 1 },
+  colEmpty: { flex: 1 },
 
   // Card
   card: {
@@ -152,7 +184,7 @@ const s = StyleSheet.create({
     overflow:        'hidden',
   },
 
-  // Card top: image + info side by side
+  // Card top: image + info
   cardTop: {
     flexDirection: 'row',
     gap:           CARD_PAD,
@@ -174,59 +206,57 @@ const s = StyleSheet.create({
     flexShrink:      0,
   },
   cardInfo: {
-    flex:    1,
+    flex:     1,
     minWidth: 0,
   },
-
-  // Card info elements
   tagsRow: {
     flexDirection: 'row',
     alignItems:    'center',
-    gap:           5,
+    gap:           4,
     marginBottom:  4,
     flexWrap:      'wrap',
   },
   tagCategory: {
-    fontSize:      7.5,
-    color:         TQ_BLUE,
-    fontFamily:    'Helvetica-Bold',
-    letterSpacing: 0.7,
-    backgroundColor: 'rgba(0,85,127,0.08)',
+    fontSize:          7,
+    color:             TQ_BLUE,
+    fontFamily:        'Helvetica-Bold',
+    letterSpacing:     0.6,
+    backgroundColor:   'rgba(0,85,127,0.08)',
     paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius:  3,
+    paddingVertical:   2,
+    borderRadius:      3,
   },
   tagMarca: {
-    fontSize:      7.5,
+    fontSize:      7,
     color:         TQ_GOLD,
     fontFamily:    'Helvetica-Bold',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   tagSep: {
-    fontSize: 7.5,
+    fontSize: 7,
     color:    '#cccccc',
   },
   productName: {
-    fontSize:    11,
+    fontSize:    10.5,
     color:       TQ_BLUE,
     fontFamily:  'Helvetica-Bold',
     lineHeight:  1.3,
     marginBottom: 3,
   },
   productFamilia: {
-    fontSize:     8,
+    fontSize:     7.5,
     color:        '#999999',
     marginBottom: 4,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems:    'center',
-    gap:           5,
+    gap:           4,
     marginBottom:  5,
     flexWrap:      'wrap',
   },
   tagMetal: {
-    fontSize:          8,
+    fontSize:          7.5,
     color:             TQ_BLUE,
     backgroundColor:   'rgba(0,85,127,0.08)',
     paddingHorizontal: 5,
@@ -234,7 +264,7 @@ const s = StyleSheet.create({
     borderRadius:      3,
   },
   tagKarat: {
-    fontSize:          8,
+    fontSize:          7.5,
     color:             '#7a5c1e',
     fontFamily:        'Helvetica-Bold',
     backgroundColor:   'rgba(200,132,42,0.12)',
@@ -243,7 +273,7 @@ const s = StyleSheet.create({
     borderRadius:      3,
   },
   cardCodigo: {
-    fontSize:   7.5,
+    fontSize:   7,
     color:      '#c8c5c1',
     marginLeft: 'auto' as unknown as number,
   },
@@ -251,25 +281,25 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'baseline',
     gap:           4,
-    marginTop:     4,
+    marginTop:     2,
   },
   priceLabel: {
     fontSize: 8,
     color:    '#aaaaaa',
   },
   priceValue: {
-    fontSize:   14,
+    fontSize:   13,
     color:      TQ_BLUE,
     fontFamily: 'Helvetica-Bold',
   },
   discontinuedBadge: {
-    marginTop:         6,
-    fontSize:          7.5,
+    marginTop:         5,
+    fontSize:          7,
     color:             '#888888',
     fontFamily:        'Helvetica-Bold',
     letterSpacing:     0.5,
     backgroundColor:   'rgba(120,120,120,0.10)',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical:   3,
     borderRadius:      3,
     alignSelf:         'flex-start',
@@ -283,121 +313,123 @@ const s = StyleSheet.create({
   },
   variantsSection: {
     paddingHorizontal: CARD_PAD,
-    paddingTop:        7,
-    paddingBottom:     CARD_PAD,
+    paddingTop:        6,
+    paddingBottom:     8,
   },
   variantsHeaderRow: {
     flexDirection:  'row',
     justifyContent: 'space-between',
     alignItems:     'center',
-    marginBottom:   5,
+    marginBottom:   4,
   },
   variantsLabel: {
-    fontSize:      7,
+    fontSize:      6.5,
     color:         '#b2b2b2',
     fontFamily:    'Helvetica-Bold',
-    letterSpacing: 1.2,
+    letterSpacing: 1,
   },
   variantsTotal: {
-    fontSize: 7,
+    fontSize: 6.5,
     color:    '#cccccc',
   },
 
-  // Variant rows
-  variantRow: {
+  // 2-column variant grid
+  variantGridRow: {
+    flexDirection: 'row',
+    marginBottom:  2,
+    gap:           4,
+  },
+
+  // Each half-column
+  variantCell: {
+    flex:           1,
     flexDirection:  'row',
     alignItems:     'center',
-    paddingVertical: 3,
+    paddingVertical: 2.5,
     paddingHorizontal: 5,
     borderRadius:   3,
-    marginBottom:   2,
+    gap:            4,
   },
-  variantRowActive: {
-    backgroundColor: 'rgba(58,158,106,0.05)',
+  variantCellActive: {
+    backgroundColor: 'rgba(58,158,106,0.06)',
   },
-  variantRowDisc: {
+  variantCellDisc: {
     backgroundColor: 'rgba(120,120,120,0.04)',
   },
+
+  // Dot (View, not Unicode)
+  dotAvailable: {
+    width:           7,
+    height:          7,
+    borderRadius:    3.5,
+    backgroundColor: '#3A9E6A',
+    flexShrink:      0,
+  },
+  dotDiscontinued: {
+    width:           7,
+    height:          7,
+    borderRadius:    3.5,
+    backgroundColor: '#cccccc',
+    flexShrink:      0,
+  },
+
   variantTalla: {
-    fontSize:   8.5,
+    fontSize:   8,
     color:      '#333333',
     fontFamily: 'Helvetica-Bold',
-    width:      48,
+    width:      22,
     flexShrink: 0,
   },
   variantTallaDisc: {
-    fontSize:   8.5,
+    fontSize:   8,
     color:      '#bbbbbb',
-    width:      48,
+    width:      22,
     flexShrink: 0,
   },
   variantPrice: {
-    fontSize:   8.5,
-    color:      TQ_BLUE,
-    flex:       1,
-    textAlign:  'right' as unknown as 'right',
-  },
-  variantPriceDisc: {
-    fontSize:   8.5,
-    color:      '#cccccc',
-    flex:       1,
-    textAlign:  'right' as unknown as 'right',
-  },
-  variantStatus: {
-    fontSize:   7.5,
-    color:      '#3A9E6A',
-    fontFamily: 'Helvetica-Bold',
-    width:      72,
-    flexShrink: 0,
-    textAlign:  'right' as unknown as 'right',
-  },
-  variantStatusDisc: {
-    fontSize:  7.5,
-    color:     '#bbbbbb',
-    width:     72,
-    flexShrink: 0,
+    fontSize:  8,
+    color:     TQ_BLUE,
+    flex:      1,
     textAlign: 'right' as unknown as 'right',
   },
+  variantPriceDisc: {
+    fontSize:  8,
+    color:     '#cccccc',
+    flex:      1,
+    textAlign: 'right' as unknown as 'right',
+  },
+
   variantsMore: {
-    fontSize:    7.5,
-    color:       '#b2b2b2',
-    fontFamily:  'Helvetica-Oblique',
-    marginTop:   3,
+    fontSize:   7,
+    color:      '#b2b2b2',
+    fontFamily: 'Helvetica-Oblique',
+    marginTop:  3,
     paddingLeft: 5,
+  },
+
+  // Separador vertical entre columnas de variantes
+  variantColSep: {
+    width:           1,
+    backgroundColor: 'rgba(0,85,127,0.07)',
+    marginVertical:  1,
   },
 })
 
-// ── Helpers ────────────────────────────────────────────────────────
+// ── VariantCell ────────────────────────────────────────────────────
 
-function fmtEur(n: number) {
-  return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-}
-
-function fmtDate(d: Date) {
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
-}
-
-function sortVar(a: string | null, b: string | null): number {
-  const na = parseFloat(a ?? ''), nb = parseFloat(b ?? '')
-  if (!isNaN(na) && !isNaN(nb)) return na - nb
-  return (a ?? '').localeCompare(b ?? '', 'es')
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
-  return out
-}
-
-function buildFilterSummary(filters: CatalogPDFFilters): string | null {
-  const parts: string[] = []
-  if (filters.search)   parts.push(`"${filters.search}"`)
-  if (filters.metal)    parts.push(filters.metal)
-  if (filters.familia)  parts.push(filters.familia)
-  if (filters.category) parts.push(filters.category)
-  if (filters.estado === 'catalogo')      parts.push('En catálogo')
-  if (filters.estado === 'descatalogado') parts.push('Descatalogados')
-  return parts.length > 0 ? parts.join('  ·  ') : null
+function VariantCell({ v }: { v: CatalogPDFVariant }) {
+  const disc = v.is_discontinued
+  return (
+    <View style={[s.variantCell, disc ? s.variantCellDisc : s.variantCellActive]}>
+      <View style={disc ? s.dotDiscontinued : s.dotAvailable} />
+      <Text style={disc ? s.variantTallaDisc : s.variantTalla}>
+        {v.variante ?? '-'}
+      </Text>
+      <Text style={disc ? s.variantPriceDisc : s.variantPrice}>
+        {v.precio_venta != null ? fmtEur(v.precio_venta) : '-'}
+      </Text>
+    </View>
+  )
 }
 
 // ── ProductCard ────────────────────────────────────────────────────
@@ -414,7 +446,10 @@ function ProductCard({ p }: { p: CatalogPDFProduct }) {
   const shown       = allVariants.slice(0, MAX_VARIANTS)
   const hidden      = allVariants.length - shown.length
 
-  // Price: min among available variants
+  // Agrupar en pares para layout de 2 columnas
+  const pairs = chunk(shown, 2)
+
+  // Precio: mínimo entre variantes disponibles
   const activePrices = active.map(v => v.precio_venta).filter((x): x is number => x != null)
   const minPrice     = activePrices.length > 0 ? Math.min(...activePrices) : null
   const maxPrice     = activePrices.length > 0 ? Math.max(...activePrices) : null
@@ -422,7 +457,7 @@ function ProductCard({ p }: { p: CatalogPDFProduct }) {
 
   return (
     <View style={s.card} wrap={false}>
-      {/* ── Top section: image + info ── */}
+      {/* ── Top: imagen + info ── */}
       <View style={s.cardTop}>
         {p.image_url
           ? <Image src={p.image_url} style={s.cardImg} />
@@ -430,27 +465,22 @@ function ProductCard({ p }: { p: CatalogPDFProduct }) {
         }
 
         <View style={s.cardInfo}>
-          {/* Category + Marca */}
           <View style={s.tagsRow}>
             {p.category && <Text style={s.tagCategory}>{p.category.toUpperCase()}</Text>}
             {p.category && p.marca && <Text style={s.tagSep}>·</Text>}
             {p.marca    && <Text style={s.tagMarca}>{p.marca.toUpperCase()}</Text>}
           </View>
 
-          {/* Name */}
           <Text style={s.productName}>{p.description ?? p.codigo_modelo}</Text>
 
-          {/* Familia */}
           {p.familia && <Text style={s.productFamilia}>{p.familia}</Text>}
 
-          {/* Metal + Karat + código */}
           <View style={s.metaRow}>
             {p.metal && <Text style={s.tagMetal}>{p.metal}</Text>}
             {p.karat && <Text style={s.tagKarat}>{p.karat}</Text>}
             <Text style={s.cardCodigo}>{p.codigo_modelo}</Text>
           </View>
 
-          {/* Price or discontinued badge */}
           {p.is_discontinued ? (
             <Text style={s.discontinuedBadge}>DESCATALOGADO</Text>
           ) : minPrice != null ? (
@@ -462,8 +492,8 @@ function ProductCard({ p }: { p: CatalogPDFProduct }) {
         </View>
       </View>
 
-      {/* ── Variants section ── */}
-      {shown.length > 0 && (
+      {/* ── Variantes en 2 columnas ── */}
+      {pairs.length > 0 && (
         <>
           <View style={s.variantsDivider} />
           <View style={s.variantsSection}>
@@ -474,25 +504,16 @@ function ProductCard({ p }: { p: CatalogPDFProduct }) {
               </Text>
             </View>
 
-            {shown.map((v, i) => {
-              const isDisc = v.is_discontinued
-              return (
-                <View
-                  key={i}
-                  style={[s.variantRow, isDisc ? s.variantRowDisc : s.variantRowActive]}
-                >
-                  <Text style={isDisc ? s.variantTallaDisc : s.variantTalla}>
-                    {v.variante ?? '—'}
-                  </Text>
-                  <Text style={isDisc ? s.variantPriceDisc : s.variantPrice}>
-                    {v.precio_venta != null ? fmtEur(v.precio_venta) : '—'}
-                  </Text>
-                  <Text style={isDisc ? s.variantStatusDisc : s.variantStatus}>
-                    {isDisc ? '○  Descatalogada' : '●  Stock disponible'}
-                  </Text>
-                </View>
-              )
-            })}
+            {pairs.map((pair, i) => (
+              <View key={i} style={s.variantGridRow}>
+                <VariantCell v={pair[0]} />
+                <View style={s.variantColSep} />
+                {pair[1]
+                  ? <VariantCell v={pair[1]} />
+                  : <View style={{ flex: 1 }} />
+                }
+              </View>
+            ))}
 
             {hidden > 0 && (
               <Text style={s.variantsMore}>
@@ -517,37 +538,36 @@ export function CatalogPDF({
 }) {
   const fecha         = fmtDate(new Date())
   const filterSummary = buildFilterSummary(filters)
+  // Agrupamos en filas de 2; wrap={false} en cada fila evita que se parta entre páginas
   const rows          = chunk(products, 2)
 
   return (
     <Document
-      title="Te Quiero Joyerías — Catálogo de productos"
-      author="Te Quiero Joyerías"
+      title="Te Quiero Joyerias - Catalogo de productos"
+      author="Te Quiero Joyerias"
     >
       <Page size="A4" style={s.page}>
 
-        {/* ── Fixed header ── */}
+        {/* ── Cabecera fija ── */}
         <View style={s.header} fixed>
           <View style={s.headerBar}>
-            <Text style={s.headerBrand}>TE QUIERO JOYERÍAS</Text>
+            <Text style={s.headerBrand}>TE QUIERO JOYERIAS</Text>
             <Text style={s.headerMeta}>
               {products.length} referencia{products.length !== 1 ? 's' : ''}  ·  {fecha}
             </Text>
           </View>
-
           {filterSummary && (
             <View style={s.headerFilterBar}>
               <Text style={s.headerFilterKey}>FILTROS:</Text>
-              <Text style={s.headerFilterSep}>|</Text>
               <Text style={s.headerFilterVal}>{filterSummary}</Text>
             </View>
           )}
         </View>
 
-        {/* ── Fixed footer ── */}
+        {/* ── Pie fijo ── */}
         <View style={s.footer} fixed>
           <Text style={s.footerText}>
-            Joyerías Te Quiero  ·  Catálogo de productos  ·  Solo para uso interno
+            Joyerias Te Quiero  ·  Catalogo de productos  ·  Uso interno
           </Text>
           <Text
             style={s.footerPage}
@@ -555,15 +575,15 @@ export function CatalogPDF({
           />
         </View>
 
-        {/* ── Product grid (2 columns) ── */}
+        {/* ── Cuadricula de productos (2 columnas) ── */}
         {rows.map((row, ri) => (
-          <View key={ri} style={s.row}>
+          // wrap={false} mantiene las 2 tarjetas juntas en la misma página
+          <View key={ri} style={s.row} wrap={false}>
             {row.map(p => (
               <View key={p.codigo_modelo} style={s.col}>
                 <ProductCard p={p} />
               </View>
             ))}
-            {/* Filler column if odd number of products */}
             {row.length < 2 && <View style={s.colEmpty} />}
           </View>
         ))}
