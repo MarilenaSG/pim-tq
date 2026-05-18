@@ -16,32 +16,20 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
 
   // Pre-queries for join-like filters (vendor, stock) run in parallel
-  let vendorCodes: string[] | null = null
-  let withStockCodes: string[] | null = null
-  let noStockExclude: string[] | null = null
-
-  const preQueries: Promise<void>[] = []
-
-  if (vendor) {
-    preQueries.push(
-      supabase.from('product_shopify_data').select('codigo_modelo').eq('shopify_vendor', vendor)
-        .then(({ data }) => { vendorCodes = (data ?? []).map(r => r.codigo_modelo as string) })
-    )
-  }
-  if (stock === 'con') {
-    preQueries.push(
-      supabase.from('product_variants').select('codigo_modelo').gt('stock_variante', 0)
-        .then(({ data }) => { withStockCodes = Array.from(new Set((data ?? []).map(r => r.codigo_modelo as string))) })
-    )
-  }
-  if (stock === 'sin') {
-    preQueries.push(
-      supabase.from('product_variants').select('codigo_modelo').gt('stock_variante', 0)
-        .then(({ data }) => { noStockExclude = Array.from(new Set((data ?? []).map(r => r.codigo_modelo as string))) })
-    )
-  }
-
-  await Promise.all(preQueries)
+  const [vendorCodes, withStockCodes, noStockExclude] = await Promise.all([
+    vendor
+      ? supabase.from('product_shopify_data').select('codigo_modelo').eq('shopify_vendor', vendor)
+          .then(({ data }): string[] => (data ?? []).map(r => r.codigo_modelo as string))
+      : Promise.resolve(null as string[] | null),
+    stock === 'con'
+      ? supabase.from('product_variants').select('codigo_modelo').gt('stock_variante', 0)
+          .then(({ data }): string[] => Array.from(new Set((data ?? []).map(r => r.codigo_modelo as string))))
+      : Promise.resolve(null as string[] | null),
+    stock === 'sin'
+      ? supabase.from('product_variants').select('codigo_modelo').gt('stock_variante', 0)
+          .then(({ data }): string[] => Array.from(new Set((data ?? []).map(r => r.codigo_modelo as string))))
+      : Promise.resolve(null as string[] | null),
+  ])
 
   if (vendorCodes !== null && vendorCodes.length === 0) return NextResponse.json([])
   if (withStockCodes !== null && withStockCodes.length === 0) return NextResponse.json([])
