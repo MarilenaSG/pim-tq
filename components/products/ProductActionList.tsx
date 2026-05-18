@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -400,12 +399,13 @@ export function ProductActionList({ codigosModelo, titulo, onClose, context = 'g
                     </td>
                     <td className="w-10 py-2 pr-2">
                       {p.imageUrl ? (
-                        <Image
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
                           src={p.imageUrl}
                           alt={p.desc ?? p.codigo}
                           width={32}
                           height={32}
-                          className="rounded object-cover"
+                          className="rounded object-cover w-8 h-8"
                         />
                       ) : (
                         <div className="w-8 h-8 rounded bg-[#f0ece8]" />
