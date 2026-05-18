@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui'
@@ -21,8 +21,12 @@ export type ProductTableRow = {
   completitudPct:     number
   completitudNivel:   'alta' | 'media' | 'baja'
   is_discontinued:    boolean
+  lifecycle_status:   string
   stock_total:        number
 }
+
+type SortKey = 'stock_total' | 'ingresos_12m' | null
+type SortDir = 'asc' | 'desc'
 
 export type CampaignOption = { id: string; nombre: string }
 
@@ -58,6 +62,36 @@ function CompletitudBar({ pct, nivel }: { pct: number; nivel: 'alta' | 'media' |
   )
 }
 
+function StockCell({ stock }: { stock: number }) {
+  if (stock === 0) return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(192,57,43,0.1)', color: '#C0392B' }}>
+      ⚠ 0
+    </span>
+  )
+  return <span className="font-mono text-xs font-bold" style={{ color: '#3A9E6A' }}>{stock.toLocaleString('es-ES')}</span>
+}
+
+function SortableHeader({
+  label, sortKey, current, dir, onSort,
+}: {
+  label: string
+  sortKey: SortKey
+  current: SortKey
+  dir: SortDir
+  onSort: (k: SortKey) => void
+}) {
+  const active = current === sortKey
+  return (
+    <th
+      className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase cursor-pointer select-none hover:opacity-80 transition-opacity"
+      style={{ color: active ? '#00557f' : '#b2b2b2' }}
+      onClick={() => onSort(sortKey)}
+    >
+      {label} {active ? (dir === 'desc' ? '↓' : '↑') : '↕'}
+    </th>
+  )
+}
+
 // ── main ──────────────────────────────────────────────────────────
 
 export function ProductsTable({
@@ -72,6 +106,22 @@ export function ProductsTable({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [campaignDrop, setCampaignDrop] = useState(false)
   const [addingToCampaign, setAddingToCampaign] = useState(false)
+  const [sortKey, setSortKey] = useState<SortKey>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    else { setSortKey(key); setSortDir('desc') }
+  }
+
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows
+    return [...rows].sort((a, b) => {
+      const av = a[sortKey] ?? -1
+      const bv = b[sortKey] ?? -1
+      return sortDir === 'desc' ? (bv as number) - (av as number) : (av as number) - (bv as number)
+    })
+  }, [rows, sortKey, sortDir])
 
   function toggleAll() {
     if (selected.size === rows.length) setSelected(new Set())
@@ -123,7 +173,15 @@ export function ProductsTable({
                 />
               </th>
               <th className="w-14 px-3 py-3" />
-              {(['Código', 'Descripción', 'Metal / Qt', 'Familia', 'ABC', 'Ingresos 12m', 'Vars', 'Shopify', 'Completitud'] as const).map(h => (
+              {(['Código', 'Descripción', 'Metal / Qt', 'Familia', 'ABC'] as const).map(h => (
+                <th key={h} className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
+                  {h}
+                </th>
+              ))}
+              <SortableHeader label="Ingresos 12m" sortKey="ingresos_12m" current={sortKey} dir={sortDir} onSort={handleSort} />
+              <th className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Vars</th>
+              <SortableHeader label="Stock" sortKey="stock_total" current={sortKey} dir={sortDir} onSort={handleSort} />
+              {(['Shopify', 'Completitud'] as const).map(h => (
                 <th key={h} className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
                   {h}
                 </th>
@@ -131,7 +189,7 @@ export function ProductsTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((p, i) => (
+            {sortedRows.map((p, i) => (
               <tr
                 key={p.codigo_modelo}
                 className="hover:bg-[rgba(0,85,127,0.02)] transition-colors"
@@ -205,12 +263,14 @@ export function ProductsTable({
                   {p.ingresos_12m != null ? p.ingresos_12m.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €' : '—'}
                 </td>
 
-                {/* Variantes / Stock */}
-                <td className="px-3 py-2 text-xs text-center whitespace-nowrap" style={{ color: '#b2b2b2' }}>
-                  <span>{p.num_variantes ?? '—'}</span>
-                  {p.stock_total > 0 && (
-                    <span className="ml-1 text-[10px] font-bold" style={{ color: '#3A9E6A' }}>/ {p.stock_total}</span>
-                  )}
+                {/* Variantes */}
+                <td className="px-3 py-2 text-xs text-center" style={{ color: '#b2b2b2' }}>
+                  {p.num_variantes ?? '—'}
+                </td>
+
+                {/* Stock */}
+                <td className="px-3 py-2 text-xs text-center whitespace-nowrap">
+                  <StockCell stock={p.stock_total} />
                 </td>
 
                 {/* Shopify */}
