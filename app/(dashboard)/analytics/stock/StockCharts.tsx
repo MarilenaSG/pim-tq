@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ReferenceLine,
 } from 'recharts'
 import { ChartCard } from '@/components/analytics/ChartCard'
+import { ProductActionList } from '@/components/products/ProductActionList'
 
 interface FamiliaRow  { familia: string; stock: number; sinStock: number; coberturaMedia: number }
 interface CobRow      { rango: string; count: number }
@@ -17,7 +19,32 @@ interface Props {
   alertasExceso:     AlertaRow[]
 }
 
+async function fetchFilter(params: Record<string, string>): Promise<string[]> {
+  const qs  = new URLSearchParams(params).toString()
+  const res = await fetch(`/api/products/filter?${qs}`)
+  return res.ok ? res.json() : []
+}
+
 export function StockCharts({ familiaData, coberturaData, alertasSinStock, alertasExceso }: Props) {
+  const [actionCodes, setActionCodes] = useState<string[]>([])
+  const [actionTitle, setActionTitle] = useState('')
+
+  async function selectByFamilia(familia: string) {
+    const codes = await fetchFilter({ familia })
+    setActionCodes(codes)
+    setActionTitle(`Familia: ${familia}`)
+  }
+
+  function selectByCodigo(codigo: string, desc?: string) {
+    setActionCodes([codigo])
+    setActionTitle(desc ? `${codigo} — ${desc}` : `Producto ${codigo}`)
+  }
+
+  function selectAlertas(rows: AlertaRow[], titulo: string) {
+    setActionCodes(rows.map(r => r.codigo))
+    setActionTitle(titulo)
+  }
+
   return (
     <div className="space-y-6">
       {/* Row 1: stock x familia + cobertura distribución */}
@@ -25,7 +52,7 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
         <div className="col-span-2">
           <ChartCard
             title="Stock por familia"
-            subtitle="Unidades totales en existencia"
+            subtitle="Unidades totales · clic para ver productos"
             height={340}
           >
             <ResponsiveContainer width="100%" height="100%">
@@ -47,11 +74,19 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
                         <p>Stock: <span className="font-semibold">{d.stock.toLocaleString('es-ES')} uds</span></p>
                         <p>Sin stock: <span className="font-semibold">{d.sinStock} modelos</span></p>
                         <p>Cobertura media: <span className="font-semibold">{d.coberturaMedia}m</span></p>
+                        <p className="text-[#b2b2b2] text-[10px]">Clic para ver productos</p>
                       </div>
                     )
                   }}
                 />
-                <Bar dataKey="stock" fill="#00557f" radius={[0, 3, 3, 0]} maxBarSize={18} />
+                <Bar
+                  dataKey="stock"
+                  fill="#00557f"
+                  radius={[0, 3, 3, 0]}
+                  maxBarSize={18}
+                  cursor="pointer"
+                  onClick={(d: any) => selectByFamilia(d.familia)}
+                />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -76,7 +111,7 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
       {/* Row 2: cobertura media por familia */}
       <ChartCard
         title="Cobertura media por familia"
-        subtitle="Meses de stock estimados · línea roja = 12 meses (exceso)"
+        subtitle="Meses de stock estimados · clic para ver productos"
         height={280}
       >
         <ResponsiveContainer width="100%" height="100%">
@@ -97,7 +132,14 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
               contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
             />
             <ReferenceLine x={12} stroke="#C0392B" strokeDasharray="4 2" strokeWidth={1.5} />
-            <Bar dataKey="coberturaMedia" fill="#3A9E6A" radius={[0, 3, 3, 0]} maxBarSize={18} />
+            <Bar
+              dataKey="coberturaMedia"
+              fill="#3A9E6A"
+              radius={[0, 3, 3, 0]}
+              maxBarSize={18}
+              cursor="pointer"
+              onClick={(d: any) => selectByFamilia(d.familia)}
+            />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -106,9 +148,18 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
       <div className="grid grid-cols-2 gap-6">
         {/* Sin stock ABC-A */}
         <div className="bg-white rounded-xl p-6" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <h3 className="text-sm font-bold text-[#C0392B] uppercase tracking-wider mb-1">
-            Rotura de stock · ABC A
-          </h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-bold text-[#C0392B] uppercase tracking-wider">Rotura de stock · ABC A</h3>
+            {alertasSinStock.length > 0 && (
+              <button
+                onClick={() => selectAlertas(alertasSinStock, 'Rotura de stock ABC-A')}
+                className="text-[10px] px-2 py-1 rounded-lg font-semibold transition-colors hover:bg-[rgba(0,85,127,0.06)]"
+                style={{ color: '#00557f' }}
+              >
+                Ver todos →
+              </button>
+            )}
+          </div>
           <p className="text-xs text-[#b2b2b2] mb-4">Productos sin stock que más venden — priorizar reposición</p>
           {alertasSinStock.length === 0 ? (
             <p className="text-sm text-[#3A9E6A]">Sin alertas — todos los modelos ABC-A tienen stock</p>
@@ -123,7 +174,11 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
               </thead>
               <tbody>
                 {alertasSinStock.map((r, i) => (
-                  <tr key={i} className="border-b border-[#f0ece8]">
+                  <tr
+                    key={i}
+                    className="border-b border-[#f0ece8] hover:bg-red-50/40 transition-colors cursor-pointer"
+                    onClick={() => selectByCodigo(r.codigo, r.desc)}
+                  >
                     <td className="py-1.5 pr-3 font-mono text-[#b2b2b2]">{r.codigo}</td>
                     <td className="py-1.5 pr-3 text-[#1d1d1b] truncate max-w-[120px]">{r.desc}</td>
                     <td className="py-1.5 pr-3 text-[#b2b2b2]">{r.familia}</td>
@@ -141,9 +196,18 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
 
         {/* Exceso de stock */}
         <div className="bg-white rounded-xl p-6" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <h3 className="text-sm font-bold text-[#C8842A] uppercase tracking-wider mb-1">
-            Exceso de stock · &gt;12 meses
-          </h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-bold text-[#C8842A] uppercase tracking-wider">Exceso de stock · &gt;12 meses</h3>
+            {alertasExceso.length > 0 && (
+              <button
+                onClick={() => selectAlertas(alertasExceso, 'Exceso de stock +12 meses')}
+                className="text-[10px] px-2 py-1 rounded-lg font-semibold transition-colors hover:bg-[rgba(0,85,127,0.06)]"
+                style={{ color: '#00557f' }}
+              >
+                Ver todos →
+              </button>
+            )}
+          </div>
           <p className="text-xs text-[#b2b2b2] mb-4">Capital inmovilizado — revisar política de compras o promociones</p>
           {alertasExceso.length === 0 ? (
             <p className="text-sm text-[#3A9E6A]">Sin alertas de exceso de stock</p>
@@ -158,7 +222,11 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
               </thead>
               <tbody>
                 {alertasExceso.map((r, i) => (
-                  <tr key={i} className="border-b border-[#f0ece8]">
+                  <tr
+                    key={i}
+                    className="border-b border-[#f0ece8] hover:bg-amber-50/40 transition-colors cursor-pointer"
+                    onClick={() => selectByCodigo(r.codigo, r.desc)}
+                  >
                     <td className="py-1.5 pr-3 font-mono text-[#b2b2b2]">{r.codigo}</td>
                     <td className="py-1.5 pr-3 text-[#1d1d1b] truncate max-w-[140px]">{r.desc}</td>
                     <td className="py-1.5 pr-3">
@@ -178,6 +246,16 @@ export function StockCharts({ familiaData, coberturaData, alertasSinStock, alert
           )}
         </div>
       </div>
+
+      {/* Product action list */}
+      {actionCodes.length > 0 && (
+        <ProductActionList
+          codigosModelo={actionCodes}
+          titulo={actionTitle}
+          onClose={() => setActionCodes([])}
+          context="analytics"
+        />
+      )}
     </div>
   )
 }

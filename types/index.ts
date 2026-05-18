@@ -29,11 +29,38 @@ export interface Product {
   // true = sin stock en almacén central; visible en catálogo mientras haya stock en tiendas
   is_discontinued: boolean
 
+  // Lifecycle (Category Management)
+  lifecycle_status: LifecycleStatus
+
   // Control
   metabase_synced_at: string | null
   shopify_synced_at: string | null
   created_at: string
   updated_at: string
+}
+
+export type LifecycleStatus = 'activo' | 'en_revision' | 'a_discontinuar' | 'descatalogado'
+
+export interface ProductCDecision {
+  id: string
+  codigo_modelo: string
+  decision: 'outlet' | 'promocion' | 'retirar' | 'mantener' | 'reubicar' | null
+  descuento_sugerido: number | null
+  descuento_aprobado: number | null
+  precio_objetivo: number | null
+  diagnostico: string | null
+  notas: string | null
+  estado: 'borrador' | 'aprobado' | 'ejecutado'
+  ia_razonamiento: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProductStockSummary {
+  codigo_modelo: string
+  stock_total: number
+  num_variantes: number
+  variantes_con_stock: number
 }
 
 export interface ProductVariant {

@@ -5,15 +5,12 @@ const VALID = ['activo', 'en_revision', 'a_discontinuar', 'descatalogado'] as co
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { codes, lifecycle_status } = await req.json() as {
-      codes: string[]
-      lifecycle_status: string
-    }
+    const { codes, lifecycle_status } = await req.json() as { codes: string[]; lifecycle_status: string }
 
-    if (!codes?.length) return NextResponse.json({ error: 'codes requerido' }, { status: 400 })
-    if (!VALID.includes(lifecycle_status as typeof VALID[number])) {
-      return NextResponse.json({ error: `lifecycle_status inválido: ${lifecycle_status}` }, { status: 400 })
-    }
+    if (!Array.isArray(codes) || codes.length === 0)
+      return NextResponse.json({ error: 'codes requerido' }, { status: 400 })
+    if (!VALID.includes(lifecycle_status as typeof VALID[number]))
+      return NextResponse.json({ error: 'lifecycle_status inválido' }, { status: 400 })
 
     const supabase = createServiceClient()
     const { error } = await supabase
@@ -21,10 +18,10 @@ export async function PATCH(req: NextRequest) {
       .update({ lifecycle_status, updated_at: new Date().toISOString() })
       .in('codigo_modelo', codes)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) throw new Error(error.message)
     return NextResponse.json({ ok: true, updated: codes.length })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

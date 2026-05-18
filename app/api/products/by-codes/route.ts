@@ -4,66 +4,64 @@ import { createServiceClient } from '@/lib/supabase/server'
 export async function POST(req: NextRequest) {
   try {
     const { codes } = await req.json() as { codes: string[] }
-    if (!codes?.length) return NextResponse.json([])
+    if (!Array.isArray(codes) || codes.length === 0)
+      return NextResponse.json([], { status: 200 })
 
     const supabase = createServiceClient()
 
-    const [productsRes, variantsRes, imagesRes] = await Promise.all([
+    const [prodRes, imgRes, varRes] = await Promise.all([
       supabase
         .from('products')
-        .select('codigo_modelo, description, familia, metal, karat, abc_ventas, lifecycle_status, ingresos_12m')
-        .in('codigo_modelo', codes),
-      supabase
-        .from('product_variants')
-        .select('codigo_modelo, stock_variante, precio_venta, pct_margen_bruto, es_variante_lider')
+        .select('codigo_modelo, description, familia, metal, karat, abc_ventas, lifecycle_status, is_discontinued')
         .in('codigo_modelo', codes),
       supabase
         .from('product_images')
         .select('codigo_modelo, url')
         .in('codigo_modelo', codes)
         .eq('is_primary', true),
+      supabase
+        .from('product_variants')
+        .select('codigo_modelo, precio_venta, pct_margen_bruto, stock_variante')
+        .in('codigo_modelo', codes),
     ])
 
-    const products = productsRes.data  ?? []
-    const variants = variantsRes.data  ?? []
-    const images   = imagesRes.data    ?? []
+    if (prodRes.error) throw new Error(prodRes.error.message)
 
-    const imageMap = Object.fromEntries(images.map(i => [i.codigo_modelo as string, i.url as string]))
+    const imageMap: Record<string, string> = {}
+    for (const r of imgRes.data ?? []) imageMap[r.codigo_modelo] = r.url
 
-    type VarAgg = { stock: number; precio: number | null; margen: number | null }
-    const varAgg = new Map<string, VarAgg>()
-    for (const v of variants) {
-      const code = v.codigo_modelo as string
-      const cur  = varAgg.get(code) ?? { stock: 0, precio: null, margen: null }
-      cur.stock += Number(v.stock_variante ?? 0)
-      if (v.es_variante_lider) {
-        cur.precio = v.precio_venta     != null ? Number(v.precio_venta)     : null
-        cur.margen = v.pct_margen_bruto != null ? Number(v.pct_margen_bruto) : null
+    const stockMap: Record<string, number> = {}
+    const precioMap: Record<string, number | null> = {}
+    const margenMap: Record<string, number | null> = {}
+    for (const v of varRes.data ?? []) {
+      stockMap[v.codigo_modelo] = (stockMap[v.codigo_modelo] ?? 0) + (v.stock_variante ?? 0)
+      // keep highest precio_venta as representative
+      if (v.precio_venta != null && (precioMap[v.codigo_modelo] == null || v.precio_venta > (precioMap[v.codigo_modelo] ?? 0))) {
+        precioMap[v.codigo_modelo] = v.precio_venta
+        margenMap[v.codigo_modelo] = v.pct_margen_bruto
       }
-      varAgg.set(code, cur)
     }
 
-    const result = products.map(p => {
-      const code = p.codigo_modelo as string
-      const agg  = varAgg.get(code) ?? { stock: 0, precio: null, margen: null }
-      return {
-        codigo:          code,
-        desc:            p.description as string | null,
-        familia:         p.familia     as string | null,
-        metal:           p.metal       as string | null,
-        karat:           p.karat       as string | null,
-        abc:             p.abc_ventas  as string | null,
-        lifecycleStatus: (p.lifecycle_status as string) ?? 'activo',
-        stockTotal:      agg.stock,
-        precioVenta:     agg.precio,
-        pctMargen:       agg.margen != null ? Math.round(agg.margen) : null,
-        imageUrl:        imageMap[code] ?? null,
-      }
-    })
+    const rows = (prodRes.data ?? []).map(p => ({
+      codigo_modelo:    p.codigo_modelo,
+      description:      p.description,
+      familia:          p.familia,
+      metal:            p.metal,
+      karat:            p.karat,
+      abc_ventas:       p.abc_ventas,
+      lifecycle_status: p.lifecycle_status ?? 'activo',
+      is_discontinued:  p.is_discontinued ?? false,
+      imageUrl:         imageMap[p.codigo_modelo] ?? null,
+      stock_total:      stockMap[p.codigo_modelo] ?? 0,
+      precio_venta:     precioMap[p.codigo_modelo] ?? null,
+      pct_margen_bruto: margenMap[p.codigo_modelo] ?? null,
+    }))
 
-    return NextResponse.json(result)
+    // preserve original order
+    const ordered = codes.map(c => rows.find(r => r.codigo_modelo === c)).filter(Boolean)
+    return NextResponse.json(ordered)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

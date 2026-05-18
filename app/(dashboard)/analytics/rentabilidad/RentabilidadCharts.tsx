@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ScatterChart, Scatter,
   ReferenceLine,
 } from 'recharts'
 import { ChartCard } from '@/components/analytics/ChartCard'
+import { ProductActionList } from '@/components/products/ProductActionList'
 
 interface FamiliaRow  { familia: string; ingresos: number; margenMedio: number; count: number }
 interface MetalRow    { metal: string; ingresos: number }
@@ -24,12 +26,37 @@ const fmtEur = (v: unknown) => {
   return n >= 1000 ? `${Math.round(n / 1000)}k€` : `${Math.round(n)}€`
 }
 
-// Palette for scatter by familia
 const COLORS = ['#00557f','#C8842A','#3A9E6A','#C0392B','#7B68EE','#20B2AA','#FF8C00','#9932CC','#008080','#DC143C']
+
+async function fetchFilter(params: Record<string, string>): Promise<string[]> {
+  const qs  = new URLSearchParams(params).toString()
+  const res = await fetch(`/api/products/filter?${qs}`)
+  return res.ok ? res.json() : []
+}
 
 export function RentabilidadCharts({ familiaData, metalData, top10, scatterData }: Props) {
   const familias = Array.from(new Set(scatterData.map(d => d.familia)))
   const colorByFamilia = Object.fromEntries(familias.map((f, i) => [f, COLORS[i % COLORS.length]]))
+
+  const [actionCodes, setActionCodes] = useState<string[]>([])
+  const [actionTitle, setActionTitle] = useState('')
+
+  async function selectByFamilia(familia: string) {
+    const codes = await fetchFilter({ familia })
+    setActionCodes(codes)
+    setActionTitle(`Familia: ${familia}`)
+  }
+
+  async function selectByMetal(metal: string) {
+    const codes = await fetchFilter({ metal })
+    setActionCodes(codes)
+    setActionTitle(`Metal: ${metal}`)
+  }
+
+  function selectByCodigo(codigo: string, desc?: string | null) {
+    setActionCodes([codigo])
+    setActionTitle(desc ? `${codigo} — ${desc}` : `Producto ${codigo}`)
+  }
 
   return (
     <div className="space-y-6">
@@ -38,7 +65,7 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
         <div className="col-span-2">
           <ChartCard
             title="Ingresos 12m por familia"
-            subtitle="Contribución absoluta por categoría de producto"
+            subtitle="Contribución absoluta · clic para ver productos"
             height={340}
           >
             <ResponsiveContainer width="100%" height="100%">
@@ -60,17 +87,25 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
                         <p>Ingresos: <span className="font-semibold">{fmtEur(d.ingresos)}</span></p>
                         <p>Margen medio: <span className="font-semibold">{d.margenMedio}%</span></p>
                         <p>Modelos: {d.count}</p>
+                        <p className="text-[#b2b2b2] text-[10px]">Clic para ver productos</p>
                       </div>
                     )
                   }}
                 />
-                <Bar dataKey="ingresos" fill="#00557f" radius={[0, 3, 3, 0]} maxBarSize={18} />
+                <Bar
+                  dataKey="ingresos"
+                  fill="#00557f"
+                  radius={[0, 3, 3, 0]}
+                  maxBarSize={18}
+                  cursor="pointer"
+                  onClick={(d: any) => selectByFamilia(d.familia)}
+                />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
         </div>
 
-        <ChartCard title="Por metal" subtitle="Ingresos 12m por tipo de metal" height={340}>
+        <ChartCard title="Por metal" subtitle="Ingresos 12m · clic para ver" height={340}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={metalData} margin={{ top: 0, right: 8, bottom: 24, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0ece8" />
@@ -80,7 +115,13 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
                 formatter={(v: unknown) => [fmtEur(v), 'Ingresos']}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
               />
-              <Bar dataKey="ingresos" fill="#C8842A" radius={[3, 3, 0, 0]} />
+              <Bar
+                dataKey="ingresos"
+                fill="#C8842A"
+                radius={[3, 3, 0, 0]}
+                cursor="pointer"
+                onClick={(d: any) => selectByMetal(d.metal)}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -90,7 +131,7 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
       <div className="grid grid-cols-2 gap-6">
         <ChartCard
           title="Ingresos vs Margen"
-          subtitle="Cada punto es un modelo · cuadrante ideal: arriba-derecha"
+          subtitle="Cada punto es un modelo · clic para ver"
           height={340}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -124,6 +165,7 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
                       <p>Ingresos: <span className="font-semibold">{fmtEur(d.ingresos)}</span></p>
                       <p>Margen: <span className="font-semibold">{d.margen}%</span></p>
                       <p className="text-[#b2b2b2]">{d.familia} · ABC {d.abc}</p>
+                      <p className="text-[#b2b2b2] text-[10px]">Clic para ver producto</p>
                     </div>
                   )
                 }}
@@ -136,6 +178,8 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
                   fill={colorByFamilia[f]}
                   opacity={0.65}
                   r={4}
+                  cursor="pointer"
+                  onClick={(d: any) => selectByCodigo(d.codigo, d.desc)}
                 />
               ))}
             </ScatterChart>
@@ -145,7 +189,7 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
         {/* Top 10 tabla */}
         <div className="bg-white rounded-xl p-6" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
           <h3 className="text-sm font-bold text-[#00557f] uppercase tracking-wider mb-1">Top 10 modelos</h3>
-          <p className="text-xs text-[#b2b2b2] mb-4">Por ingresos 12m</p>
+          <p className="text-xs text-[#b2b2b2] mb-4">Por ingresos 12m · clic en fila para ver producto</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#e2ddd9]">
@@ -156,7 +200,11 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
             </thead>
             <tbody>
               {top10.map((r, i) => (
-                <tr key={i} className="border-b border-[#f0ece8] hover:bg-[#f0ece8]/40 transition-colors">
+                <tr
+                  key={i}
+                  className="border-b border-[#f0ece8] hover:bg-[#f0ece8]/60 transition-colors cursor-pointer"
+                  onClick={() => selectByCodigo(r.codigo, r.desc)}
+                >
                   <td className="py-2 pr-3 text-xs text-[#b2b2b2] font-mono">{i + 1}</td>
                   <td className="py-2 pr-3">
                     <div className="font-mono text-xs text-[#b2b2b2]">{r.codigo}</div>
@@ -182,6 +230,16 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
           </table>
         </div>
       </div>
+
+      {/* Product action list */}
+      {actionCodes.length > 0 && (
+        <ProductActionList
+          codigosModelo={actionCodes}
+          titulo={actionTitle}
+          onClose={() => setActionCodes([])}
+          context="analytics"
+        />
+      )}
     </div>
   )
 }

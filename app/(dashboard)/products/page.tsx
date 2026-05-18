@@ -18,11 +18,12 @@ type ProductRow = {
   metal:              string | null
   karat:              string | null
   num_variantes:      number | null
-  ingresos_12m: number | null
+  ingresos_12m:       number | null
   abc_ventas:         string | null
   metabase_synced_at: string | null
   shopify_synced_at:  string | null
   is_discontinued:    boolean
+  lifecycle_status:   string | null
 }
 
 type FilterOption = {
@@ -62,7 +63,7 @@ export default async function ProductsPage({
   let productsQuery = supabase
     .from('products')
     .select(
-      'codigo_modelo, description, category, familia, metal, karat, num_variantes, ingresos_12m, abc_ventas, metabase_synced_at, shopify_synced_at, is_discontinued',
+      'codigo_modelo, description, category, familia, metal, karat, num_variantes, ingresos_12m, abc_ventas, metabase_synced_at, shopify_synced_at, is_discontinued, lifecycle_status',
       { count: 'exact' }
     )
 
@@ -277,6 +278,7 @@ export default async function ProductsPage({
       completitudPct:   comp.score,
       completitudNivel: comp.nivel,
       is_discontinued:  p.is_discontinued ?? false,
+      lifecycle_status: p.lifecycle_status ?? 'activo',
       stock_total:      stockByModel[p.codigo_modelo] ?? 0,
     }
   })

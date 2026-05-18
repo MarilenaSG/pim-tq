@@ -1,16 +1,18 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis,
   CartesianGrid, Tooltip, BarChart, Bar, Cell,
 } from 'recharts'
 import { ChartCard } from '@/components/analytics/ChartCard'
+import { ProductActionList } from '@/components/products/ProductActionList'
 import type { CicloEtapa } from './page'
 
 interface ScatterRow { meses: number; ingresos: number; etapa: CicloEtapa; codigo: string; description: string }
-interface EtapaRow   { etapa: CicloEtapa; count: number; color: string }
+interface EtapaRow   { etapa: CicloEtapa; count: number; color: string; codigos: string[] }
 interface AnomaliaRow { codigo_modelo: string; description: string | null; familia: string | null; abc: string | null; ingresos: number; meses: number | null; etapa: string; pctIngresos: number }
-interface EdadRow    { rango: string; count: number }
+interface EdadRow    { rango: string; count: number; mesesMin: number; mesesMax: number }
 
 interface Props {
   scatterData:   ScatterRow[]
@@ -27,7 +29,32 @@ const fmtEur = (v: unknown) => {
   return n >= 1000 ? `${Math.round(n / 1000)}k€` : `${Math.round(n)}€`
 }
 
+async function fetchFilter(params: Record<string, string>): Promise<string[]> {
+  const qs  = new URLSearchParams(params).toString()
+  const res = await fetch(`/api/products/filter?${qs}`)
+  return res.ok ? res.json() : []
+}
+
 export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, etapaColors }: Props) {
+  const [actionCodes, setActionCodes] = useState<string[]>([])
+  const [actionTitle, setActionTitle] = useState('')
+
+  function selectByCodigo(codigo: string, description?: string) {
+    setActionCodes([codigo])
+    setActionTitle(description ? `${codigo} — ${description}` : `Producto ${codigo}`)
+  }
+
+  function selectByEtapa(row: EtapaRow) {
+    setActionCodes(row.codigos)
+    setActionTitle(`Etapa: ${row.etapa} (${row.count} productos)`)
+  }
+
+  async function selectByEdad(row: EdadRow) {
+    const codes = await fetchFilter({ meses_min: String(row.mesesMin), meses_max: String(row.mesesMax) })
+    setActionCodes(codes)
+    setActionTitle(`Antigüedad ${row.rango}`)
+  }
+
   return (
     <div className="space-y-6">
       {/* Row 1: scatter + distribución */}
@@ -35,7 +62,7 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
         <div className="col-span-2">
           <ChartCard
             title="Mapa de ciclo de vida"
-            subtitle="Edad del producto (meses) vs ingresos 12m · color por etapa"
+            subtitle="Edad vs ingresos · clic en punto para ver producto"
             height={360}
           >
             <ResponsiveContainer width="100%" height="100%">
@@ -66,12 +93,8 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
                         <p className="text-[#b2b2b2]">{d.codigo}</p>
                         <p>Edad: <span className="font-semibold">{d.meses} meses</span></p>
                         <p>Ingresos: <span className="font-semibold">{fmtEur(d.ingresos)}</span></p>
-                        <span
-                          className="inline-block px-2 py-0.5 rounded text-white text-[10px]"
-                          style={{ background: etapaColors[d.etapa] }}
-                        >
-                          {d.etapa}
-                        </span>
+                        <span className="inline-block px-2 py-0.5 rounded text-white text-[10px]" style={{ background: etapaColors[d.etapa] }}>{d.etapa}</span>
+                        <p className="text-[#b2b2b2] text-[10px]">Clic para ver producto</p>
                       </div>
                     )
                   }}
@@ -87,6 +110,8 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
                       fill={etapaColors[etapa]}
                       opacity={0.7}
                       r={4}
+                      cursor="pointer"
+                      onClick={(d: any) => selectByCodigo(d.codigo, d.description)}
                     />
                   )
                 })}
@@ -96,7 +121,7 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
         </div>
 
         <div className="space-y-4">
-          <ChartCard title="Por etapa" subtitle="Distribución de modelos" height={160}>
+          <ChartCard title="Por etapa" subtitle="Clic para ver productos" height={160}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={etapaData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
                 <XAxis dataKey="etapa" tick={{ fontSize: 9, fill: '#b2b2b2' }} />
@@ -105,14 +130,14 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
                   formatter={(v: unknown) => [`${Number(v)} modelos`, '']}
                   contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
                 />
-                <Bar dataKey="count" radius={[3, 3, 0, 0]}>
+                <Bar dataKey="count" radius={[3, 3, 0, 0]} cursor="pointer" onClick={(d: any) => selectByEtapa(d)}>
                   {etapaData.map((d, i) => <Cell key={i} fill={d.color} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="Antigüedad" subtitle="Nº de modelos por edad" height={160}>
+          <ChartCard title="Antigüedad" subtitle="Clic para ver por rango" height={160}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={edadData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
                 <XAxis dataKey="rango" tick={{ fontSize: 8, fill: '#b2b2b2' }} angle={-30} textAnchor="end" interval={0} />
@@ -121,7 +146,13 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
                   formatter={(v: unknown) => [`${Number(v)} modelos`, '']}
                   contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
                 />
-                <Bar dataKey="count" fill="#C8842A" radius={[3, 3, 0, 0]} />
+                <Bar
+                  dataKey="count"
+                  fill="#C8842A"
+                  radius={[3, 3, 0, 0]}
+                  cursor="pointer"
+                  onClick={(d: any) => selectByEdad(d)}
+                />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -136,7 +167,7 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
               Anomalías: Declive con ingresos relevantes
             </h3>
             <p className="text-xs text-[#b2b2b2] mt-0.5">
-              Productos clasificados en declive que aún generan ingresos destacados — candidatos a revisión o renovación
+              Clic en fila para ver el producto
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -150,7 +181,11 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
               </thead>
               <tbody>
                 {anomalias.map((r, i) => (
-                  <tr key={i} className="border-b border-[#f0ece8] hover:bg-[#fdf3e4]/40 transition-colors">
+                  <tr
+                    key={i}
+                    className="border-b border-[#f0ece8] hover:bg-[#fdf3e4]/60 transition-colors cursor-pointer"
+                    onClick={() => selectByCodigo(r.codigo_modelo, r.description ?? undefined)}
+                  >
                     <td className="py-2 pr-4 font-mono text-xs text-[#b2b2b2]">{r.codigo_modelo}</td>
                     <td className="py-2 pr-4 text-[#1d1d1b] max-w-[220px] truncate">{r.description ?? '—'}</td>
                     <td className="py-2 pr-4 text-[#b2b2b2]">{r.familia ?? '—'}</td>
@@ -172,6 +207,16 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
             </table>
           </div>
         </div>
+      )}
+
+      {/* Product action list */}
+      {actionCodes.length > 0 && (
+        <ProductActionList
+          codigosModelo={actionCodes}
+          titulo={actionTitle}
+          onClose={() => setActionCodes([])}
+          context="analytics"
+        />
       )}
     </div>
   )
