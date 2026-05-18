@@ -65,8 +65,13 @@ export default async function CicloVidaPage() {
     Declive:     '#C0392B',
     'Sin datos': '#b2b2b2',
   }
+  const codigosByEtapa: Record<CicloEtapa, string[]> = {
+    Nuevo: [], Crecimiento: [], Maduro: [], Declive: [], 'Sin datos': [],
+  }
+  for (const r of enriched) codigosByEtapa[r.etapa].push(r.codigo_modelo)
+
   const etapaData = (Object.keys(counts) as CicloEtapa[])
-    .map(e => ({ etapa: e, count: counts[e], color: etapaColors[e] }))
+    .map(e => ({ etapa: e, count: counts[e], color: etapaColors[e], codigos: codigosByEtapa[e] }))
     .filter(d => d.count > 0)
 
   // ── Anomalías: declive con ingresos altos ─────────────────────
@@ -97,7 +102,20 @@ export default async function CicloVidaPage() {
     else if (r.meses < 36)     edadBuckets['24 – 36m']++
     else                       edadBuckets['> 36 meses']++
   }
-  const edadData = Object.entries(edadBuckets).map(([rango, count]) => ({ rango, count }))
+  const edadRanges: Record<string, [number, number]> = {
+    '< 6 meses':  [0,   6],
+    '6 – 12m':    [6,   12],
+    '12 – 24m':   [12,  24],
+    '24 – 36m':   [24,  36],
+    '> 36 meses': [36,  9999],
+    'Sin fecha':  [-1,  -1],
+  }
+  const edadData = Object.entries(edadBuckets).map(([rango, count]) => ({
+    rango,
+    count,
+    mesesMin: edadRanges[rango][0],
+    mesesMax: edadRanges[rango][1],
+  }))
 
   return (
     <>

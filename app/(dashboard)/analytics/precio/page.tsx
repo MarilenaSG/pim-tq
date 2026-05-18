@@ -14,7 +14,7 @@ interface FamiliaStats {
   count:           number
 }
 
-interface BucketRow { rango: string; count: number }
+interface BucketRow { rango: string; count: number; min: number; max: number }
 
 export default async function PrecioPage() {
   const supabase = createServerClient()
@@ -104,8 +104,16 @@ export default async function PrecioPage() {
     else if (p < 1000)  buckets['500 – 1000€']++
     else                buckets['> 1000€']++
   }
+  const bucketRanges: Record<string, [number, number]> = {
+    '< 50€':       [0,    50],
+    '50 – 100€':   [50,   100],
+    '100 – 200€':  [100,  200],
+    '200 – 500€':  [200,  500],
+    '500 – 1000€': [500,  1000],
+    '> 1000€':     [1000, 99999],
+  }
   const distribucionData: BucketRow[] = Object.entries(buckets)
-    .map(([rango, count]) => ({ rango, count }))
+    .map(([rango, count]) => ({ rango, count, min: bucketRanges[rango][0], max: bucketRanges[rango][1] }))
 
   return (
     <>

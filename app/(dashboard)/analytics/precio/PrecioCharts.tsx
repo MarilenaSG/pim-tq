@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine,
 } from 'recharts'
 import { ChartCard } from '@/components/analytics/ChartCard'
+import { ProductActionList } from '@/components/products/ProductActionList'
 
 interface FamiliaStats {
   familia:         string
@@ -15,7 +17,7 @@ interface FamiliaStats {
   margenMedio:     number
   count:           number
 }
-interface BucketRow { rango: string; count: number }
+interface BucketRow { rango: string; count: number; min: number; max: number }
 
 interface Props {
   familiaStats:     FamiliaStats[]
@@ -24,7 +26,28 @@ interface Props {
 
 const fmtEur = (v: unknown) => `${Number(v).toLocaleString('es-ES')}€`
 
+async function fetchFilter(params: Record<string, string>): Promise<string[]> {
+  const qs  = new URLSearchParams(params).toString()
+  const res = await fetch(`/api/products/filter?${qs}`)
+  return res.ok ? res.json() : []
+}
+
 export function PrecioCharts({ familiaStats, distribucionData }: Props) {
+  const [actionCodes, setActionCodes] = useState<string[]>([])
+  const [actionTitle, setActionTitle] = useState('')
+
+  async function selectByFamilia(familia: string) {
+    const codes = await fetchFilter({ familia })
+    setActionCodes(codes)
+    setActionTitle(`Familia: ${familia}`)
+  }
+
+  async function selectByPriceRange(row: BucketRow) {
+    const codes = await fetchFilter({ precio_min: String(row.min), precio_max: String(row.max) })
+    setActionCodes(codes)
+    setActionTitle(`Precio ${row.rango}`)
+  }
+
   return (
     <div className="space-y-6">
       {/* Row 1: precio medio por familia + distribución */}
@@ -32,7 +55,7 @@ export function PrecioCharts({ familiaStats, distribucionData }: Props) {
         <div className="col-span-2">
           <ChartCard
             title="Precio medio por familia"
-            subtitle="Variante líder de cada modelo · ordenado de mayor a menor"
+            subtitle="Variante líder · clic para ver productos"
             height={360}
           >
             <ResponsiveContainer width="100%" height="100%">
@@ -63,11 +86,19 @@ export function PrecioCharts({ familiaStats, distribucionData }: Props) {
                         <p>Precio medio: <span className="font-semibold">{fmtEur(d.precioMedio)}</span></p>
                         <p>Rango: {fmtEur(d.precioMin)} – {fmtEur(d.precioMax)}</p>
                         <p>Modelos: {d.count}</p>
+                        <p className="text-[#b2b2b2] text-[10px]">Clic para ver productos</p>
                       </div>
                     )
                   }}
                 />
-                <Bar dataKey="precioMedio" fill="#00557f" radius={[0, 3, 3, 0]} maxBarSize={18} />
+                <Bar
+                  dataKey="precioMedio"
+                  fill="#00557f"
+                  radius={[0, 3, 3, 0]}
+                  maxBarSize={18}
+                  cursor="pointer"
+                  onClick={(d: any) => selectByFamilia(d.familia)}
+                />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -75,7 +106,7 @@ export function PrecioCharts({ familiaStats, distribucionData }: Props) {
 
         <ChartCard
           title="Distribución de precios"
-          subtitle="Nº de modelos por rango de PVP"
+          subtitle="Nº de modelos · clic por rango"
           height={360}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -96,7 +127,13 @@ export function PrecioCharts({ familiaStats, distribucionData }: Props) {
                 formatter={(v: unknown) => [`${Number(v)} modelos`, 'Modelos']}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
               />
-              <Bar dataKey="count" fill="#C8842A" radius={[3, 3, 0, 0]} />
+              <Bar
+                dataKey="count"
+                fill="#C8842A"
+                radius={[3, 3, 0, 0]}
+                cursor="pointer"
+                onClick={(d: any) => selectByPriceRange(d)}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -106,7 +143,7 @@ export function PrecioCharts({ familiaStats, distribucionData }: Props) {
       <div className="grid grid-cols-2 gap-6">
         <ChartCard
           title="Margen bruto por familia"
-          subtitle="Promedio % sobre variantes líderes"
+          subtitle="Promedio % sobre variantes líderes · clic para ver"
           height={340}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -138,6 +175,8 @@ export function PrecioCharts({ familiaStats, distribucionData }: Props) {
                 radius={[0, 3, 3, 0]}
                 maxBarSize={18}
                 fill="#3A9E6A"
+                cursor="pointer"
+                onClick={(d: any) => selectByFamilia(d.familia)}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -145,7 +184,7 @@ export function PrecioCharts({ familiaStats, distribucionData }: Props) {
 
         <ChartCard
           title="Descuento medio por familia"
-          subtitle="Promedio €descuento en modelos con precio tachado"
+          subtitle="Promedio €descuento · clic para ver"
           height={340}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -172,11 +211,28 @@ export function PrecioCharts({ familiaStats, distribucionData }: Props) {
                 formatter={(v: unknown) => [fmtEur(v), 'Descuento medio']}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
               />
-              <Bar dataKey="descuentoMedio" fill="#C0392B" radius={[0, 3, 3, 0]} maxBarSize={18} />
+              <Bar
+                dataKey="descuentoMedio"
+                fill="#C0392B"
+                radius={[0, 3, 3, 0]}
+                maxBarSize={18}
+                cursor="pointer"
+                onClick={(d: any) => selectByFamilia(d.familia)}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
+
+      {/* Product action list */}
+      {actionCodes.length > 0 && (
+        <ProductActionList
+          codigosModelo={actionCodes}
+          titulo={actionTitle}
+          onClose={() => setActionCodes([])}
+          context="analytics"
+        />
+      )}
     </div>
   )
 }

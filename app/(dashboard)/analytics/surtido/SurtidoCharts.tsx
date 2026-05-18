@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ComposedChart, Line, Cell, PieChart, Pie, Legend,
   type PieLabelRenderProps,
 } from 'recharts'
 import { ChartCard } from '@/components/analytics/ChartCard'
+import { ProductActionList } from '@/components/products/ProductActionList'
 
 interface AmplitudRow { familia: string; modelos: number; avgVariantes: number }
 interface ParetoRow   { rank: number; codigo: string; ingresos: number; pct: number }
@@ -22,14 +24,40 @@ const fmtEur = (v: unknown) => {
   return n >= 1000 ? `${Math.round(n / 1000)}k€` : `${Math.round(n)}€`
 }
 
+async function fetchFilter(params: Record<string, string>): Promise<string[]> {
+  const qs  = new URLSearchParams(params).toString()
+  const res = await fetch(`/api/products/filter?${qs}`)
+  return res.ok ? res.json() : []
+}
+
 export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
+  const [actionCodes, setActionCodes] = useState<string[]>([])
+  const [actionTitle, setActionTitle] = useState('')
+
+  async function selectByFamilia(familia: string) {
+    const codes = await fetchFilter({ familia })
+    setActionCodes(codes)
+    setActionTitle(`Familia: ${familia}`)
+  }
+
+  async function selectByAbc(abc: string) {
+    const codes = await fetchFilter({ abc })
+    setActionCodes(codes)
+    setActionTitle(`ABC ${abc}`)
+  }
+
+  function selectByCodigo(codigo: string) {
+    setActionCodes([codigo])
+    setActionTitle(`Producto ${codigo}`)
+  }
+
   return (
     <div className="space-y-6">
       {/* Row 1: Amplitud + Profundidad */}
       <div className="grid grid-cols-2 gap-6">
         <ChartCard
           title="Amplitud por familia"
-          subtitle="Número de modelos por familia"
+          subtitle="Número de modelos · clic para ver productos"
           height={380}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -50,14 +78,21 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
                 formatter={(v: unknown) => [`${Number(v)} modelos`, 'Modelos']}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
               />
-              <Bar dataKey="modelos" fill="#00557f" radius={[0, 3, 3, 0]} maxBarSize={18} />
+              <Bar
+                dataKey="modelos"
+                fill="#00557f"
+                radius={[0, 3, 3, 0]}
+                maxBarSize={18}
+                cursor="pointer"
+                onClick={(d: any) => selectByFamilia(d.familia)}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard
           title="Profundidad por familia"
-          subtitle="Promedio de variantes por modelo"
+          subtitle="Promedio de variantes · clic para ver productos"
           height={380}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -78,7 +113,14 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
                 formatter={(v: unknown) => [`${Number(v)} var/modelo`, 'Profundidad']}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
               />
-              <Bar dataKey="avgVariantes" fill="#C8842A" radius={[0, 3, 3, 0]} maxBarSize={18} />
+              <Bar
+                dataKey="avgVariantes"
+                fill="#C8842A"
+                radius={[0, 3, 3, 0]}
+                maxBarSize={18}
+                cursor="pointer"
+                onClick={(d: any) => selectByFamilia(d.familia)}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -89,7 +131,7 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
         <div className="col-span-2">
           <ChartCard
             title="Pareto de ingresos"
-            subtitle="Top 30 modelos · barras = ingresos · línea = % acumulado"
+            subtitle="Top 30 modelos · clic en barra para ver el producto"
             height={320}
           >
             <ResponsiveContainer width="100%" height="100%">
@@ -103,11 +145,7 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
                   tick={{ fontSize: 10, fill: '#b2b2b2' }}
                   label={{ value: 'Ranking', position: 'insideBottom', offset: -2, fontSize: 10, fill: '#b2b2b2' }}
                 />
-                <YAxis
-                  yAxisId="left"
-                  tick={{ fontSize: 10, fill: '#00557f' }}
-                  tickFormatter={fmtEur}
-                />
+                <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#00557f' }} tickFormatter={fmtEur} />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
@@ -122,9 +160,8 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
                       : [`${Number(v)}%`, 'Acumulado']
                   }
                   labelFormatter={(rank: unknown) => {
-                    const i = Number(rank)
-                    const row = paretoData[i - 1]
-                    return row ? row.codigo : `#${i}`
+                    const row = paretoData[Number(rank) - 1]
+                    return row ? row.codigo : `#${rank}`
                   }}
                   contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
                 />
@@ -134,15 +171,10 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
                   fill="#00557f"
                   radius={[2, 2, 0, 0]}
                   maxBarSize={20}
+                  cursor="pointer"
+                  onClick={(d: any) => selectByCodigo(d.codigo)}
                 />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="pct"
-                  stroke="#C8842A"
-                  strokeWidth={2}
-                  dot={false}
-                />
+                <Line yAxisId="right" type="monotone" dataKey="pct" stroke="#C8842A" strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -150,7 +182,7 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
 
         <ChartCard
           title="Distribución ABC"
-          subtitle="Modelos por clasificación de ventas"
+          subtitle="Modelos por clasificación · clic para ver"
           height={320}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -163,10 +195,12 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
                 outerRadius={100}
                 paddingAngle={2}
                 dataKey="value"
+                cursor="pointer"
                 label={(p: PieLabelRenderProps) =>
                   `${String(p.name)} ${Math.round(Number(p.percent) * 100)}%`
                 }
                 labelLine={false}
+                onClick={(d: any) => selectByAbc(d.name)}
               >
                 {abcData.map((entry, i) => (
                   <Cell key={i} fill={entry.color} />
@@ -176,15 +210,21 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
                 formatter={(v: unknown, name: unknown) => [`${Number(v)} modelos`, `ABC ${String(name)}`]}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2ddd9' }}
               />
-              <Legend
-                iconType="circle"
-                iconSize={8}
-                wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-              />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
+
+      {/* Product action list */}
+      {actionCodes.length > 0 && (
+        <ProductActionList
+          codigosModelo={actionCodes}
+          titulo={actionTitle}
+          onClose={() => setActionCodes([])}
+          context="analytics"
+        />
+      )}
     </div>
   )
 }
