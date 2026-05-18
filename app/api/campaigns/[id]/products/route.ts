@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, createAuthServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createServiceClient()
@@ -16,10 +16,6 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const body = await req.json()
   const codigos: string[] = Array.isArray(body.codigos) ? body.codigos : [body.codigo_modelo].filter(Boolean)
   if (!codigos.length) return NextResponse.json({ error: 'codigos requerido' }, { status: 400 })
@@ -28,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const rows = codigos.map(c => ({
     campaign_id:   params.id,
     codigo_modelo: c,
-    added_by:      user.email ?? null,
+    added_by:      null,
   }))
   const { data, error } = await supabase
     .from('campaign_products')
@@ -39,10 +35,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const { searchParams } = new URL(req.url)
   const codigo = searchParams.get('codigo_modelo')
 
