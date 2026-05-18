@@ -18,10 +18,11 @@ const navSections = [
   {
     label: 'Operativo',
     items: [
-      { href: '/alerts',   label: 'Alertas',           icon: '⚑', badge: true },
-      { href: '/campaigns', label: 'Campañas',          icon: '◈' },
-      { href: '/category', label: 'Category Manager',  icon: '▦' },
-      { href: '/suppliers', label: 'Proveedores',       icon: '◇' },
+      { href: '/alerts',        label: 'Alertas',           icon: '⚑', badge: true },
+      { href: '/campaigns',     label: 'Campañas',          icon: '◈' },
+      { href: '/sin-rotacion',  label: 'Sin rotación',      icon: '⊗' },
+      { href: '/category',      label: 'Category Manager',  icon: '▦' },
+      { href: '/suppliers',     label: 'Proveedores',       icon: '◇' },
     ],
   },
   {
