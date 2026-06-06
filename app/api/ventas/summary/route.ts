@@ -87,12 +87,12 @@ export async function GET() {
   const lastM = sumRows(r => r.anyo === lastAnyo && r.mes === lastMes)
   const lmPrev = sumRows(r => r.anyo === lastAnyo - 1 && r.mes === lastMes)
 
-  // ── 5. Evolución mensual (últimos 18 meses) ──────────────────
+  // ── 5. Evolución mensual (últimos 18 meses desde HOY) ────────
   const evoMap = new Map<string, { anyo: number; mes: number; ingresos: number; unidades: number }>()
 
-  // Generar los 18 períodos hacia atrás
+  // Ancla siempre en el mes actual, no en el último dato de la BD
   const periods: { anyo: number; mes: number }[] = []
-  let a = lastAnyo, m = lastMes
+  let a = curAnyo, m = curMes
   for (let i = 0; i < 18; i++) {
     periods.unshift({ anyo: a, mes: m })
     m--
@@ -121,10 +121,10 @@ export async function GET() {
     unidades: v.unidades,
   }))
 
-  // ── 6. Top 10 modelos (últimos 12 meses) ────────────────────
-  const ref12 = lastAnyo * 100 + lastMes
+  // ── 6. Top 10 modelos (últimos 12 meses desde HOY) ──────────
+  const ref12 = curAnyo * 100 + curMes
   const cut12 = (() => {
-    let a2 = lastAnyo, m2 = lastMes - 11
+    let a2 = curAnyo, m2 = curMes - 11
     while (m2 <= 0) { m2 += 12; a2-- }
     return a2 * 100 + m2
   })()
