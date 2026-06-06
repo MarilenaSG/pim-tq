@@ -45,7 +45,7 @@ export async function GET() {
   // ── 1. Todos los datos disponibles (últimos 24 meses máx) ────
   const { data: allRows, error } = await supabase
     .from('ventas_mensuales')
-    .select('slug, codigo_modelo, anyo, mes, unidades_vendidas, ingresos_netos')
+    .select('codigo_interno, codigo_modelo, anyo, mes, unidades_vendidas, ingresos_netos')
     .gte('anyo', prevAnyo - 1)
     .order('anyo', { ascending: true })
     .order('mes',  { ascending: true })

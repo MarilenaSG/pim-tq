@@ -38,7 +38,7 @@ export async function syncVentas(): Promise<SyncVentasResult> {
   }
 
   const rows: {
-    slug: string
+    codigo_interno: string
     anyo: number
     mes: number
     unidades_vendidas: number | null
@@ -55,8 +55,8 @@ export async function syncVentas(): Promise<SyncVentasResult> {
     const cols = parseCSVLine(lines[i])
     if (cols.length < 4) continue
 
-    const slug = cols[idx.codigo_interno]?.trim()
-    if (!slug) continue
+    const codigo_interno = cols[idx.codigo_interno]?.trim()
+    if (!codigo_interno) continue
 
     const anyo = parseAnyo(cols[idx.anyo] ?? '')
     const mes  = parseInt((cols[idx.mes] ?? '').trim(), 10)
@@ -67,7 +67,7 @@ export async function syncVentas(): Promise<SyncVentasResult> {
     }
 
     rows.push({
-      slug,
+      codigo_interno,
       anyo,
       mes,
       unidades_vendidas: parseInt((cols[idx.unidades_vendidas] ?? '').trim(), 10) || null,
@@ -84,25 +84,25 @@ export async function syncVentas(): Promise<SyncVentasResult> {
 
   const supabase = createServiceClient()
 
-  // Look up codigo_modelo via product_variants.slug
-  const allSlugs = Array.from(new Set(rows.map(r => r.slug)))
-  const variantMap = new Map<string, string>() // slug → codigo_modelo
+  // Look up codigo_modelo via product_variants.codigo_interno
+  const allCodigos = Array.from(new Set(rows.map(r => r.codigo_interno)))
+  const variantMap = new Map<string, string>() // codigo_interno → codigo_modelo
   const LOOKUP_CHUNK = 500
-  for (let i = 0; i < allSlugs.length; i += LOOKUP_CHUNK) {
+  for (let i = 0; i < allCodigos.length; i += LOOKUP_CHUNK) {
     const { data } = await supabase
       .from('product_variants')
-      .select('slug, codigo_modelo')
-      .in('slug', allSlugs.slice(i, i + LOOKUP_CHUNK))
-    for (const v of data ?? []) if (v.slug) variantMap.set(v.slug, v.codigo_modelo)
+      .select('codigo_interno, codigo_modelo')
+      .in('codigo_interno', allCodigos.slice(i, i + LOOKUP_CHUNK))
+    for (const v of data ?? []) if (v.codigo_interno) variantMap.set(v.codigo_interno, v.codigo_modelo)
   }
 
   // Enrich rows with codigo_modelo, skip rows with no match (descatalogued)
   const enrichedRows = rows
-    .map(r => ({ ...r, codigo_modelo: variantMap.get(r.slug) ?? null }))
+    .map(r => ({ ...r, codigo_modelo: variantMap.get(r.codigo_interno) ?? null }))
     .filter((r): r is typeof r & { codigo_modelo: string } => r.codigo_modelo !== null)
 
   if (enrichedRows.length === 0) {
-    errors.push('Ningún slug del CSV coincide con product_variants. Ejecuta primero el sync de Metabase.')
+    errors.push('Ningún codigo_interno del CSV coincide con product_variants. Ejecuta primero el sync de Metabase.')
     return { rowsUpserted: 0, errors }
   }
 
@@ -112,7 +112,7 @@ export async function syncVentas(): Promise<SyncVentasResult> {
     const chunk = enrichedRows.slice(i, i + CHUNK)
     const { error } = await supabase
       .from('ventas_mensuales')
-      .upsert(chunk, { onConflict: 'slug,anyo,mes' })
+      .upsert(chunk, { onConflict: 'codigo_interno,anyo,mes' })
 
     if (error) {
       errors.push(`Upsert ventas (chunk ${Math.floor(i / CHUNK) + 1}): ${error.message}`)

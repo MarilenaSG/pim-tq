@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   // Fetch raw ventas
   const { data: rows, error } = await supabase
     .from('ventas_mensuales')
-    .select('slug, codigo_modelo, anyo, mes, ingresos_netos, unidades_vendidas')
+    .select('codigo_interno, codigo_modelo, anyo, mes, ingresos_netos, unidades_vendidas')
     .gte('anyo', curAnyo - 2)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
