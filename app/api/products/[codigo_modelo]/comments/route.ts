@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, createAuthServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(_: NextRequest, { params }: { params: { codigo_modelo: string } }) {
   const supabase = createServiceClient()
@@ -13,11 +13,7 @@ export async function GET(_: NextRequest, { params }: { params: { codigo_modelo:
 }
 
 export async function POST(req: NextRequest, { params }: { params: { codigo_modelo: string } }) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
-  const { contenido, tipo } = await req.json()
+  const { contenido, tipo, user_email } = await req.json()
   if (!contenido?.trim()) return NextResponse.json({ error: 'Contenido requerido' }, { status: 400 })
 
   const supabase = createServiceClient()
@@ -25,9 +21,8 @@ export async function POST(req: NextRequest, { params }: { params: { codigo_mode
     .from('product_comments')
     .insert({
       codigo_modelo: params.codigo_modelo,
-      user_id:       user.id,
-      user_email:    user.email!,
-      user_name:     user.email?.split('@')[0] ?? null,
+      user_email:    user_email ?? null,
+      user_name:     user_email ? user_email.split('@')[0] : null,
       contenido:     contenido.trim(),
       tipo:          tipo || 'nota',
     })
@@ -37,10 +32,6 @@ export async function POST(req: NextRequest, { params }: { params: { codigo_mode
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { codigo_modelo: string } }) {
-  const auth = createAuthServerClient()
-  const { data: { user } } = await auth.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id requerido' }, { status: 400 })
@@ -50,7 +41,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { codigo_mo
     .from('product_comments')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
     .eq('codigo_modelo', params.codigo_modelo)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

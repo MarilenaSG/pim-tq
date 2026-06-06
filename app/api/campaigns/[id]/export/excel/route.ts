@@ -244,7 +244,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   const headerRow = ws.getRow(nextRow)
   headerRow.values = COLS.map(c => c.header)
   headerRow.height = 22
-  headerRow.eachCell(cell => {
+  headerRow.eachCell((cell: ExcelJS.Cell) => {
     cell.font      = { bold: true, size: 10, color: { argb: WHITE } }
     cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: TQ_BLUE } }
     cell.alignment = { vertical: 'middle', horizontal: 'left' }
@@ -265,7 +265,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
       r.precio ?? '', r.precioAntes ?? '', r.descuento != null ? `${Math.round(r.descuento)}%` : '',
       r.tallas, r.imagen1, r.imagen2, r.imagen3,
     ]
-    row.eachCell((cell, col) => {
+    row.eachCell((cell: ExcelJS.Cell, col: number) => {
       cell.border    = cellBorder
       cell.font      = { size: 10 }
       cell.alignment = { vertical: 'middle', wrapText: col === 5 }

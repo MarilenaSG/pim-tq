@@ -12,7 +12,10 @@
       "Bash(node -e \"require\\('exceljs'\\); console.log\\('ok'\\)\")",
       "PowerShell(cd \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\.claude\\\\worktrees\\\\happy-leakey-e5e8dd\"; git add --all -- ':!.claude/settings.local.json'; git status --short)",
       "Bash(git checkout *)",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "Bash(git rm *)",
+      "Bash(git status *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

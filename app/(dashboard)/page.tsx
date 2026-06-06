@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { KpiCard, SyncIndicator, StatusBadge } from '@/components/ui'
+import { ZoneCardsSection } from '@/components/ui/ZoneCardsSection'
 import type { SyncLog, AlertSummary } from '@/types'
 
 async function getDashboardData() {
@@ -75,6 +76,9 @@ export default async function DashboardPage() {
           {today}
         </p>
       </div>
+
+      {/* Zone cards */}
+      <ZoneCardsSection />
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">

@@ -26,3 +26,7 @@ Thumbs.db
 
 # Logs
 npm-debug.log*
+
+# Claude Code internal
+.claude/worktrees/
+.claire/

@@ -332,11 +332,11 @@ function TabResumen({
                 </span>
                 {!d.cumplido && d.tab && (
                   <Link
-                    href={`/products/${product.codigo_modelo}?tab=${d.tab}${d.generacion ? `&gen=${d.generacion}` : ''}`}
+                    href={`/products/${product.codigo_modelo}?tab=${d.tab}`}
                     className="text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors"
                     style={{ background: 'rgba(0,153,242,0.1)', color: '#0099f2' }}
                   >
-                    {d.generacion ? 'Generar con IA' : 'Ir →'}
+                    Ir →
                   </Link>
                 )}
               </li>
