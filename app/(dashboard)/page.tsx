@@ -1,57 +1,51 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { KpiCard, SyncIndicator, StatusBadge } from '@/components/ui'
-import { ZoneCardsSection } from '@/components/ui/ZoneCardsSection'
-import type { SyncLog, AlertSummary } from '@/types'
+import { ZoneCardsSection }    from '@/components/ui/ZoneCardsSection'
+import { ZoneSummaryWidget }   from '@/components/ui/ZoneSummaryWidget'
+import type { SyncLog } from '@/types'
 
 async function getDashboardData() {
   const supabase = createServerClient()
 
-  const { data: activeProducts, count: totalProducts } = await supabase
-    .from('products')
-    .select('codigo_modelo, ingresos_12m, abc_ventas', { count: 'exact' })
-    .eq('is_discontinued', false)
-
-  const total         = totalProducts ?? 0
-  const totalIngresos = (activeProducts ?? []).reduce((acc, p) => acc + (Number(p.ingresos_12m) || 0), 0)
-  const abcACount     = (activeProducts ?? []).filter(p => p.abc_ventas === 'A').length
-
-  const codes = (activeProducts ?? []).map(p => p.codigo_modelo as string)
-
-  const [variantsResult, syncLogsResult, withPrimaryResult] = await Promise.all([
-    supabase.from('product_variants').select('*', { count: 'exact', head: true }).eq('is_discontinued', false),
-    supabase.from('sync_log').select('*').order('started_at', { ascending: false }).limit(10),
-    codes.length > 0
-      ? supabase.from('product_images').select('codigo_modelo', { count: 'exact', head: true }).eq('is_primary', true).in('codigo_modelo', codes)
-      : Promise.resolve({ count: 0 }),
+  const [activeRes, varRes, syncRes, imgRes] = await Promise.all([
+    supabase
+      .from('products')
+      .select('codigo_modelo, ingresos_12m, abc_ventas', { count: 'exact' })
+      .eq('is_discontinued', false),
+    supabase
+      .from('product_variants')
+      .select('*', { count: 'exact', head: true }),
+    supabase
+      .from('sync_log')
+      .select('*')
+      .order('started_at', { ascending: false })
+      .limit(6),
+    supabase
+      .from('product_images')
+      .select('codigo_modelo', { count: 'exact', head: true })
+      .eq('is_primary', true),
   ])
 
-  const totalVariants     = variantsResult.count ?? 0
-  const withPrimary       = withPrimaryResult.count ?? 0
-  const sinImagenPrimaria = Math.max(0, total - withPrimary)
-  const pctIncompletas    = total > 0 ? Math.round((sinImagenPrimaria / total) * 100) : 0
+  const rows          = activeRes.data ?? []
+  const total         = activeRes.count ?? 0
+  const totalIngresos = rows.reduce((s, p) => s + (Number(p.ingresos_12m) || 0), 0)
+  const abcACount     = rows.filter(p => p.abc_ventas === 'A').length
+  const totalVariants = varRes.count ?? 0
+  const sinImagen     = Math.max(0, total - (imgRes.count ?? 0))
 
-  const logs         = (syncLogsResult.data ?? []) as SyncLog[]
-  const lastMetabase = logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null
+  const logs           = (syncRes.data ?? []) as SyncLog[]
+  const lastMetabase   = logs.find(l => l.source === 'metabase'  && l.status !== 'running') ?? null
 
-  return { totalProducts: total, totalVariants, abcACount, totalIngresos, lastMetabase, sinImagenPrimaria, pctIncompletas }
+  return { total, totalVariants, abcACount, totalIngresos, lastMetabase, sinImagen }
 }
 
 export default async function DashboardPage() {
-  const {
-    totalProducts, totalVariants, abcACount, totalIngresos,
-    lastMetabase, sinImagenPrimaria, pctIncompletas,
-  } = await getDashboardData()
+  const { total, totalVariants, abcACount, totalIngresos, lastMetabase, sinImagen } =
+    await getDashboardData()
 
-  let alertSummary: AlertSummary | null = null
-  try {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`
-    const res = await fetch(`${base}/api/alerts/summary`, { next: { revalidate: 300 } })
-    if (res.ok) alertSummary = await res.json()
-  } catch { /* non-critical */ }
-
-  const abcAPct       = totalProducts > 0 ? Math.round((abcACount / totalProducts) * 100) : 0
-  const formatEur = (n: number) =>
+  const abcAPct   = total > 0 ? Math.round((abcACount / total) * 100) : 0
+  const fmtEur    = (n: number) =>
     n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 
   const today = new Date().toLocaleDateString('es-ES', {
@@ -59,20 +53,18 @@ export default async function DashboardPage() {
   })
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="p-8 max-w-6xl">
 
       {/* Header */}
-      <div className="mb-8">
-        <p className="text-[11px] font-bold tracking-widest uppercase text-tq-sky mb-1">
+      <div className="mb-6">
+        <p className="text-[11px] font-bold tracking-widest uppercase" style={{ color: '#0099f2' }}>
           Te Quiero Joyerías
         </p>
-        <h1
-          className="text-4xl font-bold text-tq-snorkel mb-2"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-        >
+        <h1 className="text-4xl font-bold text-[#00557f] mt-1 mb-1"
+          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
           Dashboard
         </h1>
-        <p className="text-sm capitalize" style={{ color: 'color-mix(in srgb, #00557f 65%, #fff)' }}>
+        <p className="text-sm capitalize" style={{ color: 'color-mix(in srgb, #00557f 60%, #fff)' }}>
           {today}
         </p>
       </div>
@@ -80,96 +72,50 @@ export default async function DashboardPage() {
       {/* Zone cards */}
       <ZoneCardsSection />
 
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      {/* Zone-aware summary widget (client, reads localStorage) */}
+      <ZoneSummaryWidget />
+
+      {/* Catálogo KPIs */}
+      <h2 className="text-[11px] font-bold tracking-widest uppercase mb-3" style={{ color: '#00557f' }}>
+        Catálogo
+      </h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiCard
-          label="Modelos"
-          value={totalProducts.toLocaleString('es-ES')}
+          label="Modelos activos"
+          value={total.toLocaleString('es-ES')}
           sub="referencias únicas"
-          color="neutral"
+          color="blue"
           icon="◻"
         />
         <KpiCard
-          label="Variantes"
+          label="Variantes (SKU)"
           value={totalVariants.toLocaleString('es-ES')}
-          sub="SKUs totales"
-          color="blue"
+          sub="unidades de venta"
+          color="neutral"
           icon="◫"
         />
         <KpiCard
           label="Ingresos 12m"
-          value={formatEur(totalIngresos)}
-          sub="suma de todos los modelos"
+          value={fmtEur(totalIngresos)}
+          sub="suma del catálogo activo"
           color="green"
           icon="€"
         />
         <KpiCard
-          label="Productos ABC A"
-          value={abcACount.toLocaleString('es-ES')}
-          sub={`top performers — ${abcAPct}% del catálogo`}
+          label="ABC-A"
+          value={`${abcACount} (${abcAPct}%)`}
+          sub="modelos top performers"
           color="amber"
           icon="★"
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <KpiCard
-          label="Fichas incompletas"
-          value={sinImagenPrimaria.toLocaleString('es-ES')}
-          sub={`${pctIncompletas}% sin imagen primaria`}
-          color={sinImagenPrimaria === 0 ? 'green' : 'amber'}
-          icon="◻"
-        />
-      </div>
-
-      {/* Alert widget */}
-      {alertSummary && (
-        <div
-          className="mb-6 rounded-xl px-5 py-4"
-          style={{
-            background: alertSummary.total === 0 ? 'rgba(58,158,106,0.06)' : 'rgba(200,132,42,0.06)',
-            border: `1px solid ${alertSummary.total === 0 ? 'rgba(58,158,106,0.2)' : 'rgba(200,132,42,0.2)'}`,
-          }}
-        >
-          {alertSummary.total === 0 ? (
-            <p className="text-sm font-semibold" style={{ color: '#2d7a54' }}>✓ Sin alertas pendientes</p>
-          ) : (
-            <>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold" style={{ color: '#a06818' }}>
-                  ⚑ {alertSummary.total} alerta{alertSummary.total !== 1 ? 's' : ''} activa{alertSummary.total !== 1 ? 's' : ''}
-                  {alertSummary.criticas > 0 && (
-                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: '#C0392B', color: '#fff' }}>
-                      {alertSummary.criticas} crítica{alertSummary.criticas !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </p>
-                <Link href="/alerts" className="text-xs font-semibold" style={{ color: '#0099f2' }}>Ver todas →</Link>
-              </div>
-              <div className="flex flex-wrap gap-3 text-xs">
-                {alertSummary.byCategory.stock > 0 && (
-                  <span style={{ color: '#C0392B' }}>🔴 Stock: {alertSummary.byCategory.stock}</span>
-                )}
-                {alertSummary.byCategory.sin_venta > 0 && (
-                  <span style={{ color: '#C0392B' }}>🔴 Sin ventas: {alertSummary.byCategory.sin_venta}</span>
-                )}
-                {alertSummary.byCategory.familias_sin_new > 0 && (
-                  <span style={{ color: '#C8842A' }}>🟠 Familias: {alertSummary.byCategory.familias_sin_new}</span>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Sync status */}
-      <h2 className="text-[11px] font-bold tracking-widest uppercase mb-3" style={{ color: '#00557f' }}>
-        Estado de sincronización
-      </h2>
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      {/* Sync + Completitud row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {/* Sync card */}
         <div className="tq-card p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-tq-snorkel">Metabase CSV</span>
+            <span className="text-sm font-semibold text-[#00557f]">Metabase CSV</span>
             <StatusBadge
               status={!lastMetabase ? 'warn' : lastMetabase.status === 'success' ? 'ok' : 'error'}
               label={!lastMetabase ? 'Nunca' : lastMetabase.status === 'success' ? 'OK' : 'Error'}
@@ -179,22 +125,41 @@ export default async function DashboardPage() {
           <SyncIndicator
             status={lastMetabase?.status === 'error' ? 'error' : 'success'}
             lastSync={lastMetabase?.finished_at ?? null}
-            label={
-              lastMetabase
-                ? `${(lastMetabase.records_updated ?? 0).toLocaleString('es-ES')} registros`
-                : 'Sin sincronizar'
-            }
+            label={lastMetabase
+              ? `${(lastMetabase.records_updated ?? 0).toLocaleString('es-ES')} registros`
+              : 'Sin sincronizar'}
           />
           {lastMetabase?.error_message && (
-            <p className="mt-2 text-xs line-clamp-2" style={{ color: '#C0392B' }}>
-              {lastMetabase.error_message}
-            </p>
+            <p className="mt-2 text-xs text-[#C0392B] line-clamp-2">{lastMetabase.error_message}</p>
           )}
-          <div className="mt-3">
-            <Link href="/settings/sync" className="text-xs font-semibold" style={{ color: '#0099f2' }}>
-              Ir a sync →
-            </Link>
+          <Link href="/settings/sync" className="mt-3 inline-block text-xs font-semibold text-[#0099f2]">
+            Gestionar sync →
+          </Link>
+        </div>
+
+        {/* Completitud card */}
+        <div className="tq-card p-5">
+          <p className="text-sm font-semibold text-[#00557f] mb-3">Completitud del catálogo</p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#555]">Con imagen primaria</span>
+              <span className="text-xs font-bold text-[#3A9E6A]">
+                {(total - sinImagen).toLocaleString('es-ES')} / {total.toLocaleString('es-ES')}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-[#f4f1ee] overflow-hidden">
+              <div
+                className="h-2 rounded-full bg-[#3A9E6A]"
+                style={{ width: total > 0 ? `${Math.round(((total - sinImagen) / total) * 100)}%` : '0%' }}
+              />
+            </div>
+            {sinImagen > 0 && (
+              <p className="text-xs text-[#C8842A]">{sinImagen} modelos sin imagen primaria</p>
+            )}
           </div>
+          <Link href="/products?sin_imagen=1" className="mt-3 inline-block text-xs font-semibold text-[#0099f2]">
+            Ver fichas incompletas →
+          </Link>
         </div>
       </div>
 
@@ -202,19 +167,22 @@ export default async function DashboardPage() {
       <h2 className="text-[11px] font-bold tracking-widest uppercase mb-3" style={{ color: '#00557f' }}>
         Accesos rápidos
       </h2>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
         {[
-          { href: '/products',      label: 'Ver productos',   color: '#00557f' },
-          { href: '/settings/sync', label: 'Sincronizar',     color: '#0099f2' },
-          { href: '/campaigns',     label: 'Campañas',        color: '#C8842A' },
-        ].map((l) => (
+          { href: '/products',            label: 'Productos',       bg: '#00557f' },
+          { href: '/campaigns',           label: 'Campañas',        bg: '#C8842A' },
+          { href: '/analytics/ciclo-vida',label: 'Ciclo de vida',   bg: '#2A5F9E' },
+          { href: '/ventas',              label: 'Ventas',          bg: '#C8842A' },
+          { href: '/stock',               label: 'Stock',           bg: '#3A9E6A' },
+          { href: '/tiendas/boletin',     label: 'Boletín',         bg: '#8B5E1A' },
+        ].map(l => (
           <Link
             key={l.href}
             href={l.href}
-            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-85"
-            style={{ background: l.color }}
+            className="flex items-center justify-center py-2.5 rounded-xl text-xs font-semibold text-white transition-opacity hover:opacity-80"
+            style={{ background: l.bg }}
           >
-            {l.label} →
+            {l.label}
           </Link>
         ))}
       </div>

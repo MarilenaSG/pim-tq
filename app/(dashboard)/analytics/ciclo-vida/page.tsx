@@ -18,7 +18,7 @@ export default async function CicloVidaPage() {
 
   const { data: products } = await supabase
     .from('products')
-    .select('codigo_modelo, description, familia, abc_ventas, ingresos_12m, primera_entrada, num_variantes')
+    .select('codigo_modelo, description, familia, abc_ventas, ingresos_12m, primera_entrada, num_variantes, lifecycle_status')
     .eq('is_discontinued', false)
 
   const rows = products ?? []
@@ -82,6 +82,7 @@ export default async function CicloVidaPage() {
     .slice(0, 10)
     .map(r => ({
       ...r,
+      lifecycle_status: (products?.find(p => p.codigo_modelo === r.codigo_modelo)?.lifecycle_status ?? null) as string | null,
       pctIngresos: totalIngresos > 0 ? Math.round((r.ingresos / totalIngresos) * 1000) / 10 : 0,
     }))
 

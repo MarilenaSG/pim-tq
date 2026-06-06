@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis,
   CartesianGrid, Tooltip, BarChart, Bar, Cell,
@@ -11,7 +11,7 @@ import type { CicloEtapa } from './page'
 
 interface ScatterRow { meses: number; ingresos: number; etapa: CicloEtapa; codigo: string; description: string }
 interface EtapaRow   { etapa: CicloEtapa; count: number; color: string; codigos: string[] }
-interface AnomaliaRow { codigo_modelo: string; description: string | null; familia: string | null; abc: string | null; ingresos: number; meses: number | null; etapa: string; pctIngresos: number }
+interface AnomaliaRow { codigo_modelo: string; description: string | null; familia: string | null; abc: string | null; ingresos: number; meses: number | null; etapa: string; pctIngresos: number; lifecycle_status?: string | null }
 interface EdadRow    { rango: string; count: number; mesesMin: number; mesesMax: number }
 
 interface Props {
@@ -38,6 +38,22 @@ async function fetchFilter(params: Record<string, string>): Promise<string[]> {
 export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, etapaColors }: Props) {
   const [actionCodes, setActionCodes] = useState<string[]>([])
   const [actionTitle, setActionTitle] = useState('')
+  const [lifecycleMap, setLifecycleMap] = useState<Record<string, string>>({})
+  const [savingCode, setSavingCode]     = useState<string | null>(null)
+
+  const updateLifecycle = useCallback(async (codigo: string, status: string) => {
+    setSavingCode(codigo)
+    try {
+      const res = await fetch(`/api/products/${codigo}/lifecycle`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lifecycle_status: status }),
+      })
+      if (res.ok) setLifecycleMap(m => ({ ...m, [codigo]: status }))
+    } finally {
+      setSavingCode(null)
+    }
+  }, [])
 
   function selectByCodigo(codigo: string, description?: string) {
     setActionCodes([codigo])
@@ -174,35 +190,67 @@ export function CicloVidaCharts({ scatterData, etapaData, anomalias, edadData, e
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e2ddd9]">
-                  {['Código', 'Descripción', 'Familia', 'ABC', 'Edad', 'Ingresos 12m', '% del total'].map(h => (
-                    <th key={h} className="text-left pb-2 text-xs font-bold text-[#00557f] uppercase tracking-wider pr-4">{h}</th>
+                  {['Código', 'Descripción', 'Familia', 'ABC', 'Edad', 'Ingresos 12m', '% total', 'Estado CM'].map(h => (
+                    <th key={h} className="text-left pb-2 text-xs font-bold text-[#00557f] uppercase tracking-wider pr-3">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {anomalias.map((r, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-[#f0ece8] hover:bg-[#fdf3e4]/60 transition-colors cursor-pointer"
-                    onClick={() => selectByCodigo(r.codigo_modelo, r.description ?? undefined)}
-                  >
-                    <td className="py-2 pr-4 font-mono text-xs text-[#b2b2b2]">{r.codigo_modelo}</td>
-                    <td className="py-2 pr-4 text-[#1d1d1b] max-w-[220px] truncate">{r.description ?? '—'}</td>
-                    <td className="py-2 pr-4 text-[#b2b2b2]">{r.familia ?? '—'}</td>
-                    <td className="py-2 pr-4">
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                        r.abc === 'A' ? 'bg-green-100 text-green-700' :
-                        r.abc === 'B' ? 'bg-blue-100 text-blue-700' :
-                        r.abc === 'C' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
-                      }`}>{r.abc ?? 'S/D'}</span>
-                    </td>
-                    <td className="py-2 pr-4 text-[#b2b2b2]">{r.meses != null ? `${r.meses}m` : '—'}</td>
-                    <td className="py-2 pr-4 font-semibold text-[#00557f]">
-                      {r.ingresos.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
-                    </td>
-                    <td className="py-2 text-[#C8842A] font-semibold">{r.pctIngresos.toFixed(1)}%</td>
-                  </tr>
-                ))}
+                {anomalias.map((r, i) => {
+                  const currentStatus = lifecycleMap[r.codigo_modelo] ?? r.lifecycle_status ?? 'activo'
+                  const isSaving      = savingCode === r.codigo_modelo
+                  return (
+                    <tr
+                      key={i}
+                      className="border-b border-[#f0ece8] hover:bg-[#fdf3e4]/60 transition-colors"
+                    >
+                      <td
+                        className="py-2 pr-3 font-mono text-xs text-[#b2b2b2] cursor-pointer"
+                        onClick={() => selectByCodigo(r.codigo_modelo, r.description ?? undefined)}
+                      >{r.codigo_modelo}</td>
+                      <td
+                        className="py-2 pr-3 text-[#1d1d1b] max-w-[180px] truncate cursor-pointer"
+                        onClick={() => selectByCodigo(r.codigo_modelo, r.description ?? undefined)}
+                      >{r.description ?? '—'}</td>
+                      <td className="py-2 pr-3 text-[#b2b2b2]">{r.familia ?? '—'}</td>
+                      <td className="py-2 pr-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          r.abc === 'A' ? 'bg-green-100 text-green-700' :
+                          r.abc === 'B' ? 'bg-blue-100 text-blue-700' :
+                          r.abc === 'C' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                        }`}>{r.abc ?? 'S/D'}</span>
+                      </td>
+                      <td className="py-2 pr-3 text-[#b2b2b2]">{r.meses != null ? `${r.meses}m` : '—'}</td>
+                      <td className="py-2 pr-3 font-semibold text-[#00557f]">
+                        {r.ingresos.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                      </td>
+                      <td className="py-2 pr-3 text-[#C8842A] font-semibold">{r.pctIngresos.toFixed(1)}%</td>
+                      <td className="py-2" onClick={e => e.stopPropagation()}>
+                        <select
+                          value={currentStatus}
+                          disabled={isSaving}
+                          onChange={e => updateLifecycle(r.codigo_modelo, e.target.value)}
+                          className="text-xs rounded-lg border px-2 py-1 transition-opacity"
+                          style={{
+                            borderColor: currentStatus === 'a_discontinuar' ? '#C0392B'
+                              : currentStatus === 'en_revision' ? '#C8842A'
+                              : '#e8e3df',
+                            color: currentStatus === 'a_discontinuar' ? '#C0392B'
+                              : currentStatus === 'en_revision' ? '#C8842A'
+                              : '#555',
+                            opacity: isSaving ? 0.5 : 1,
+                            background: 'white',
+                          }}
+                        >
+                          <option value="activo">Activo</option>
+                          <option value="en_revision">En revisión</option>
+                          <option value="a_discontinuar">A discontinuar</option>
+                          <option value="descatalogado">Descatalogado</option>
+                        </select>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
