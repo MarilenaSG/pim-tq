@@ -22,7 +22,7 @@ const ACTIVITY: ActivityItem[] = [
   { id: '2', type: 'edit',   title: 'Campo editado: Colección',       description: '002AA · por admin@tq.com',      timestamp: new Date(Date.now() - 32 * 60_000).toISOString() },
   { id: '3', type: 'export', title: 'Export a Google Sheets',         description: 'Catálogo Primavera 2026',        timestamp: new Date(Date.now() - 3 * 3600_000).toISOString() },
   { id: '4', type: 'ai',     title: 'Descripción generada por IA',    description: '015CC · Claude Haiku',           timestamp: new Date(Date.now() - 5 * 3600_000).toISOString() },
-  { id: '5', type: 'sync',   title: 'Sync Shopify completado',        description: '218 productos con imagen',       timestamp: new Date(Date.now() - 25 * 3600_000).toISOString() },
+  { id: '5', type: 'sync',   title: 'Sync ventas completado',          description: '788 variantes actualizadas',     timestamp: new Date(Date.now() - 25 * 3600_000).toISOString() },
 ]
 
 const DEFAULT_FILTERS: AnalyticsFilterValues = {
@@ -43,7 +43,7 @@ function ToastDemo() {
         Toast success
       </button>
       <button
-        onClick={() => toast('Error al conectar con Shopify', 'error')}
+        onClick={() => toast('Error al conectar con Metabase', 'error')}
         className="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-80"
         style={{ background: '#C0392B' }}
       >
@@ -101,7 +101,6 @@ export default function TestPage() {
             <StatusBadge status="warn"    dot />
             <StatusBadge status="error"   dot />
             <StatusBadge status="info"    dot />
-            <StatusBadge status="shopify" dot label="Shopify sync" />
             <StatusBadge status="imagen"  dot label="Imagen pendiente" />
             <StatusBadge status="ok"      label="440 productos" />
             <StatusBadge status="warn"    label="Sin precio" />
@@ -113,8 +112,8 @@ export default function TestPage() {
           <SectionTitle>SyncIndicator</SectionTitle>
           <div className="flex flex-col gap-3">
             <SyncIndicator status="success" lastSync={new Date(Date.now() - 7 * 60_000)}   label="Metabase OK" />
-            <SyncIndicator status="running" lastSync={null}                                  label="Shopify" />
-            <SyncIndicator status="error"   lastSync={new Date(Date.now() - 2 * 3600_000)} label="Google Sheets" />
+            <SyncIndicator status="running" lastSync={null}                                  label="Ventas" />
+            <SyncIndicator status="error"   lastSync={new Date(Date.now() - 2 * 3600_000)} label="Reservas" />
             <SyncIndicator status="success" lastSync={null} />
           </div>
         </section>
@@ -124,9 +123,9 @@ export default function TestPage() {
           <SectionTitle>FeatureCard</SectionTitle>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FeatureCard icon="◻" name="Lista de productos"     description="440 modelos con filtros por metal, categoría y ABC"  href="/products"         badge="440" />
-            <FeatureCard icon="↻" name="Sincronización"         description="Conecta Metabase y Shopify con el PIM"               href="/settings/sync" />
-            <FeatureCard icon="↗" name="Exportar a Sheets"      description="Genera un catálogo exportable a Google Sheets"       href="/export" />
-            <FeatureCard icon="✦" name="IA: Generar contenido"  description="Descripciones y SEO con Claude Haiku"                href="/products"         badge="Nuevo" />
+            <FeatureCard icon="↻" name="Sincronización"         description="Importa datos de Metabase, ventas y reservas"        href="/settings/sync" />
+            <FeatureCard icon="↗" name="Exportar catálogo"     description="Genera un catálogo en Excel o PDF"                   href="/export" />
+            <FeatureCard icon="✦" name="Analítica avanzada"    description="Surtido, precio, ciclo de vida, rentabilidad, stock"  href="/analytics/surtido" badge="Nuevo" />
           </div>
         </section>
 

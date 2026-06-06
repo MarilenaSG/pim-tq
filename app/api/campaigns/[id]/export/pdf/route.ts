@@ -4,21 +4,6 @@ import { renderToBuffer } from '@react-pdf/renderer'
 import { createServiceClient } from '@/lib/supabase/server'
 import { CampaignPDF, type CampaignPDFData, type ProductPDFRow } from '@/lib/campaign-pdf'
 
-function stripHtml(html: string | null | undefined): string {
-  if (!html) return ''
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
-
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createServiceClient()
 
@@ -55,14 +40,10 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   if (!codes.length) return new Response('La campaña no tiene productos', { status: 404 })
 
   // ── 3. Product data ─────────────────────────────────────────────
-  const [productsRes, shopifyRes, variantsRes, imagesRes] = await Promise.all([
+  const [productsRes, variantsRes, imagesRes] = await Promise.all([
     supabase
       .from('products')
-      .select('codigo_modelo, familia, metal, karat')
-      .in('codigo_modelo', codes),
-    supabase
-      .from('product_shopify_data')
-      .select('codigo_modelo, shopify_title, shopify_description, shopify_vendor, shopify_handle, shopify_tags')
+      .select('codigo_modelo, description, familia, metal, karat, supplier_name')
       .in('codigo_modelo', codes),
     supabase
       .from('product_variants')
@@ -78,7 +59,6 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   ])
 
   const productMap = Object.fromEntries((productsRes.data ?? []).map(p => [p.codigo_modelo, p]))
-  const shopifyMap = Object.fromEntries((shopifyRes.data ?? []).map(p => [p.codigo_modelo, p]))
 
   const leaderMap: Record<string, { precio_venta: number | null; precio_tachado: number | null; descuento_aplicado: number | null }> = {}
   const variantsByModel: Record<string, string[]> = {}
@@ -100,11 +80,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     if (imagesByModel[code].length < 3) imagesByModel[code].push(img.url as string)
   }
 
-  const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN ?? ''
-
   const products: ProductPDFRow[] = codes.map(code => {
     const p  = productMap[code]
-    const sh = shopifyMap[code]
     const lv = leaderMap[code]
     const vars = variantsByModel[code] ?? []
     const sortedVars = [...vars].sort((a, b) => {
@@ -113,17 +90,17 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     })
     return {
       codigo:      code,
-      nombre:      sh?.shopify_title      ?? '',
-      marca:       sh?.shopify_vendor      ?? null,
-      metal:       p?.metal               ?? null,
-      karat:       p?.karat               ?? null,
-      familia:     p?.familia             ?? null,
-      precio:      lv?.precio_venta       ?? null,
-      precioAntes: lv?.precio_tachado     ?? null,
+      nombre:      p?.description ?? '',
+      marca:       p?.supplier_name ?? null,
+      metal:       p?.metal ?? null,
+      karat:       p?.karat ?? null,
+      familia:     p?.familia ?? null,
+      precio:      lv?.precio_venta ?? null,
+      precioAntes: lv?.precio_tachado ?? null,
       descuento:   lv?.descuento_aplicado ?? null,
-      descripcion: stripHtml(sh?.shopify_description),
-      tags:        Array.isArray(sh?.shopify_tags) ? (sh.shopify_tags as string[]).join(', ') : '',
-      url:         sh?.shopify_handle ? `https://${shopDomain}/products/${sh.shopify_handle}` : '',
+      descripcion: '',
+      tags:        '',
+      url:         '',
       tallas:      sortedVars.join(', '),
       imagenes:    imagesByModel[code] ?? [],
     }
@@ -133,7 +110,6 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const element = React.createElement(CampaignPDF, { campaign, products }) as any
   const nodeBuffer = await renderToBuffer(element)
-  // Convert Node Buffer → Uint8Array for Web Response API
   const buffer = new Uint8Array(nodeBuffer)
 
   const fecha = new Date().toISOString().slice(0, 10)

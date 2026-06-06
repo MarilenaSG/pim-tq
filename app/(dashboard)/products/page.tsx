@@ -21,7 +21,6 @@ type ProductRow = {
   ingresos_12m:       number | null
   abc_ventas:         string | null
   metabase_synced_at: string | null
-  shopify_synced_at:  string | null
   is_discontinued:    boolean
   lifecycle_status:   string | null
 }
@@ -50,20 +49,18 @@ export default async function ProductsPage({
   const abc         = str('abc')
   const completitud = str('completitud')
   const supplier    = str('supplier')
-  const estado      = str('estado')      // 'catalogo' | 'descatalogado'
-  const vendor      = str('vendor')      // shopify_vendor
-  const campaign    = str('campaign')    // campaign id
+  const estado      = str('estado')
+  const campaign    = str('campaign')
   const stockMin    = Math.max(0, Number(searchParams.stock_min ?? 0))
   const page        = Math.max(1, Number(searchParams.page ?? 1))
   const offset      = (page - 1) * PAGE_SIZE
 
   const supabase = createServerClient()
 
-  // Base query
   let productsQuery = supabase
     .from('products')
     .select(
-      'codigo_modelo, description, category, familia, metal, karat, num_variantes, ingresos_12m, abc_ventas, metabase_synced_at, shopify_synced_at, is_discontinued, lifecycle_status',
+      'codigo_modelo, description, category, familia, metal, karat, num_variantes, ingresos_12m, abc_ventas, metabase_synced_at, is_discontinued, lifecycle_status',
       { count: 'exact' }
     )
 
@@ -81,23 +78,13 @@ export default async function ProductsPage({
     .order('abc_ventas',   { ascending: true,  nullsFirst: false })
     .order('ingresos_12m', { ascending: false, nullsFirst: false })
 
-  // ── Code-based filters (vendor, campaign, completitud, stock_min) ──
-  // Each resolves to a set of allowed codes; we take the intersection.
+  // ── Code-based filters (campaign, completitud, stock_min) ──
 
   let allowedCodes: Set<string> | null = null
 
   function intersect(codes: string[]) {
     if (allowedCodes === null) allowedCodes = new Set(codes)
     else allowedCodes = new Set(codes.filter(c => allowedCodes!.has(c)))
-  }
-
-  // Vendor filter
-  if (vendor) {
-    const { data } = await supabase
-      .from('product_shopify_data')
-      .select('codigo_modelo')
-      .eq('shopify_vendor', vendor)
-    intersect((data ?? []).map(r => r.codigo_modelo))
   }
 
   // Campaign filter
@@ -117,22 +104,20 @@ export default async function ProductsPage({
 
     let compCodes: string[] = []
     if (effectiveCodes.length > 0) {
-      const [imgRes, shopRes] = await Promise.all([
+      const [imgRes, fieldRes] = await Promise.all([
         supabase.from('product_images').select('codigo_modelo, is_primary').in('codigo_modelo', effectiveCodes),
-        supabase.from('product_shopify_data').select('codigo_modelo, shopify_description, shopify_seo_title, shopify_tags').in('codigo_modelo', effectiveCodes),
+        supabase.from('custom_field_definitions').select('field_key').eq('is_active', true),
       ])
       const primarySet    = new Set((imgRes.data ?? []).filter(r => r.is_primary).map(r => r.codigo_modelo))
       const additionalSet = new Set((imgRes.data ?? []).filter(r => !r.is_primary).map(r => r.codigo_modelo))
-      const shopByModel   = Object.fromEntries((shopRes.data ?? []).map(r => [r.codigo_modelo, r]))
+      const totalDefs     = (fieldRes.data ?? []).length
       compCodes = effectiveCodes.filter(code =>
         calcularCompletitud({
-          hasImagenPrimaria:       primarySet.has(code),
-          hasDescripcionShopify:   !!(shopByModel[code]?.shopify_description),
-          hasTituloSEO:            !!(shopByModel[code]?.shopify_seo_title),
-          hasTags:                 !!(shopByModel[code]?.shopify_tags?.length),
-          hasImagenAdicional:      additionalSet.has(code),
-          camposCustomRellenos:    0,
-          totalCamposCustomActivos: 0,
+          hasImagenPrimaria:        primarySet.has(code),
+          hasImagenAdicional:       additionalSet.has(code),
+          hasDescripcionCustom:     false,
+          camposCustomRellenos:     0,
+          totalCamposCustomActivos: totalDefs,
         }).nivel === completitud
       )
     }
@@ -145,7 +130,6 @@ export default async function ProductsPage({
     const baseCodes = (allProds ?? []).map((p: { codigo_modelo: string }) => p.codigo_modelo)
     const effectiveCodes = allowedCodes ? baseCodes.filter(c => allowedCodes!.has(c)) : baseCodes
 
-    let stockCodes: string[] = []
     if (effectiveCodes.length > 0) {
       const { data: stockData } = await supabase
         .from('product_variants')
@@ -155,34 +139,29 @@ export default async function ProductsPage({
       for (const v of stockData ?? []) {
         stockByModel[v.codigo_modelo] = (stockByModel[v.codigo_modelo] ?? 0) + (v.stock_variante ?? 0)
       }
-      stockCodes = effectiveCodes.filter(c => (stockByModel[c] ?? 0) >= stockMin)
+      allowedCodes = new Set(effectiveCodes.filter(c => (stockByModel[c] ?? 0) >= stockMin))
     }
-    allowedCodes = new Set(stockCodes)
   }
 
-  // Apply the intersection
+  // Apply intersection
   if (allowedCodes !== null) {
     const arr = Array.from(allowedCodes)
     if (arr.length === 0) {
-      // Short-circuit: no products match
-      const [optRes, venRes, camRes] = await Promise.all([
+      const [optRes, camRes] = await Promise.all([
         supabase.from('products').select('metal, category, familia, karat, supplier_name'),
-        supabase.from('product_shopify_data').select('shopify_vendor'),
         supabase.from('campaigns').select('id, nombre').eq('estado', 'activa').order('nombre'),
       ])
-      const allOpts = (optRes.data ?? []) as FilterOption[]
-      const uniq = (key: keyof FilterOption) =>
+      const allOpts    = (optRes.data ?? []) as FilterOption[]
+      const uniq       = (key: keyof FilterOption) =>
         Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
-      const vendors   = Array.from(new Set((venRes.data ?? []).map(r => r.shopify_vendor).filter(Boolean))).sort() as string[]
-      const campaigns = (camRes.data ?? []) as { id: string; nombre: string }[]
+      const campaigns  = (camRes.data ?? []) as { id: string; nombre: string }[]
       return (
         <div className="p-6 max-w-[1400px] space-y-5">
           <PageHeader eyebrow="Catálogo" title="Productos" subtitle="0 modelos encontrados" />
           <Suspense>
             <ProductFilters
               metals={uniq('metal')} categories={uniq('category')} familias={uniq('familia')}
-              karats={uniq('karat')} suppliers={uniq('supplier_name')}
-              vendors={vendors} campaigns={campaigns}
+              karats={uniq('karat')} suppliers={uniq('supplier_name')} campaigns={campaigns}
             />
           </Suspense>
           <EmptyState icon="◻" message="Sin resultados" description="Ningún modelo coincide con los filtros activos." />
@@ -194,10 +173,9 @@ export default async function ProductsPage({
 
   const paginatedQuery = productsQuery.range(offset, offset + PAGE_SIZE - 1)
 
-  const [productsResult, optionsResult, vendorsResult, campaignsResult] = await Promise.all([
+  const [productsResult, optionsResult, campaignsResult] = await Promise.all([
     paginatedQuery,
     supabase.from('products').select('metal, category, familia, karat, supplier_name'),
-    supabase.from('product_shopify_data').select('shopify_vendor'),
     supabase.from('campaigns').select('id, nombre').eq('estado', 'activa').order('nombre'),
   ])
 
@@ -205,63 +183,52 @@ export default async function ProductsPage({
   const total      = allowedCodes ? (allowedCodes as Set<string>).size : (productsResult.count ?? 0)
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
-  // Phase 2: images + shopify + stock + completitud for visible products
+  // Phase 2: images + stock + completitud
   const codes = products.map(p => p.codigo_modelo)
-  const [imagesResult, shopifyResult, imgCountResult, shopifyFullResult, fieldDefsResult, leaderSlugsResult, stockResult] =
+  const [imagesResult, imgCountResult, fieldDefsResult, leaderSlugsResult, stockResult] =
     codes.length > 0
       ? await Promise.all([
           supabase.from('product_images').select('codigo_modelo, url').in('codigo_modelo', codes).eq('is_primary', true),
-          supabase.from('product_shopify_data').select('codigo_modelo, shopify_status, shopify_vendor').in('codigo_modelo', codes),
           supabase.from('product_images').select('codigo_modelo').in('codigo_modelo', codes),
-          supabase.from('product_shopify_data').select('codigo_modelo, shopify_description, shopify_seo_title, shopify_tags').in('codigo_modelo', codes),
           supabase.from('custom_field_definitions').select('field_key').eq('is_active', true),
           supabase.from('product_variants').select('codigo_modelo, slug').in('codigo_modelo', codes).eq('es_variante_lider', true),
           supabase.from('product_variants').select('codigo_modelo, stock_variante').in('codigo_modelo', codes),
         ])
       : [
           { data: [] as { codigo_modelo: string; url: string }[] },
-          { data: [] as { codigo_modelo: string; shopify_status: string; shopify_vendor: string | null }[] },
           { data: [] as { codigo_modelo: string }[] },
-          { data: [] as { codigo_modelo: string; shopify_description: string | null; shopify_seo_title: string | null; shopify_tags: string[] | null }[] },
           { data: [] as { field_key: string }[] },
           { data: [] as { codigo_modelo: string; slug: string }[] },
           { data: [] as { codigo_modelo: string; stock_variante: number | null }[] },
         ]
 
-  const imageMap   = Object.fromEntries((imagesResult.data ?? []).map(r => [r.codigo_modelo, r.url]))
-  const shopifyMap = Object.fromEntries((shopifyResult.data ?? []).map(r => [r.codigo_modelo, r]))
-  const slugMap    = Object.fromEntries((leaderSlugsResult.data ?? []).map(r => [r.codigo_modelo, r.slug]))
+  const imageMap = Object.fromEntries((imagesResult.data ?? []).map(r => [r.codigo_modelo, r.url]))
+  const slugMap  = Object.fromEntries((leaderSlugsResult.data ?? []).map(r => [r.codigo_modelo, r.slug]))
 
-  // Stock totals per model
   const stockByModel: Record<string, number> = {}
   for (const v of (stockResult.data ?? [])) {
     stockByModel[v.codigo_modelo] = (stockByModel[v.codigo_modelo] ?? 0) + (v.stock_variante ?? 0)
   }
 
-  // Completitud
-  const primarySet = new Set((imagesResult.data ?? []).map(r => r.codigo_modelo))
+  const primarySet       = new Set((imagesResult.data ?? []).map(r => r.codigo_modelo))
   const imgCounts: Record<string, number> = {}
   for (const r of imgCountResult.data ?? []) {
     imgCounts[r.codigo_modelo] = (imgCounts[r.codigo_modelo] ?? 0) + 1
   }
-  const shopifyFullMap  = Object.fromEntries((shopifyFullResult.data ?? []).map(r => [r.codigo_modelo, r]))
   const totalActiveDefs = (fieldDefsResult.data ?? []).length
 
   function getCompletitud(codigo: string) {
     return calcularCompletitud({
-      hasImagenPrimaria:       primarySet.has(codigo),
-      hasDescripcionShopify:   !!(shopifyFullMap[codigo]?.shopify_description),
-      hasTituloSEO:            !!(shopifyFullMap[codigo]?.shopify_seo_title),
-      hasTags:                 !!(shopifyFullMap[codigo]?.shopify_tags?.length),
-      hasImagenAdicional:      (imgCounts[codigo] ?? 0) >= 2,
-      camposCustomRellenos:    0,
+      hasImagenPrimaria:        primarySet.has(codigo),
+      hasImagenAdicional:       (imgCounts[codigo] ?? 0) >= 2,
+      hasDescripcionCustom:     false,
+      camposCustomRellenos:     0,
       totalCamposCustomActivos: totalActiveDefs,
     })
   }
 
   const productRows = products.map(p => {
-    const comp   = getCompletitud(p.codigo_modelo)
-    const shopify = shopifyMap[p.codigo_modelo]
+    const comp = getCompletitud(p.codigo_modelo)
     return {
       codigo_modelo:    p.codigo_modelo,
       description:      p.description,
@@ -272,8 +239,6 @@ export default async function ProductsPage({
       ingresos_12m:     p.ingresos_12m,
       abc_ventas:       p.abc_ventas,
       imageUrl:         imageMap[p.codigo_modelo] ?? null,
-      shopifyStatus:    shopify?.shopify_status   ?? null,
-      shopifyVendor:    shopify?.shopify_vendor   ?? null,
       leaderSlug:       slugMap[p.codigo_modelo]  ?? null,
       completitudPct:   comp.score,
       completitudNivel: comp.nivel,
@@ -283,13 +248,12 @@ export default async function ProductsPage({
     }
   })
 
-  const allOpts      = (optionsResult.data ?? []) as FilterOption[]
-  const uniq         = (key: keyof FilterOption) =>
+  const allOpts     = (optionsResult.data ?? []) as FilterOption[]
+  const uniq        = (key: keyof FilterOption) =>
     Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
-  const vendors      = Array.from(new Set((vendorsResult.data ?? []).map(r => r.shopify_vendor).filter(Boolean))).sort() as string[]
   const campaignOpts = (campaignsResult.data ?? []) as { id: string; nombre: string }[]
 
-  const hasFilters = search || metal || category || familia || karat || abc || completitud || supplier || estado || vendor || campaign || stockMin > 0
+  const hasFilters = search || metal || category || familia || karat || abc || completitud || supplier || estado || campaign || stockMin > 0
 
   return (
     <div className="p-6 max-w-[1400px] space-y-5">
@@ -306,7 +270,6 @@ export default async function ProductsPage({
           familias={uniq('familia')}
           karats={uniq('karat')}
           suppliers={uniq('supplier_name')}
-          vendors={vendors}
           campaigns={campaignOpts}
         />
       </Suspense>

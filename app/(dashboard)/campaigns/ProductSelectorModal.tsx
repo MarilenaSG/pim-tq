@@ -9,7 +9,6 @@ type ProductResult = {
   category: string | null
   abc_ventas: string | null
   is_discontinued: boolean
-  shopify_vendor: string | null
 }
 
 interface Props {
@@ -51,7 +50,6 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
   const [familia, setFamilia]         = useState('')
   const [category, setCategory]       = useState('')
   const [abc, setAbc]                 = useState('')
-  const [vendor, setVendor]           = useState('')
   const [discontinued, setDiscontinued] = useState('')
   const [stock, setStock]             = useState('')
 
@@ -62,7 +60,6 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
 
   const [familias, setFamilias]     = useState<string[]>([])
   const [categories, setCategories] = useState<string[]>([])
-  const [vendors, setVendors]       = useState<string[]>([])
   const [optionsLoaded, setOptionsLoaded] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
@@ -73,19 +70,17 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
       .then(d => {
         setFamilias(d.familias ?? [])
         setCategories(d.categories ?? [])
-        setVendors(d.vendors ?? [])
         setOptionsLoaded(true)
       })
   }, [])
 
-  const doSearch = useCallback(async (q: string, f: string, cat: string, a: string, v: string, disc: string, stk: string) => {
+  const doSearch = useCallback(async (q: string, f: string, cat: string, a: string, disc: string, stk: string) => {
     setLoading(true)
     const params = new URLSearchParams()
     if (q)    params.set('q', q)
     if (f)    params.set('familia', f)
     if (cat)  params.set('category', cat)
     if (a)    params.set('abc', a)
-    if (v)    params.set('vendor', v)
     if (disc) params.set('discontinued', disc)
     if (stk)  params.set('stock', stk)
     const res = await fetch(`/api/products/search?${params}`)
@@ -97,17 +92,17 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
   useEffect(() => {
     if (!optionsLoaded) return
     clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => doSearch(search, familia, category, abc, vendor, discontinued, stock), 280)
+    debounceRef.current = setTimeout(() => doSearch(search, familia, category, abc, discontinued, stock), 280)
     return () => clearTimeout(debounceRef.current)
-  }, [search, familia, category, abc, vendor, discontinued, stock, optionsLoaded, doSearch])
+  }, [search, familia, category, abc, discontinued, stock, optionsLoaded, doSearch])
 
   useEffect(() => {
-    if (optionsLoaded) doSearch('', '', '', '', '', '', '')
+    if (optionsLoaded) doSearch('', '', '', '', '', '')
   }, [optionsLoaded, doSearch])
 
   const available = products.filter(p => !alreadyAdded.has(p.codigo_modelo))
   const allSelected = available.length > 0 && available.every(p => selected.has(p.codigo_modelo))
-  const hasFilters = search || familia || category || abc || vendor || discontinued || stock
+  const hasFilters = search || familia || category || abc || discontinued || stock
 
   function toggleAll() {
     setSelected(prev => {
@@ -128,7 +123,7 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
   }
 
   function clearFilters() {
-    setSearch(''); setFamilia(''); setCategory(''); setAbc(''); setVendor(''); setDiscontinued(''); setStock('')
+    setSearch(''); setFamilia(''); setCategory(''); setAbc(''); setDiscontinued(''); setStock('')
   }
 
   async function handleAdd() {
@@ -180,7 +175,6 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
             <FilterSelect value={category}   onChange={setCategory}  placeholder="Categoría: todas"  options={categories} />
             <FilterSelect value={familia}    onChange={setFamilia}   placeholder="Familia: todas"     options={familias} />
             <FilterSelect value={abc}        onChange={setAbc}       placeholder="ABC: todos"          options={['A', 'B', 'C']} />
-            <FilterSelect value={vendor}     onChange={setVendor}    placeholder="Marca: todas"        options={vendors} />
             <select
               value={discontinued}
               onChange={e => setDiscontinued(e.target.value)}
@@ -237,7 +231,7 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
                       className="rounded cursor-pointer"
                     />
                   </th>
-                  {['Código', 'Descripción', 'Categoría', 'Familia', 'Marca', 'ABC'].map(h => (
+                  {['Código', 'Descripción', 'Categoría', 'Familia', 'ABC'].map(h => (
                     <th
                       key={h}
                       className="px-3 py-2.5 text-left text-[10px] font-bold tracking-widest uppercase"
@@ -295,9 +289,6 @@ export function ProductSelectorModal({ alreadyAdded, onAdd, onClose }: Props) {
                       </td>
                       <td className="px-3 py-2 text-xs" style={{ color: '#b2b2b2' }}>
                         {p.familia ?? '—'}
-                      </td>
-                      <td className="px-3 py-2 text-xs" style={{ color: '#b2b2b2' }}>
-                        {p.shopify_vendor ?? '—'}
                       </td>
                       <td className="px-3 py-2">
                         <AbcDot abc={p.abc_ventas} />

@@ -6,31 +6,19 @@ import type { SyncLog, AlertSummary } from '@/types'
 async function getDashboardData() {
   const supabase = createServerClient()
 
-  // Only active (non-discontinued) products — base for all KPIs
   const { data: activeProducts, count: totalProducts } = await supabase
     .from('products')
     .select('codigo_modelo, ingresos_12m, abc_ventas', { count: 'exact' })
     .eq('is_discontinued', false)
 
-  const codes         = (activeProducts ?? []).map(p => p.codigo_modelo as string)
+  const total         = totalProducts ?? 0
   const totalIngresos = (activeProducts ?? []).reduce((acc, p) => acc + (Number(p.ingresos_12m) || 0), 0)
   const abcACount     = (activeProducts ?? []).filter(p => p.abc_ventas === 'A').length
-  const total         = totalProducts ?? 0
 
-  const [
-    variantsResult,
-    shopifyResult,
-    imagesResult,
-    syncLogsResult,
-    withPrimaryResult,
-  ] = await Promise.all([
+  const codes = (activeProducts ?? []).map(p => p.codigo_modelo as string)
+
+  const [variantsResult, syncLogsResult, withPrimaryResult] = await Promise.all([
     supabase.from('product_variants').select('*', { count: 'exact', head: true }).eq('is_discontinued', false),
-    codes.length > 0
-      ? supabase.from('product_shopify_data').select('codigo_modelo').in('codigo_modelo', codes)
-      : Promise.resolve({ data: [] as { codigo_modelo: string }[] }),
-    codes.length > 0
-      ? supabase.from('product_images').select('codigo_modelo').eq('source', 'shopify').in('codigo_modelo', codes)
-      : Promise.resolve({ data: [] as { codigo_modelo: string }[] }),
     supabase.from('sync_log').select('*').order('started_at', { ascending: false }).limit(10),
     codes.length > 0
       ? supabase.from('product_images').select('codigo_modelo', { count: 'exact', head: true }).eq('is_primary', true).in('codigo_modelo', codes)
@@ -38,30 +26,22 @@ async function getDashboardData() {
   ])
 
   const totalVariants     = variantsResult.count ?? 0
-  const totalShopify      = (shopifyResult.data ?? []).length
-  const withShopifyImages = new Set((imagesResult.data ?? []).map(r => r.codigo_modelo)).size
-  const sinImagenShopify  = Math.max(0, total - withShopifyImages)
-  const sinShopify        = Math.max(0, total - totalShopify)
-
-  const logs         = (syncLogsResult.data ?? []) as SyncLog[]
-  const lastMetabase = logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null
-  const lastShopify  = logs.find(l => l.source === 'shopify'  && l.status !== 'running') ?? null
-
   const withPrimary       = withPrimaryResult.count ?? 0
   const sinImagenPrimaria = Math.max(0, total - withPrimary)
   const pctIncompletas    = total > 0 ? Math.round((sinImagenPrimaria / total) * 100) : 0
 
-  return { totalProducts: total, totalVariants, totalShopify, sinImagenShopify, abcACount, sinShopify, totalIngresos, lastMetabase, lastShopify, sinImagenPrimaria, pctIncompletas }
+  const logs         = (syncLogsResult.data ?? []) as SyncLog[]
+  const lastMetabase = logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null
+
+  return { totalProducts: total, totalVariants, abcACount, totalIngresos, lastMetabase, sinImagenPrimaria, pctIncompletas }
 }
 
 export default async function DashboardPage() {
   const {
-    totalProducts, totalVariants, totalShopify, sinImagenShopify,
-    abcACount, sinShopify, totalIngresos, lastMetabase, lastShopify,
-    sinImagenPrimaria, pctIncompletas,
+    totalProducts, totalVariants, abcACount, totalIngresos,
+    lastMetabase, sinImagenPrimaria, pctIncompletas,
   } = await getDashboardData()
 
-  // Fetch alert summary (non-blocking, cached 5min)
   let alertSummary: AlertSummary | null = null
   try {
     const base = process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`
@@ -69,10 +49,7 @@ export default async function DashboardPage() {
     if (res.ok) alertSummary = await res.json()
   } catch { /* non-critical */ }
 
-  const shopifyPct       = totalProducts > 0 ? Math.round((totalShopify      / totalProducts) * 100) : 0
-  const sinImagenPct     = totalProducts > 0 ? Math.round((sinImagenShopify  / totalProducts) * 100) : 0
-  const abcAPct          = totalProducts > 0 ? Math.round((abcACount         / totalProducts) * 100) : 0
-
+  const abcAPct       = totalProducts > 0 ? Math.round((abcACount / totalProducts) * 100) : 0
   const formatEur = (n: number) =>
     n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 
@@ -99,7 +76,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* KPI grid — catálogo */}
+      {/* KPI grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <KpiCard
           label="Modelos"
@@ -116,24 +93,6 @@ export default async function DashboardPage() {
           icon="◫"
         />
         <KpiCard
-          label="Con Shopify"
-          value={totalShopify.toLocaleString('es-ES')}
-          sub={`${shopifyPct}% del catálogo`}
-          color="green"
-          icon="⊕"
-        />
-        <KpiCard
-          label="Sin imagen Shopify"
-          value={sinImagenShopify.toLocaleString('es-ES')}
-          sub={`${sinImagenPct}% sin fotos del producto`}
-          color={sinImagenShopify === 0 ? 'green' : 'red'}
-          icon="◎"
-        />
-      </div>
-
-      {/* KPI grid — negocio */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-        <KpiCard
           label="Ingresos 12m"
           value={formatEur(totalIngresos)}
           sub="suma de todos los modelos"
@@ -147,6 +106,9 @@ export default async function DashboardPage() {
           color="amber"
           icon="★"
         />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <KpiCard
           label="Fichas incompletas"
           value={sinImagenPrimaria.toLocaleString('es-ES')}
@@ -190,9 +152,6 @@ export default async function DashboardPage() {
                 {alertSummary.byCategory.familias_sin_new > 0 && (
                   <span style={{ color: '#C8842A' }}>🟠 Familias: {alertSummary.byCategory.familias_sin_new}</span>
                 )}
-                {alertSummary.byCategory.shopify_inactivo > 0 && (
-                  <span style={{ color: '#C8842A' }}>🟠 Shopify: {alertSummary.byCategory.shopify_inactivo}</span>
-                )}
               </div>
             </>
           )}
@@ -204,8 +163,6 @@ export default async function DashboardPage() {
         Estado de sincronización
       </h2>
       <div className="grid grid-cols-2 gap-4 mb-6">
-
-        {/* Metabase */}
         <div className="tq-card p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-tq-snorkel">Metabase CSV</span>
@@ -235,60 +192,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
         </div>
-
-        {/* Shopify */}
-        <div className="tq-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-tq-snorkel">Shopify</span>
-            <StatusBadge
-              status={!lastShopify ? 'warn' : lastShopify.status === 'success' ? 'shopify' : 'error'}
-              label={!lastShopify ? 'Nunca' : lastShopify.status === 'success' ? 'Shopify' : 'Error'}
-              dot
-            />
-          </div>
-          <SyncIndicator
-            status={lastShopify?.status === 'error' ? 'error' : 'success'}
-            lastSync={lastShopify?.finished_at ?? null}
-            label={
-              lastShopify
-                ? `${(lastShopify.records_updated ?? 0).toLocaleString('es-ES')} registros`
-                : 'Sin sincronizar'
-            }
-          />
-          {lastShopify?.error_message && (
-            <p className="mt-2 text-xs line-clamp-2" style={{ color: '#C0392B' }}>
-              {lastShopify.error_message}
-            </p>
-          )}
-          <div className="mt-3">
-            <Link href="/settings/sync" className="text-xs font-semibold" style={{ color: '#0099f2' }}>
-              Ir a sync →
-            </Link>
-          </div>
-        </div>
       </div>
-
-      {/* Alert: models without Shopify */}
-      {sinShopify > 0 && (
-        <div
-          className="mb-6 rounded-xl px-5 py-4"
-          style={{ background: 'rgba(200,132,42,0.07)', border: '1px solid rgba(200,132,42,0.25)' }}
-        >
-          <p className="text-sm font-semibold mb-1" style={{ color: '#a06818' }}>
-            ⚠ {sinShopify.toLocaleString('es-ES')} modelo{sinShopify !== 1 ? 's' : ''} sin datos de Shopify
-          </p>
-          <p className="text-xs mb-3" style={{ color: '#b2b2b2' }}>
-            Estos productos no tienen título, descripción ni imágenes de Shopify. Ejecuta un sync para completarlos.
-          </p>
-          <Link
-            href="/settings/sync"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80"
-            style={{ background: '#C8842A', color: '#fff' }}
-          >
-            Sincronizar ahora →
-          </Link>
-        </div>
-      )}
 
       {/* Quick nav */}
       <h2 className="text-[11px] font-bold tracking-widest uppercase mb-3" style={{ color: '#00557f' }}>
@@ -296,9 +200,9 @@ export default async function DashboardPage() {
       </h2>
       <div className="grid grid-cols-3 gap-3">
         {[
-          { href: '/products',     label: 'Ver productos',    color: '#00557f' },
-          { href: '/settings/sync', label: 'Sincronizar',    color: '#0099f2' },
-          { href: '/catalog',      label: 'Catálogo público', color: '#C8842A' },
+          { href: '/products',      label: 'Ver productos',   color: '#00557f' },
+          { href: '/settings/sync', label: 'Sincronizar',     color: '#0099f2' },
+          { href: '/campaigns',     label: 'Campañas',        color: '#C8842A' },
         ].map((l) => (
           <Link
             key={l.href}

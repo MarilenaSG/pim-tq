@@ -9,11 +9,10 @@ interface Props {
   familias:   string[]
   karats:     string[]
   suppliers:  string[]
-  vendors:    string[]
   campaigns:  { id: string; nombre: string }[]
 }
 
-export function ProductFilters({ metals, categories, familias, karats, suppliers, vendors, campaigns }: Props) {
+export function ProductFilters({ metals, categories, familias, karats, suppliers, campaigns }: Props) {
   const router   = useRouter()
   const pathname = usePathname()
   const sp       = useSearchParams()
@@ -53,12 +52,11 @@ export function ProductFilters({ metals, categories, familias, karats, suppliers
   const abc        = sp.get('abc')        ?? ''
   const supplier   = sp.get('supplier')   ?? ''
   const estado     = sp.get('estado')     ?? ''
-  const vendor     = sp.get('vendor')     ?? ''
   const campaign   = sp.get('campaign')   ?? ''
   const stockMin   = Number(sp.get('stock_min') ?? 0)
 
   const hasFilters = searchValue || metal || category || familia || karat || abc || supplier ||
-                     estado || vendor || campaign || stockMin > 0 || sp.get('completitud')
+                     estado || campaign || stockMin > 0 || sp.get('completitud')
 
   return (
     <div
@@ -141,11 +139,6 @@ export function ProductFilters({ metals, categories, familias, karats, suppliers
 
         {/* Proveedor */}
         <FilterSelect value={supplier} onChange={v => setParam('supplier', v)} placeholder="Proveedor" options={suppliers} />
-
-        {/* Marca (Shopify vendor) */}
-        {vendors.length > 0 && (
-          <FilterSelect value={vendor} onChange={v => setParam('vendor', v)} placeholder="Marca" options={vendors} />
-        )}
 
         {/* Campaña */}
         {campaigns.length > 0 && (

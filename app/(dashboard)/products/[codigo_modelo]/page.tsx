@@ -1,10 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
-import { getCurrentUser } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui'
 import { CustomFieldsEditor } from './CustomFieldsEditor'
-import { AiContentPanel } from './AiContentPanel'
 import { ProductComments } from './ProductComments'
 import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
 import { VentasTab } from './VentasTab'
@@ -12,7 +10,7 @@ import { AddToCampaignButton } from './AddToCampaignButton'
 import type { CampaignRef } from './VentasTab'
 import type {
   Product, ProductVariant, ProductImage,
-  ProductShopifyData, ProductCustomField, CustomFieldDefinition, AbcRating,
+  ProductCustomField, CustomFieldDefinition, AbcRating,
 } from '@/types'
 
 // ── Tabs ──────────────────────────────────────────────────────────
@@ -21,9 +19,7 @@ const TABS = [
   { key: 'resumen',   label: 'Resumen'       },
   { key: 'variantes', label: 'Variantes'     },
   { key: 'imagenes',  label: 'Imágenes'      },
-  { key: 'shopify',   label: 'Shopify'       },
   { key: 'custom',    label: 'Campos custom' },
-  { key: 'ia',        label: '✦ IA'          },
   { key: 'ventas',    label: 'Ventas'        },
   { key: 'notas',     label: 'Notas'         },
 ] as const
@@ -46,15 +42,13 @@ export default async function ProductPage({
   const tab: TabKey = (VALID_TABS.includes(rawTab as TabKey) ? rawTab : 'resumen') as TabKey
 
   const supabase = createServiceClient()
-  const user = await getCurrentUser()
 
-  const [productRes, variantsRes, imagesRes, shopifyRes, customFieldsRes, fieldDefsRes, campaignProductsRes, activeCampaignsRes] =
+  const [productRes, variantsRes, imagesRes, customFieldsRes, fieldDefsRes, campaignProductsRes, activeCampaignsRes] =
     await Promise.all([
       supabase.from('products').select('*').eq('codigo_modelo', codigo_modelo).single(),
       supabase.from('product_variants').select('*').eq('codigo_modelo', codigo_modelo).order('codigo_interno'),
       supabase.from('product_images').select('*').eq('codigo_modelo', codigo_modelo)
         .order('is_primary', { ascending: false }).order('orden'),
-      supabase.from('product_shopify_data').select('*').eq('codigo_modelo', codigo_modelo).maybeSingle(),
       supabase.from('product_custom_fields').select('*').eq('codigo_modelo', codigo_modelo),
       supabase.from('custom_field_definitions').select('*').eq('is_active', true).order('field_key'),
       supabase.from('campaign_products')
@@ -78,7 +72,6 @@ export default async function ProductPage({
   const product      = productRes.data      as Product
   const variants     = (variantsRes.data    ?? []) as ProductVariant[]
   const images       = (imagesRes.data      ?? []) as ProductImage[]
-  const shopify      = (shopifyRes.data     ?? null) as ProductShopifyData | null
   const customFields = (customFieldsRes.data ?? []) as ProductCustomField[]
   const fieldDefs    = (fieldDefsRes.data   ?? []) as CustomFieldDefinition[]
   const ventas       = (ventasRes.data       ?? []) as import('./VentasTab').VentaRow[]
@@ -172,14 +165,12 @@ export default async function ProductPage({
       </nav>
 
       {/* Tab content */}
-      {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} images={images} variants={variants} shopify={shopify} customFields={customFields} fieldDefs={fieldDefs} productCampaigns={productCampaigns} activeCampaigns={activeCampaigns} alreadyInIds={alreadyInIds} />}
+      {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} images={images} variants={variants} customFields={customFields} fieldDefs={fieldDefs} productCampaigns={productCampaigns} activeCampaigns={activeCampaigns} alreadyInIds={alreadyInIds} />}
       {tab === 'variantes' && <TabVariantes variants={variants} />}
       {tab === 'imagenes'  && <TabImagenes  images={images} />}
-      {tab === 'shopify'   && <TabShopify   shopify={shopify} />}
       {tab === 'custom'    && <CustomFieldsEditor fieldDefs={fieldDefs} customFields={customFields} codigo={codigo_modelo} />}
-      {tab === 'ia'        && <AiContentPanel codigoModelo={codigo_modelo} />}
       {tab === 'ventas'    && <VentasTab ventas={ventas} reservas={reservas} variantSlugMap={variantSlugMap} campaigns={productCampaigns} />}
-      {tab === 'notas'     && <ProductComments codigo_modelo={codigo_modelo} userEmail={user?.email ?? null} />}
+      {tab === 'notas'     && <ProductComments codigo_modelo={codigo_modelo} userEmail={null} />}
     </div>
   )
 }
@@ -231,14 +222,13 @@ function DataRow({ label, children }: { label: string; children: React.ReactNode
 // ── Tab: Resumen ──────────────────────────────────────────────────
 
 function TabResumen({
-  product, primaryImage, images, variants, shopify, customFields, fieldDefs,
+  product, primaryImage, images, variants, customFields, fieldDefs,
   productCampaigns, activeCampaigns, alreadyInIds,
 }: {
   product: Product
   primaryImage: ProductImage | null
   images: ProductImage[]
   variants: ProductVariant[]
-  shopify: ProductShopifyData | null
   customFields: ProductCustomField[]
   fieldDefs: CustomFieldDefinition[]
   productCampaigns: CampaignRef[]
@@ -254,12 +244,10 @@ function TabResumen({
     : 0
 
   const completitud = calcularCompletitud({
-    hasImagenPrimaria:       images.some(i => i.is_primary),
-    hasDescripcionShopify:   !!(shopify?.shopify_description),
-    hasTituloSEO:            !!(shopify?.shopify_seo_title),
-    hasTags:                 !!(shopify?.shopify_tags?.length),
-    hasImagenAdicional:      images.length >= 2,
-    camposCustomRellenos:    camposRatio,
+    hasImagenPrimaria:        images.some(i => i.is_primary),
+    hasImagenAdicional:       images.length >= 2,
+    hasDescripcionCustom:     customFields.some(f => f.field_key === 'descripcion_interna' && f.field_value),
+    camposCustomRellenos:     camposRatio,
     totalCamposCustomActivos: activeDefs.length,
   })
   const col = NIVEL_COLOR[completitud.nivel]
@@ -372,16 +360,6 @@ function TabResumen({
             <span className="font-mono text-xs">{product.variante_lider ?? '—'}</span>
           </DataRow>
           <DataRow label="ABC unidades"><AbcChip abc={product.abc_unidades} /></DataRow>
-          <DataRow label="Shopify">
-            {shopify ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: shopify.shopify_status === 'active' ? '#3A9E6A' : '#C8842A' }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: shopify.shopify_status === 'active' ? '#3A9E6A' : '#C8842A' }} />
-                {shopify.shopify_status ?? 'desconocido'} · {shopify.shopify_handle}
-              </span>
-            ) : (
-              <span style={{ color: '#d0cdc9' }}>Sin datos de Shopify</span>
-            )}
-          </DataRow>
         </div>
 
         {/* Campaigns */}
@@ -434,10 +412,6 @@ function TabResumen({
           <span style={{ color: '#b2b2b2' }}>
             <span className="font-semibold text-tq-snorkel">Metabase: </span>
             {fmtDate(product.metabase_synced_at)}
-          </span>
-          <span style={{ color: '#b2b2b2' }}>
-            <span className="font-semibold text-tq-snorkel">Shopify: </span>
-            {fmtDate(product.shopify_synced_at)}
           </span>
         </div>
       </div>
@@ -517,15 +491,14 @@ function TabImagenes({ images }: { images: ProductImage[] }) {
   if (images.length === 0) {
     return (
       <div className="text-center py-16 text-sm" style={{ color: '#b2b2b2' }}>
-        Sin imágenes. Las imágenes se sincronizan desde Metabase (S3) y Shopify.
+        Sin imágenes. Las imágenes se sincronizan desde Metabase (S3).
       </div>
     )
   }
 
   const sourceCfg: Record<string, { bg: string; text: string; label: string }> = {
-    s3:      { bg: 'rgba(0,153,242,0.12)',  text: '#007acc', label: 'S3' },
-    shopify: { bg: 'rgba(58,158,106,0.12)', text: '#2d7a54', label: 'Shopify' },
-    manual:  { bg: 'rgba(200,132,42,0.12)', text: '#a06818', label: 'Manual' },
+    s3:     { bg: 'rgba(0,153,242,0.12)',  text: '#007acc', label: 'S3'     },
+    manual: { bg: 'rgba(200,132,42,0.12)', text: '#a06818', label: 'Manual' },
   }
 
   return (
@@ -572,82 +545,4 @@ function TabImagenes({ images }: { images: ProductImage[] }) {
   )
 }
 
-// ── Tab: Shopify ──────────────────────────────────────────────────
-
-function TabShopify({ shopify }: { shopify: ProductShopifyData | null }) {
-  if (!shopify) {
-    return (
-      <div className="text-center py-16">
-        <div className="text-3xl mb-3" style={{ color: '#e8e3df' }}>◫</div>
-        <p className="text-sm font-medium text-tq-snorkel">Sin datos de Shopify</p>
-        <p className="text-xs mt-1" style={{ color: '#b2b2b2' }}>
-          Conecta Shopify en <Link href="/settings/sync" className="text-tq-sky hover:underline">Sincronización</Link> y ejecuta el sync.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-5">
-      {/* Status row */}
-      <div className="flex flex-wrap gap-3">
-        <div className="bg-white rounded-xl px-4 py-3 flex items-center gap-3" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <span className="w-2 h-2 rounded-full" style={{ background: shopify.shopify_status === 'active' ? '#3A9E6A' : '#C8842A' }} />
-          <span className="text-sm font-semibold capitalize text-tq-snorkel">{shopify.shopify_status ?? '—'}</span>
-        </div>
-        <div className="bg-white rounded-xl px-4 py-3" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <span className="text-xs font-semibold text-tq-snorkel">Handle: </span>
-          <span className="font-mono text-xs text-tq-sky">{shopify.shopify_handle ?? '—'}</span>
-        </div>
-        <div className="bg-white rounded-xl px-4 py-3" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <span className="text-xs font-semibold text-tq-snorkel">Vendor: </span>
-          <span className="text-xs" style={{ color: '#b2b2b2' }}>{shopify.shopify_vendor ?? '—'}</span>
-        </div>
-        <div className="bg-white rounded-xl px-4 py-3" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <span className="text-xs font-semibold text-tq-snorkel">ID: </span>
-          <span className="font-mono text-xs" style={{ color: '#b2b2b2' }}>{shopify.shopify_product_id ?? '—'}</span>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl px-5 py-1" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-        <DataRow label="Título">{shopify.shopify_title ?? '—'}</DataRow>
-        <DataRow label="SEO title">{shopify.shopify_seo_title ?? '—'}</DataRow>
-        <DataRow label="SEO desc">{shopify.shopify_seo_desc ?? '—'}</DataRow>
-        <DataRow label="Sync">
-          <span className="font-mono text-xs">{fmtDate(shopify.synced_at)}</span>
-        </DataRow>
-      </div>
-
-      {/* Tags */}
-      {shopify.shopify_tags && shopify.shopify_tags.length > 0 && (
-        <div className="bg-white rounded-xl px-5 py-4" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <p className="text-[10px] font-bold tracking-widest uppercase mb-3" style={{ color: '#b2b2b2' }}>Tags</p>
-          <div className="flex flex-wrap gap-1.5">
-            {shopify.shopify_tags.map(tag => (
-              <span
-                key={tag}
-                className="text-xs px-2.5 py-1 rounded-full font-medium"
-                style={{ background: 'rgba(0,85,127,0.06)', color: '#00557f' }}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Description HTML */}
-      {shopify.shopify_description && (
-        <div className="bg-white rounded-xl px-5 py-4" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <p className="text-[10px] font-bold tracking-widest uppercase mb-3" style={{ color: '#b2b2b2' }}>Descripción Shopify (HTML)</p>
-          <div
-            className="prose prose-sm max-w-none text-tq-snorkel"
-            style={{ fontSize: '0.8125rem', lineHeight: '1.6' }}
-            dangerouslySetInnerHTML={{ __html: shopify.shopify_description }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
 

@@ -10,7 +10,9 @@
       "Bash(mkdir -p \"C:/Users/User/Documents/Claude Code/PIM Te Quiero/.claude/worktrees/happy-leakey-e5e8dd/app/api/campaigns/[id]/export/excel\")",
       "Bash(mkdir -p \"C:/Users/User/Documents/Claude Code/PIM Te Quiero/.claude/worktrees/happy-leakey-e5e8dd/app/api/campaigns/[id]/export/pdf\")",
       "Bash(node -e \"require\\('exceljs'\\); console.log\\('ok'\\)\")",
-      "PowerShell(cd \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\.claude\\\\worktrees\\\\happy-leakey-e5e8dd\"; git add --all -- ':!.claude/settings.local.json'; git status --short)"
+      "PowerShell(cd \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\.claude\\\\worktrees\\\\happy-leakey-e5e8dd\"; git add --all -- ':!.claude/settings.local.json'; git status --short)",
+      "Bash(git checkout *)",
+      "Bash(gh auth *)"
     ]
   }
 }

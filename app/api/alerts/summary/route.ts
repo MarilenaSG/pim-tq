@@ -12,7 +12,7 @@ export async function GET() {
     console.error('alerts/summary error:', err)
     return NextResponse.json({
       total: 0, criticas: 0, medias: 0,
-      byCategory: { stock: 0, sin_venta: 0, familias_sin_new: 0, shopify_inactivo: 0 },
+      byCategory: { stock: 0, sin_venta: 0, familias_sin_new: 0 },
     })
   }
 }

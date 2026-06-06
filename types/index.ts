@@ -26,7 +26,6 @@ export interface Product {
   abc_unidades: AbcRating
 
   // Descatalogado
-  // true = sin stock en almacén central; visible en catálogo mientras haya stock en tiendas
   is_discontinued: boolean
 
   // Lifecycle (Category Management)
@@ -34,7 +33,6 @@ export interface Product {
 
   // Control
   metabase_synced_at: string | null
-  shopify_synced_at: string | null
   created_at: string
   updated_at: string
 }
@@ -102,26 +100,11 @@ export interface ProductVariant {
   updated_at: string
 }
 
-export interface ProductShopifyData {
-  id: string
-  codigo_modelo: string
-  shopify_product_id: string | null
-  shopify_title: string | null
-  shopify_description: string | null  // HTML
-  shopify_tags: string[] | null
-  shopify_seo_title: string | null
-  shopify_seo_desc: string | null
-  shopify_status: string | null
-  shopify_handle: string | null
-  shopify_vendor: string | null
-  synced_at: string | null
-}
-
 export interface ProductImage {
   id: string
   codigo_modelo: string
   url: string
-  source: 's3' | 'shopify' | 'manual'
+  source: 's3' | 'manual'
   variante: string | null
   alt_text: string | null
   orden: number
@@ -153,7 +136,7 @@ export interface CustomFieldDefinition {
 
 // ── Sync ─────────────────────────────────────────────────────
 
-export type SyncSource = 'metabase' | 'shopify' | 'ventas' | 'reservas'
+export type SyncSource = 'metabase' | 'ventas' | 'reservas'
 export type SyncStatus = 'success' | 'error' | 'running'
 export type SyncTrigger = 'cron' | 'manual'
 
@@ -182,10 +165,42 @@ export interface PricingRule {
   updated_at: string
 }
 
+// ── Boletín Tiendas ───────────────────────────────────────────
+
+export type BoletinCategoria = 'campaña' | 'nuevo' | 'outlet' | 'retirar'
+
+export interface BoletinOverride {
+  codigo_modelo: string
+  categoria: BoletinCategoria | 'excluir'
+  nota_interna: string | null
+  activo: boolean
+  expira_en: string | null   // ISO date
+  creado_por: string | null
+  created_at: string
+}
+
+// ── Navigation (multi-zone) ───────────────────────────────────
+
+export type Zone = 'cm' | 'ventas' | 'stock' | 'tiendas'
+
+export interface NavItem {
+  label: string
+  href: string
+  icon: string
+  badge?: string
+}
+
+export interface ZoneNav {
+  zone: Zone
+  label: string
+  icon: string
+  items: NavItem[]
+}
+
 // ── UI helpers ────────────────────────────────────────────────
 
 export type KpiColor = 'blue' | 'green' | 'amber' | 'red' | 'neutral'
-export type StatusVariant = 'ok' | 'warn' | 'error' | 'info' | 'shopify' | 'imagen' | 'discontinued' | 'liquidacion'
+export type StatusVariant = 'ok' | 'warn' | 'error' | 'info' | 'imagen' | 'discontinued' | 'liquidacion'
 
 export interface ActivityItem {
   id: string
@@ -198,7 +213,7 @@ export interface ActivityItem {
 // ── Alerts ───────────────────────────────────────────────────
 
 export type AlertSeverity = 'critica' | 'media'
-export type AlertCategory = 'stock' | 'sin_venta' | 'familias_sin_new' | 'shopify_inactivo'
+export type AlertCategory = 'stock' | 'sin_venta' | 'familias_sin_new'
 
 export interface AlertItem {
   id: string
@@ -244,7 +259,6 @@ export interface Campaign {
 // ── AI ────────────────────────────────────────────────────────
 
 export type GenerationTarget =
-  | 'shopify_description'
   | 'seo_title'
   | 'tags'
   | 'catalog_description'

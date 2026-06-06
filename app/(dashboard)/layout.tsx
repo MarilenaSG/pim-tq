@@ -2,8 +2,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ReactNode } from 'react'
 import { ToastProvider } from '@/components/ui'
-import { ChatWidget } from '@/components/ui/ChatWidget'
-import { SidebarUserFooter } from '@/components/ui/SidebarUserFooter'
 import { SidebarAlertBadge } from '@/components/ui/SidebarAlertBadge'
 
 const navSections = [
@@ -12,39 +10,36 @@ const navSections = [
     items: [
       { href: '/',         label: 'Dashboard', icon: '◈' },
       { href: '/products', label: 'Productos',  icon: '◻' },
-      { href: '/catalog',  label: 'Catálogo',   icon: '◫' },
     ],
   },
   {
     label: 'Operativo',
     items: [
-      { href: '/alerts',   label: 'Alertas',           icon: '⚑', badge: true },
-      { href: '/campaigns', label: 'Campañas',          icon: '◈' },
-      { href: '/category', label: 'Category Manager',  icon: '▦' },
-      { href: '/suppliers', label: 'Proveedores',       icon: '◇' },
+      { href: '/alerts',    label: 'Alertas',          icon: '⚑', badge: true },
+      { href: '/campaigns', label: 'Campañas',         icon: '◈' },
+      { href: '/category',  label: 'Category Manager', icon: '▦' },
+      { href: '/suppliers', label: 'Proveedores',      icon: '◇' },
     ],
   },
   {
     label: 'Analítica',
     items: [
-      { href: '/analytics/surtido',      label: 'Surtido',      icon: '▦' },
-      { href: '/analytics/precio',       label: 'Precio',       icon: '▤' },
+      { href: '/analytics/surtido',      label: 'Surtido',       icon: '▦' },
+      { href: '/analytics/precio',       label: 'Precio',        icon: '▤' },
       { href: '/analytics/ciclo-vida',   label: 'Ciclo de vida', icon: '▣' },
-      { href: '/analytics/rentabilidad', label: 'Rentabilidad', icon: '▧' },
-      { href: '/analytics/stock',        label: 'Stock',        icon: '▥' },
-      { href: '/analytics/price-ladder', label: 'Price Ladder', icon: '▤' },
-      { href: '/analytics/ventas',       label: 'Ventas',       icon: '▨' },
+      { href: '/analytics/rentabilidad', label: 'Rentabilidad',  icon: '▧' },
+      { href: '/analytics/stock',        label: 'Stock',         icon: '▥' },
+      { href: '/analytics/price-ladder', label: 'Price Ladder',  icon: '▤' },
+      { href: '/analytics/ventas',       label: 'Ventas',        icon: '▨' },
     ],
   },
   {
     label: 'Configuración',
     items: [
-      { href: '/export',           label: 'Exportar',          icon: '↗' },
-      { href: '/settings/sync',    label: 'Sincronización',    icon: '↻' },
-      { href: '/settings/fields',  label: 'Campos custom',     icon: '≡' },
-      { href: '/settings/pricing', label: 'Reglas de precio',  icon: '⊞' },
+      { href: '/settings/sync',    label: 'Sincronización',     icon: '↻' },
+      { href: '/settings/pricing', label: 'Reglas de precio',   icon: '⊞' },
       { href: '/settings/alerts',  label: 'Umbrales de alerta', icon: '⚑' },
-      { href: '/help',             label: 'Ayuda',             icon: '?' },
+      { href: '/help',             label: 'Ayuda',              icon: '?' },
     ],
   },
 ]
@@ -112,7 +107,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           />
           <div className="text-xs text-white/30">v2.0</div>
         </div>
-        <SidebarUserFooter />
       </aside>
 
       {/* Main content */}
@@ -121,8 +115,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           {children}
         </ToastProvider>
       </main>
-
-      <ChatWidget />
     </div>
   )
 }

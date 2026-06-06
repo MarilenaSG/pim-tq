@@ -7,7 +7,6 @@ const CATEGORY_CONFIG: Record<AlertCategory, { label: string; icon: string; seve
   stock:             { label: 'Stock crítico (ABC-A < 38 uds)',          icon: '⚠',  severityColor: '#C0392B', severidad: 'critica' },
   sin_venta:         { label: 'Sin ventas en +6 meses',                  icon: '⊘',  severityColor: '#C0392B', severidad: 'critica' },
   familias_sin_new:  { label: 'Familias sin incorporación nueva (+6 m)', icon: '↻',  severityColor: '#C8842A', severidad: 'media'   },
-  shopify_inactivo:  { label: 'En catálogo pero inactivos en Shopify',   icon: '◻',  severityColor: '#C8842A', severidad: 'media'   },
 }
 
 export default async function AlertsPage({

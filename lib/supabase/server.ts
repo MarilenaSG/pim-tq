@@ -1,6 +1,4 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { createServerClient as createSupabaseServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 
 const noStoreGlobal = {
   global: {
@@ -9,42 +7,20 @@ const noStoreGlobal = {
   },
 }
 
-// Server-side client using service role key — only for API routes
+// Service role client — only for API routes (writes, privileged reads)
 export function createServiceClient() {
-  return createSupabaseClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     noStoreGlobal
   )
 }
 
-// Server-side client using anon key — for Server Components (no auth context)
+// Anon client — for Server Components (public reads)
 export function createServerClient() {
-  return createSupabaseClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     noStoreGlobal
   )
-}
-
-// Client with user session — for server components that need auth context
-export function createAuthServerClient() {
-  const cookieStore = cookies()
-  return createSupabaseServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: () => {}, // server components cannot set cookies
-      },
-    }
-  )
-}
-
-// Helper: get current user in server components (returns null if not authenticated)
-export async function getCurrentUser() {
-  const supabase = createAuthServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
 }

@@ -117,33 +117,6 @@ export async function fetchAlerts(category?: AlertCategory | null): Promise<Aler
     }
   }
 
-  // ── 4. En catálogo pero inactivo en Shopify ──────────────────
-  if (!category || category === 'shopify_inactivo') {
-    const [catalogRes, shopifyRes] = await Promise.all([
-      supabase.from('products').select('codigo_modelo, description').eq('is_discontinued', false),
-      supabase.from('product_shopify_data').select('codigo_modelo, shopify_status'),
-    ])
-
-    const shopifyMap = Object.fromEntries(
-      (shopifyRes.data ?? []).map(r => [r.codigo_modelo, r.shopify_status])
-    )
-
-    for (const p of catalogRes.data ?? []) {
-      const status = shopifyMap[p.codigo_modelo]
-      if (!status || status === 'active') continue
-      alerts.push({
-        id: makeId('shopify_inactivo', p.codigo_modelo),
-        categoria: 'shopify_inactivo',
-        severidad: 'media',
-        titulo: `${p.description ?? p.codigo_modelo} — en catálogo pero "${status}" en Shopify`,
-        codigo_modelo: p.codigo_modelo,
-        descripcion: p.description ?? null,
-        href_accion: `/products/${p.codigo_modelo}?tab=shopify`,
-        campo_problema: 'shopify_status',
-      })
-    }
-  }
-
   return alerts
 }
 
@@ -154,10 +127,9 @@ export function summarizeAlerts(alerts: AlertItem[]) {
     criticas: alerts.filter(a => a.severidad === 'critica').length,
     medias:   alerts.filter(a => a.severidad === 'media').length,
     byCategory: {
-      stock:             count('stock'),
-      sin_venta:         count('sin_venta'),
-      familias_sin_new:  count('familias_sin_new'),
-      shopify_inactivo:  count('shopify_inactivo'),
+      stock:            count('stock'),
+      sin_venta:        count('sin_venta'),
+      familias_sin_new: count('familias_sin_new'),
     },
   }
 }

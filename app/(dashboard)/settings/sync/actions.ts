@@ -2,7 +2,6 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { syncMetabase } from '@/lib/metabase'
-import { syncShopify, getStoredShopifyToken, getConnectedShop } from '@/lib/shopify'
 import { syncVentas } from '@/lib/ventas'
 import { syncReservas } from '@/lib/reservas'
 
@@ -11,18 +10,10 @@ export interface SyncActionResult {
   modelsUpserted?: number
   variantsUpserted?: number
   imagesUpserted?: number
-  shopifyDataUpserted?: number
-  productsProcessed?: number
-  skippedNoMatch?: number
   rowsUpserted?: number
   rowsInserted?: number
   errors?: string[]
   error?: string
-}
-
-export interface ShopifyStatus {
-  connected: boolean
-  shop: string | null
 }
 
 async function withSyncLog(
@@ -41,8 +32,7 @@ async function withSyncLog(
     const result = await fn()
     const records =
       (result.modelsUpserted ?? 0) + (result.variantsUpserted ?? 0) +
-      (result.shopifyDataUpserted ?? 0) + (result.imagesUpserted ?? 0) +
-      (result.rowsUpserted ?? 0) + (result.rowsInserted ?? 0)
+      (result.imagesUpserted ?? 0) + (result.rowsUpserted ?? 0) + (result.rowsInserted ?? 0)
 
     if (logId) {
       await supabase.from('sync_log').update({
@@ -78,21 +68,6 @@ export async function triggerMetabaseSync(): Promise<SyncActionResult> {
   })
 }
 
-export async function triggerShopifySync(): Promise<SyncActionResult> {
-  const supabase = createServiceClient()
-  return withSyncLog(supabase, 'shopify', async () => {
-    const result = await syncShopify()
-    return {
-      ok:                  result.errors.length === 0,
-      shopifyDataUpserted: result.shopifyDataUpserted,
-      imagesUpserted:      result.imagesUpserted,
-      productsProcessed:   result.productsProcessed,
-      skippedNoMatch:      result.skippedNoMatch,
-      errors:              result.errors,
-    }
-  })
-}
-
 export async function triggerVentasSync(): Promise<SyncActionResult> {
   const supabase = createServiceClient()
   return withSyncLog(supabase, 'ventas', async () => {
@@ -110,34 +85,9 @@ export async function triggerReservasSync(): Promise<SyncActionResult> {
   return withSyncLog(supabase, 'reservas', async () => {
     const result = await syncReservas()
     return {
-      ok:          result.errors.length === 0,
+      ok:           result.errors.length === 0,
       rowsInserted: result.rowsInserted,
-      errors:      result.errors,
+      errors:       result.errors,
     }
   })
-}
-
-export async function getShopifyStatus(): Promise<ShopifyStatus> {
-  try {
-    const [token, shop] = await Promise.all([
-      getStoredShopifyToken(),
-      getConnectedShop(),
-    ])
-    return { connected: !!token, shop }
-  } catch {
-    return { connected: false, shop: null }
-  }
-}
-
-export async function disconnectShopify(): Promise<{ ok: boolean }> {
-  try {
-    const supabase = createServiceClient()
-    await Promise.all([
-      supabase.from('settings').delete().eq('key', 'shopify_access_token'),
-      supabase.from('settings').delete().eq('key', 'shopify_connected_shop'),
-    ])
-    return { ok: true }
-  } catch {
-    return { ok: false }
-  }
 }

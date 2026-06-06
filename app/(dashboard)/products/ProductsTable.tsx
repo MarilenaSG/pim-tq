@@ -15,8 +15,6 @@ export type ProductTableRow = {
   ingresos_12m:       number | null
   abc_ventas:         string | null
   imageUrl:           string | null
-  shopifyStatus:      string | null
-  shopifyVendor:      string | null
   leaderSlug:         string | null
   completitudPct:     number
   completitudNivel:   'alta' | 'media' | 'baja'
@@ -43,11 +41,6 @@ function AbcBadge({ abc }: { abc: string | null }) {
   return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ background: bg, color: text }}>{abc}</span>
 }
 
-function ShopifyCell({ status }: { status: string | null }) {
-  if (!status) return <span className="text-[10px]" style={{ color: '#d0cdc9' }}>—</span>
-  const color = status === 'active' ? '#3A9E6A' : status === 'draft' ? '#C8842A' : '#b2b2b2'
-  return <span className="text-[10px] font-bold capitalize" style={{ color }}>{status}</span>
-}
 
 function CompletitudBar({ pct, nivel }: { pct: number; nivel: 'alta' | 'media' | 'baja' }) {
   const bar = nivel === 'alta' ? '#3A9E6A' : nivel === 'media' ? '#C8842A' : '#C0392B'
@@ -181,7 +174,7 @@ export function ProductsTable({
               <SortableHeader label="Ingresos 12m" sortKey="ingresos_12m" current={sortKey} dir={sortDir} onSort={handleSort} />
               <th className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Vars</th>
               <SortableHeader label="Stock" sortKey="stock_total" current={sortKey} dir={sortDir} onSort={handleSort} />
-              {(['Shopify', 'Completitud'] as const).map(h => (
+              {(['Completitud'] as const).map(h => (
                 <th key={h} className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
                   {h}
                 </th>
@@ -273,8 +266,7 @@ export function ProductsTable({
                   <StockCell stock={p.stock_total} />
                 </td>
 
-                {/* Shopify */}
-                <td className="px-3 py-2"><ShopifyCell status={p.shopifyStatus} /></td>
+
 
                 {/* Completitud */}
                 <td className="px-3 py-2 w-28">

@@ -36,17 +36,15 @@ export default async function ComparePage({
 
   const supabase = createServerClient()
 
-  const [productsRes, variantsRes, imagesRes, shopifyRes] = await Promise.all([
+  const [productsRes, variantsRes, imagesRes] = await Promise.all([
     supabase.from('products').select('*').in('codigo_modelo', codes),
     supabase.from('product_variants').select('*').in('codigo_modelo', codes),
     supabase.from('product_images').select('codigo_modelo, url').in('codigo_modelo', codes).eq('is_primary', true),
-    supabase.from('product_shopify_data').select('codigo_modelo, shopify_status, shopify_vendor').in('codigo_modelo', codes),
   ])
 
   const products = (productsRes.data ?? [])
   const variants = (variantsRes.data ?? [])
   const imageMap = Object.fromEntries((imagesRes.data ?? []).map(r => [r.codigo_modelo, r.url]))
-  const shopifyMap = Object.fromEntries((shopifyRes.data ?? []).map(r => [r.codigo_modelo, r]))
 
   // Order by codes param order
   const ordered = codes.map(c => products.find(p => p.codigo_modelo === c)).filter(Boolean) as typeof products
@@ -62,8 +60,6 @@ export default async function ComparePage({
     { label: 'Quilates',      render: p => p.karat ?? '—' },
     { label: 'Categoría',     render: p => p.category ?? '—' },
     { label: 'Proveedor',     render: p => p.supplier_name ?? '—' },
-    { label: 'Shopify',       render: p => shopifyMap[p.codigo_modelo]?.shopify_status ?? '—' },
-    { label: 'Marca',         render: p => shopifyMap[p.codigo_modelo]?.shopify_vendor ?? '—' },
     { label: 'ABC ventas',    render: p => {
       const abc = p.abc_ventas
       if (!abc) return <span style={{ color: '#d0cdc9' }}>—</span>

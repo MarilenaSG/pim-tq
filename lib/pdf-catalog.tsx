@@ -29,9 +29,6 @@ export interface PdfProduct {
   precio_venta:        number | null
   image_url:           string | null
   marca:               string | null
-  shopify_description: string | null
-  shopify_tags:        string[] | null
-  shopify_status:      string | null
 }
 
 // ── Design tokens ─────────────────────────────────────────────
@@ -275,8 +272,6 @@ function trunc(s: string, n: number) {
 // ── Product Card ──────────────────────────────────────────────
 
 function ProductCard({ p }: { p: PdfProduct }) {
-  const tags = (p.shopify_tags ?? []).slice(0, 4)
-
   return (
     <View style={s.card}>
       {/* Image — fixed height, objectFit cover fills to widest side */}
@@ -318,17 +313,6 @@ function ProductCard({ p }: { p: PdfProduct }) {
             </Text>
           )}
         </View>
-
-        {/* Tags */}
-        {tags.length > 0 && (
-          <View style={s.tagsRow}>
-            {tags.map((tag, i) => (
-              <View key={i} style={s.tag}>
-                <Text style={s.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
       </View>
     </View>
   )

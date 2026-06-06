@@ -55,18 +55,33 @@ const SECTIONS: Section[] = [
       <>
         <P>
           El PIM (Product Information Manager) de Te Quiero Joyerías es la <strong>fuente de verdad interna</strong> del equipo de producto.
-          Agrega datos de Metabase y Shopify en un único lugar, permite enriquecer fichas con campos propios, exportar catálogos y analizar el rendimiento del surtido.
+          Agrega datos de Metabase en un único lugar, permite enriquecer fichas con campos propios y analizar el rendimiento del surtido desde distintas perspectivas.
         </P>
         <Callout icon="ℹ" title="Acceso libre">
           La aplicación es de uso interno y no requiere contraseña. Cualquier persona con la URL puede acceder.
-          El catálogo público (<Code>/catalog</Code>) está pensado para el equipo de tiendas.
         </Callout>
         <H3>Fuentes de datos</H3>
         <UL>
-          <LI><strong>Metabase</strong> — precios, costes, márgenes, stock, ABC de ventas. Se sincroniza cada día a las 05:00 UTC. Solo lectura.</LI>
-          <LI><strong>Shopify</strong> — título, descripción, tags, imágenes, estado del producto. Se sincroniza junto con Metabase.</LI>
+          <LI><strong>Metabase</strong> — precios, costes, márgenes, stock, ABC de ventas, variantes. Se sincroniza cada día a las 05:00 UTC. Solo lectura.</LI>
           <LI><strong>Campos custom</strong> — información adicional introducida manualmente por el equipo (campañas, colecciones, notas).</LI>
         </UL>
+      </>
+    ),
+  },
+  {
+    id: 'zonas', title: 'Zonas de trabajo', icon: '◧',
+    content: (
+      <>
+        <P>El PIM está organizado en cuatro zonas pensadas para distintos perfiles del equipo. Puedes cambiar de zona en cualquier momento desde el selector en la barra lateral.</P>
+        <UL>
+          <LI><strong>Category Management</strong> — analítica avanzada: surtido, precio, ciclo de vida, rentabilidad y stock</LI>
+          <LI><strong>Ventas</strong> — sell-out por tienda, campañas, rendimiento de familias</LI>
+          <LI><strong>Stock y Compras</strong> — cobertura, rotación, alertas de rotura y exceso</LI>
+          <LI><strong>Tiendas</strong> — boletín de novedades y catálogo sin datos financieros</LI>
+        </UL>
+        <Callout icon="ℹ" title="Zona Tiendas">
+          La zona Tiendas nunca muestra costes, márgenes ni ingresos. Está pensada para que el equipo de tienda consulte disponibilidad y novedades.
+        </Callout>
       </>
     ),
   },
@@ -83,12 +98,12 @@ const SECTIONS: Section[] = [
         </UL>
         <H3>Ficha de producto — tabs</H3>
         <UL>
-          <LI><strong>Resumen</strong> — KPIs clave, datos del modelo, sync timestamps</LI>
+          <LI><strong>Resumen</strong> — KPIs clave, datos del modelo, timestamp de última sync</LI>
           <LI><strong>Variantes</strong> — tabla con todos los SKUs: precios, costes, márgenes, stock, ABC por variante</LI>
-          <LI><strong>Imágenes</strong> — galería de imágenes (S3 + Shopify)</LI>
-          <LI><strong>Shopify</strong> — título, descripción HTML, tags, SEO, estado</LI>
+          <LI><strong>Imágenes</strong> — galería de imágenes, añadir pegando URL</LI>
           <LI><strong>Campos custom</strong> — campos definidos por el equipo, editables inline</LI>
-          <LI><strong>✦ IA</strong> — generación de contenido y sugerencia de precio</LI>
+          <LI><strong>Ventas</strong> — histórico mensual de ingresos y unidades</LI>
+          <LI><strong>Notas</strong> — comentarios internos del equipo</LI>
         </UL>
         <Callout icon="⚠" title="Datos de solo lectura">
           Los campos financieros (costes, márgenes, ingresos) provienen de Metabase y no se pueden editar desde el PIM.
@@ -97,57 +112,20 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: 'ia', title: 'Inteligencia Artificial', icon: '✦',
-    content: (
-      <>
-        <P>El PIM incluye dos niveles de IA, accesibles desde la ficha de producto (tab <strong>✦ IA</strong>) y el chat flotante.</P>
-        <H3>Generador de contenido</H3>
-        <P>Usa <Code>claude-haiku-4-5</Code> para generar en segundos:</P>
-        <UL>
-          <LI><strong>Descripción Shopify</strong> — HTML listo para pegar, tono de marca TQ Jewels</LI>
-          <LI><strong>Título SEO</strong> — optimizado para buscadores, 50-70 caracteres</LI>
-          <LI><strong>Tags</strong> — 8-15 etiquetas para filtrado en Shopify</LI>
-          <LI><strong>Descripción catálogo</strong> — texto corto para el equipo de tiendas</LI>
-        </UL>
-        <Callout icon="✓" title="Revisa siempre el resultado">
-          La IA genera contenido de calidad pero puede cometer errores. Revisa el texto antes de publicarlo en Shopify.
-        </Callout>
-        <H3>Sugerencia de precio</H3>
-        <P>Usa <Code>claude-sonnet-4-6</Code> y las reglas definidas en <strong>Reglas de precio</strong> para calcular:</P>
-        <UL>
-          <LI>Precio de venta óptimo aplicando el margen objetivo configurado</LI>
-          <LI>Precio tachado (solo si hay descuento real)</LI>
-          <LI>Margen resultante y alertas si baja del mínimo</LI>
-          <LI>Razonamiento explicado en lenguaje natural</LI>
-        </UL>
-        <H3>Chat analítico</H3>
-        <P>
-          El botón <strong>✦</strong> en la esquina inferior derecha abre un chat con acceso al contexto real del catálogo.
-          Puedes preguntar sobre ABC, familias, precios, stock o un producto concreto (menciona su código, p.ej. <Code>002AA</Code>).
-        </P>
-        <UL>
-          <LI>No guarda historial entre sesiones</LI>
-          <LI>No modifica ningún dato — solo informa</LI>
-          <LI>Inyecta contexto automáticamente según la pregunta</LI>
-        </UL>
-      </>
-    ),
-  },
-  {
     id: 'exportar', title: 'Exportar', icon: '↗',
     content: (
       <>
-        <P>Desde <strong>Exportar catálogo</strong> puedes generar ficheros con los productos que necesites.</P>
+        <P>Cada zona tiene sus propias opciones de exportación contextualizadas. Desde la sección de exportar puedes generar ficheros con los productos que necesites.</P>
         <H3>Filtros de selección</H3>
         <UL>
-          <LI>Multi-selección de metal, familia, categoría, ABC, marca</LI>
+          <LI>Multi-selección de metal, familia, categoría, ABC</LI>
           <LI>Picker de productos sueltos — busca y añade modelos individuales</LI>
           <LI>Los filtros y el picker se combinan (unión)</LI>
         </UL>
         <H3>Formatos disponibles</H3>
         <UL>
-          <LI><strong>Excel (.xlsx)</strong> — tabla completa con imagen URL, datos Shopify, opción de incluir datos financieros</LI>
-          <LI><strong>PDF Catálogo</strong> — catálogo visual A4, 4 productos por página, imágenes y datos clave. Ideal para presentaciones.</LI>
+          <LI><strong>Excel (.xlsx)</strong> — tabla completa con imagen URL, opción de incluir datos financieros</LI>
+          <LI><strong>PDF Catálogo</strong> — catálogo visual A4, 4 productos por página. Ideal para presentaciones.</LI>
         </UL>
         <H3>Actualización en lote</H3>
         <P>La pestaña <strong>Actualizar en lote</strong> permite rellenar campos custom para múltiples productos a la vez mediante un CSV:</P>
@@ -181,23 +159,20 @@ const SECTIONS: Section[] = [
     id: 'sync', title: 'Sincronización', icon: '↻',
     content: (
       <>
-        <P>Los datos se actualizan automáticamente cada día a las <strong>05:00 UTC</strong> (06:00-07:00 hora Canarias).</P>
+        <P>Los datos se actualizan automáticamente cada día a las <strong>05:00 UTC</strong> (06:00–07:00 hora Canarias).</P>
         <H3>Sync manual</H3>
         <P>Desde <strong>Configuración → Sincronización</strong> puedes lanzar un sync manual en cualquier momento:</P>
         <UL>
-          <LI><strong>Metabase</strong> — descarga el CSV y actualiza products + product_variants</LI>
-          <LI><strong>Shopify</strong> — actualiza product_shopify_data + product_images</LI>
-          <LI><strong>Ambos</strong> — ejecuta los dos en secuencia</LI>
+          <LI><strong>Metabase</strong> — descarga el CSV y actualiza products + product_variants + imágenes</LI>
+          <LI><strong>Ventas mensuales</strong> — importa el histórico mensual de ventas por variante</LI>
+          <LI><strong>Reservas activas</strong> — snapshot diario de reservas</LI>
         </UL>
         <H3>Estados posibles</H3>
         <div className="flex flex-wrap gap-2 mb-3">
           <Badge color="green">success</Badge>
           <Badge color="red">error</Badge>
         </div>
-        <P>El log de sincronización muestra los últimos 10 eventos con timestamp, registros actualizados y mensaje de error si aplica.</P>
-        <Callout icon="⚠" title="Shopify OAuth">
-          La primera vez hay que conectar Shopify desde el panel de sincronización. Una vez autorizado, el token se guarda y el cron funciona automáticamente.
-        </Callout>
+        <P>El log de sincronización muestra los últimos 20 eventos con timestamp, registros actualizados y mensaje de error si aplica.</P>
       </>
     ),
   },
@@ -205,16 +180,13 @@ const SECTIONS: Section[] = [
     id: 'campos', title: 'Campos custom', icon: '≡',
     content: (
       <>
-        <P>Los campos custom permiten añadir información propia del equipo a cada producto, sin tocar los datos de Metabase o Shopify.</P>
-        <H3>Gestionar campos</H3>
-        <P>Desde <strong>Configuración → Campos custom</strong> puedes crear, editar y desactivar campos:</P>
+        <P>Los campos custom permiten añadir información propia del equipo a cada producto, sin tocar los datos de Metabase.</P>
+        <H3>Editar valores</H3>
+        <P>En la ficha de cada producto, tab <strong>Campos custom</strong>, puedes editar los valores inline. Los cambios se guardan al hacer clic en &quot;Guardar&quot;.</P>
         <UL>
           <LI>Tipos disponibles: texto, área de texto, fecha, booleano (sí/no), selección</LI>
           <LI>Cada campo tiene una clave única (<Code>field_key</Code>) que se usa en el CSV de exportación</LI>
-          <LI>Desactivar un campo lo oculta pero no borra sus valores</LI>
         </UL>
-        <H3>Editar valores</H3>
-        <P>En la ficha de cada producto, tab <strong>Campos custom</strong>, puedes editar los valores inline. Los cambios se guardan al hacer clic en &quot;Guardar&quot;.</P>
         <H3>Rellenar en lote</H3>
         <P>Usa la pestaña <strong>Actualizar en lote</strong> de Exportar para rellenar campos en múltiples productos a la vez con un CSV.</P>
       </>
@@ -224,7 +196,7 @@ const SECTIONS: Section[] = [
     id: 'pricing', title: 'Reglas de precio', icon: '⊞',
     content: (
       <>
-        <P>Las reglas de precio definen los parámetros que usa la IA para calcular el PVP óptimo de cada producto.</P>
+        <P>Las reglas de precio definen los parámetros para calcular el PVP óptimo de cada producto.</P>
         <H3>Configurar reglas</H3>
         <P>Desde <strong>Configuración → Reglas de precio</strong> puedes definir reglas por:</P>
         <UL>
@@ -242,22 +214,28 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: 'catalogo', title: 'Catálogo público', icon: '◫',
+    id: 'boletin', title: 'Boletín Tiendas', icon: '◫',
     content: (
       <>
         <P>
-          La ruta <Code>/catalog</Code> es una página pública pensada para el equipo de tiendas.
-          No requiere login y no muestra datos financieros (costes, márgenes, ingresos).
+          La zona Tiendas incluye un boletín automático que clasifica los productos más relevantes de la semana.
+          No muestra datos financieros (costes, márgenes, ingresos).
         </P>
+        <H3>Categorías del boletín</H3>
+        <UL>
+          <LI><strong>Campaña</strong> — productos actualmente en campaña activa</LI>
+          <LI><strong>Nuevo</strong> — incorporaciones recientes al catálogo</LI>
+          <LI><strong>Outlet</strong> — productos con descuento aplicado</LI>
+          <LI><strong>Retirar</strong> — modelos descatalogados o sin stock prolongado</LI>
+        </UL>
         <UL>
           <LI>Filtros por metal, familia y categoría</LI>
           <LI>Búsqueda por código o descripción</LI>
-          <LI>Imagen, marca, precio de venta, stock total y variantes disponibles</LI>
+          <LI>Imagen, precio de venta, stock total y variantes disponibles</LI>
           <LI>Diseño mobile-first, legible en móvil y tablet</LI>
-          <LI>Se actualiza con cada sync de datos</LI>
         </UL>
-        <Callout icon="ℹ" title="URL para tiendas">
-          Comparte la URL completa con el equipo de tiendas. No hay login, pero la URL no está indexada en buscadores.
+        <Callout icon="ℹ" title="Acceso para tiendas">
+          Comparte la URL de la zona Tiendas con el equipo de tiendas. No hay login.
         </Callout>
       </>
     ),
@@ -319,7 +297,7 @@ export default function HelpPage() {
       {/* Footer */}
       <div className="mt-8 px-6 py-4 rounded-xl text-center" style={{ background: 'rgba(0,85,127,0.04)', border: '1px solid rgba(0,85,127,0.08)' }}>
         <p className="text-xs text-[#b2b2b2]">
-          PIM Te Quiero Joyerías · v1.2 · Sesión 17 ·{' '}
+          PIM Te Quiero Joyerías · arquitectura multi-zona ·{' '}
           <span className="text-[#00557f]">marilena@joyeriatequiero.com</span>
         </p>
       </div>

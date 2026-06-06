@@ -9,18 +9,12 @@ export async function GET(req: NextRequest) {
   const familia      = searchParams.get('familia') ?? ''
   const category     = searchParams.get('category') ?? ''
   const abc          = searchParams.get('abc') ?? ''
-  const vendor       = searchParams.get('vendor') ?? ''
   const discontinued = searchParams.get('discontinued') ?? ''
   const stock        = searchParams.get('stock') ?? ''
 
   const supabase = createServiceClient()
 
-  // Pre-queries for join-like filters (vendor, stock) run in parallel
-  const [vendorCodes, withStockCodes, noStockExclude] = await Promise.all([
-    vendor
-      ? supabase.from('product_shopify_data').select('codigo_modelo').eq('shopify_vendor', vendor)
-          .then(({ data }): string[] => (data ?? []).map(r => r.codigo_modelo as string))
-      : Promise.resolve(null as string[] | null),
+  const [withStockCodes, noStockExclude] = await Promise.all([
     stock === 'con'
       ? supabase.from('product_variants').select('codigo_modelo').gt('stock_variante', 0)
           .then(({ data }): string[] => Array.from(new Set((data ?? []).map(r => r.codigo_modelo as string))))
@@ -31,7 +25,6 @@ export async function GET(req: NextRequest) {
       : Promise.resolve(null as string[] | null),
   ])
 
-  if (vendorCodes !== null && vendorCodes.length === 0) return NextResponse.json([])
   if (withStockCodes !== null && withStockCodes.length === 0) return NextResponse.json([])
 
   function base() {
@@ -41,7 +34,6 @@ export async function GET(req: NextRequest) {
     if (abc)            q2 = q2.eq('abc_ventas', abc)
     if (discontinued === 'catalogado')    q2 = q2.eq('is_discontinued', false)
     if (discontinued === 'descatalogado') q2 = q2.eq('is_discontinued', true)
-    if (vendorCodes)    q2 = q2.in('codigo_modelo', vendorCodes)
     if (withStockCodes) q2 = q2.in('codigo_modelo', withStockCodes)
     if (noStockExclude !== null && noStockExclude.length > 0)
       q2 = q2.not('codigo_modelo', 'in', `(${noStockExclude.join(',')})`)
@@ -51,27 +43,19 @@ export async function GET(req: NextRequest) {
   if (!q) {
     const { data, error } = await base().order('codigo_modelo').limit(200)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(await attachVendors(supabase, data ?? []))
+    return NextResponse.json(data ?? [])
   }
 
-  // Gather extra codigo_modelo matches from variants and shopify title
-  const [variantRes, shopifyRes] = await Promise.all([
-    supabase
-      .from('product_variants')
-      .select('codigo_modelo')
-      .or(`slug.ilike.%${q}%,codigo_interno.ilike.%${q}%`)
-      .limit(100),
-    supabase
-      .from('product_shopify_data')
-      .select('codigo_modelo')
-      .ilike('shopify_title', `%${q}%`)
-      .limit(100),
-  ])
+  // Gather extra codigo_modelo matches from variants
+  const { data: variantData } = await supabase
+    .from('product_variants')
+    .select('codigo_modelo')
+    .or(`slug.ilike.%${q}%,codigo_interno.ilike.%${q}%`)
+    .limit(100)
 
-  const extraCodes = Array.from(new Set([
-    ...(variantRes.data?.map(v => v.codigo_modelo as string) ?? []),
-    ...(shopifyRes.data?.map(s => s.codigo_modelo as string) ?? []),
-  ]))
+  const extraCodes = Array.from(new Set(
+    (variantData ?? []).map(v => v.codigo_modelo as string)
+  ))
 
   const textResult = await base()
     .or(`description.ilike.%${q}%,codigo_modelo.ilike.%${q}%`)
@@ -97,16 +81,5 @@ export async function GET(req: NextRequest) {
     return true
   })
 
-  return NextResponse.json(await attachVendors(supabase, merged))
-}
-
-async function attachVendors(supabase: ReturnType<typeof import('@/lib/supabase/server').createServiceClient>, products: any[]) {
-  if (products.length === 0) return products
-  const codes = products.map(p => p.codigo_modelo as string)
-  const { data } = await supabase
-    .from('product_shopify_data')
-    .select('codigo_modelo, shopify_vendor')
-    .in('codigo_modelo', codes)
-  const vendorMap = new Map((data ?? []).map(r => [r.codigo_modelo as string, r.shopify_vendor as string | null]))
-  return products.map(p => ({ ...p, shopify_vendor: vendorMap.get(p.codigo_modelo) ?? null }))
+  return NextResponse.json(merged)
 }
