@@ -271,3 +271,31 @@ export interface PriceSuggestionResult {
   razonamiento: string
   alertas: string[]
 }
+
+// ── Ventas por tienda ─────────────────────────────────────────
+
+export interface VentasPorTienda {
+  id: string
+  slug: string
+  codigo_modelo: string | null
+  tienda_id: string
+  tienda_nombre: string | null
+  anyo: number
+  mes: number
+  unidades_vendidas: number | null
+  ingresos_netos: number | null
+  synced_at: string
+}
+
+// ── Stock por tienda ──────────────────────────────────────────
+
+export interface StockPorTienda {
+  id: string
+  slug: string
+  codigo_modelo: string | null
+  tienda_id: string
+  tienda_nombre: string | null
+  stock_variante: number
+  fecha_snapshot: string
+  synced_at: string
+}

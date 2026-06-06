@@ -40,6 +40,12 @@
   /* Motion */
   --tq-ease:           cubic-bezier(0.4, 0.0, 0.2, 1);
   --tq-duration:       200ms;
+
+  /* Zone accent colors */
+  --zone-cm-color:      #00557f;
+  --zone-ventas-color:  #C8842A;
+  --zone-stock-color:   #3A9E6A;
+  --zone-tiendas-color: #8B5E1A;
 }
 
 /* ── Base ───────────────────────────────────────────────────── */
