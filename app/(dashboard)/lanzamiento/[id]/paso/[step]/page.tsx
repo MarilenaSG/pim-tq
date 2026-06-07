@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
-import { PasoTipo }   from '@/components/lanzamiento/PasoTipo'
-import { PasoDatos }  from '@/components/lanzamiento/PasoDatos'
+import { PasoTipo }         from '@/components/lanzamiento/PasoTipo'
+import { PasoDatos }        from '@/components/lanzamiento/PasoDatos'
+import { PasoDistribucion } from '@/components/lanzamiento/PasoDistribucion'
+import { PasoReferencia }   from '@/components/lanzamiento/PasoReferencia'
 import type { Lanzamiento } from '@/types'
 
 export default async function WizardStepPage({
@@ -40,12 +42,20 @@ export default async function WizardStepPage({
     return <PasoDatos lanzamiento={lanzamiento} familias={familias} />
   }
 
-  // Pasos 3–7 — se construyen en sesiones 2–4
+  if (step === 3) {
+    return <PasoDistribucion lanzamiento={lanzamiento} />
+  }
+
+  if (step === 4) {
+    return <PasoReferencia lanzamiento={lanzamiento} />
+  }
+
+  // Pasos 5–7 — se construyen en sesiones 3–4
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
       <div className="text-4xl opacity-30">🚧</div>
       <p className="text-sm font-semibold" style={{ color: '#8fa8b8' }}>
-        Paso {step} — próximamente en sesión {step <= 4 ? 2 : step <= 6 ? 3 : 4}
+        Paso {step} — próximamente en sesión {step <= 6 ? 3 : 4}
       </p>
       <a
         href={`/lanzamiento/${params.id}/paso/${step - 1}`}
