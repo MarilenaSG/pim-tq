@@ -7,10 +7,12 @@ import { ProductComments } from './ProductComments'
 import { calcularCompletitud, NIVEL_COLOR } from '@/lib/completitud'
 import { VentasTab } from './VentasTab'
 import { AddToCampaignButton } from './AddToCampaignButton'
+import { ShopifyTab } from './ShopifyTab'
 import type { CampaignRef } from './VentasTab'
 import type {
   Product, ProductVariant, ProductImage,
   ProductCustomField, CustomFieldDefinition, AbcRating,
+  ProductShopifyData,
 } from '@/types'
 
 // ── Tabs ──────────────────────────────────────────────────────────
@@ -19,6 +21,7 @@ const TABS = [
   { key: 'resumen',   label: 'Resumen'       },
   { key: 'variantes', label: 'Variantes'     },
   { key: 'imagenes',  label: 'Imágenes'      },
+  { key: 'shopify',   label: 'Shopify'       },
   { key: 'custom',    label: 'Campos custom' },
   { key: 'ventas',    label: 'Ventas'        },
   { key: 'notas',     label: 'Notas'         },
@@ -43,7 +46,7 @@ export default async function ProductPage({
 
   const supabase = createServiceClient()
 
-  const [productRes, variantsRes, imagesRes, customFieldsRes, fieldDefsRes, campaignProductsRes, activeCampaignsRes] =
+  const [productRes, variantsRes, imagesRes, customFieldsRes, fieldDefsRes, campaignProductsRes, activeCampaignsRes, shopifyRes] =
     await Promise.all([
       supabase.from('products').select('*').eq('codigo_modelo', codigo_modelo).single(),
       supabase.from('product_variants').select('*').eq('codigo_modelo', codigo_modelo).order('codigo_interno'),
@@ -55,6 +58,7 @@ export default async function ProductPage({
         .select('campaign_id, campaigns(id, nombre, color, fecha_inicio, fecha_fin, estado, tipo)')
         .eq('codigo_modelo', codigo_modelo),
       supabase.from('campaigns').select('id, nombre, color').neq('estado', 'finalizada').order('nombre'),
+      supabase.from('product_shopify_data').select('*').eq('codigo_modelo', codigo_modelo).maybeSingle(),
     ])
 
   if (!productRes.data) return notFound()
@@ -76,6 +80,7 @@ export default async function ProductPage({
   const fieldDefs    = (fieldDefsRes.data   ?? []) as CustomFieldDefinition[]
   const ventas       = (ventasRes.data       ?? []) as import('./VentasTab').VentaRow[]
   const reservas     = (reservasRes.data     ?? []) as import('./VentasTab').ReservaRow[]
+  const shopifyData  = (shopifyRes.data ?? null) as ProductShopifyData | null
 
   // Campaigns this product belongs to
   type CampaignJoin = { campaign_id: string; campaigns: { id: string; nombre: string; color: string | null; fecha_inicio: string | null; fecha_fin: string | null; estado: string; tipo: string | null } | null }
@@ -168,6 +173,7 @@ export default async function ProductPage({
       {tab === 'resumen'   && <TabResumen   product={product} primaryImage={primaryImage} images={images} variants={variants} customFields={customFields} fieldDefs={fieldDefs} productCampaigns={productCampaigns} activeCampaigns={activeCampaigns} alreadyInIds={alreadyInIds} />}
       {tab === 'variantes' && <TabVariantes variants={variants} />}
       {tab === 'imagenes'  && <TabImagenes  images={images} />}
+      {tab === 'shopify'   && <ShopifyTab codigoModelo={codigo_modelo} shopifyData={shopifyData} shopDomain={process.env.SHOPIFY_SHOP_DOMAIN ?? null} />}
       {tab === 'custom'    && <CustomFieldsEditor fieldDefs={fieldDefs} customFields={customFields} codigo={codigo_modelo} />}
       {tab === 'ventas'    && <VentasTab ventas={ventas} reservas={reservas} variantSlugMap={variantSlugMap} campaigns={productCampaigns} />}
       {tab === 'notas'     && <ProductComments codigo_modelo={codigo_modelo} userEmail={null} />}

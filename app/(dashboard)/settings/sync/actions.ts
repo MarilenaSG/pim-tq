@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { syncMetabase } from '@/lib/metabase'
 import { syncVentas } from '@/lib/ventas'
 import { syncReservas } from '@/lib/reservas'
+import { syncShopify } from '@/lib/shopify'
 
 export interface SyncActionResult {
   ok: boolean
@@ -13,6 +14,8 @@ export interface SyncActionResult {
   rowsUpserted?: number
   rowsDropped?:  number
   rowsInserted?: number
+  shopifyDataUpserted?: number
+  skippedNoMatch?: number
   errors?: string[]
   error?: string
 }
@@ -90,6 +93,20 @@ export async function triggerReservasSync(): Promise<SyncActionResult> {
       ok:           result.errors.length === 0,
       rowsInserted: result.rowsInserted,
       errors:       result.errors,
+    }
+  })
+}
+
+export async function triggerShopifySync(): Promise<SyncActionResult> {
+  const supabase = createServiceClient()
+  return withSyncLog(supabase, 'shopify', async () => {
+    const result = await syncShopify()
+    return {
+      ok:                  result.errors.length === 0,
+      shopifyDataUpserted: result.shopifyDataUpserted,
+      imagesUpserted:      result.imagesUpserted,
+      skippedNoMatch:      result.skippedNoMatch,
+      errors:              result.errors,
     }
   })
 }

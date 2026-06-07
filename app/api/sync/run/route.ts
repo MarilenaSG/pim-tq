@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { syncMetabase } from '@/lib/metabase'
 import { syncVentas } from '@/lib/ventas'
 import { syncReservas } from '@/lib/reservas'
+import { syncShopify } from '@/lib/shopify'
 
 export const maxDuration = 60
 
@@ -51,9 +52,10 @@ export async function POST(req: NextRequest) {
   const metabaseResult = await runSync(supabase, 'metabase', syncMetabase)
   const ventasResult   = await runSync(supabase, 'ventas', syncVentas)
   const reservasResult = await runSync(supabase, 'reservas', syncReservas)
+  const shopifyResult  = await runSync(supabase, 'shopify', syncShopify)
 
   return NextResponse.json({
     ok: true,
-    results: { metabase: metabaseResult, ventas: ventasResult, reservas: reservasResult },
+    results: { metabase: metabaseResult, ventas: ventasResult, reservas: reservasResult, shopify: shopifyResult },
   })
 }

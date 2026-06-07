@@ -185,7 +185,7 @@ export default async function ProductsPage({
 
   // Phase 2: images + stock + completitud
   const codes = products.map(p => p.codigo_modelo)
-  const [imagesResult, imgCountResult, fieldDefsResult, leaderSlugsResult, stockResult] =
+  const [imagesResult, imgCountResult, fieldDefsResult, leaderSlugsResult, stockResult, shopifyStatusResult] =
     codes.length > 0
       ? await Promise.all([
           supabase.from('product_images').select('codigo_modelo, url').in('codigo_modelo', codes).eq('is_primary', true),
@@ -193,6 +193,7 @@ export default async function ProductsPage({
           supabase.from('custom_field_definitions').select('field_key').eq('is_active', true),
           supabase.from('product_variants').select('codigo_modelo, slug').in('codigo_modelo', codes).eq('es_variante_lider', true),
           supabase.from('product_variants').select('codigo_modelo, stock_variante').in('codigo_modelo', codes),
+          supabase.from('product_shopify_data').select('codigo_modelo, shopify_status').in('codigo_modelo', codes),
         ])
       : [
           { data: [] as { codigo_modelo: string; url: string }[] },
@@ -200,10 +201,12 @@ export default async function ProductsPage({
           { data: [] as { field_key: string }[] },
           { data: [] as { codigo_modelo: string; slug: string }[] },
           { data: [] as { codigo_modelo: string; stock_variante: number | null }[] },
+          { data: [] as { codigo_modelo: string; shopify_status: string | null }[] },
         ]
 
-  const imageMap = Object.fromEntries((imagesResult.data ?? []).map(r => [r.codigo_modelo, r.url]))
-  const slugMap  = Object.fromEntries((leaderSlugsResult.data ?? []).map(r => [r.codigo_modelo, r.slug]))
+  const imageMap      = Object.fromEntries((imagesResult.data ?? []).map(r => [r.codigo_modelo, r.url]))
+  const slugMap       = Object.fromEntries((leaderSlugsResult.data ?? []).map(r => [r.codigo_modelo, r.slug]))
+  const shopifyMap    = Object.fromEntries(((shopifyStatusResult as { data: { codigo_modelo: string; shopify_status: string | null }[] | null }).data ?? []).map(r => [r.codigo_modelo, r.shopify_status]))
 
   const stockByModel: Record<string, number> = {}
   for (const v of (stockResult.data ?? [])) {
@@ -245,6 +248,7 @@ export default async function ProductsPage({
       is_discontinued:  p.is_discontinued ?? false,
       lifecycle_status: p.lifecycle_status ?? 'activo',
       stock_total:      stockByModel[p.codigo_modelo] ?? 0,
+      shopify_status:   shopifyMap[p.codigo_modelo] ?? null,
     }
   })
 

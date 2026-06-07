@@ -6,6 +6,7 @@ import {
   triggerMetabaseSync,
   triggerVentasSync,
   triggerReservasSync,
+  triggerShopifySync,
   type SyncActionResult,
 } from './actions'
 import { SyncIndicator } from '@/components/ui'
@@ -15,6 +16,7 @@ interface SyncPanelProps {
   lastMetabaseSync: SyncLog | null
   lastVentasSync:   SyncLog | null
   lastReservasSync: SyncLog | null
+  lastShopifySync:  SyncLog | null
   recentLogs:       SyncLog[]
 }
 
@@ -37,17 +39,19 @@ function MetaStats({ result }: { result: SyncActionResult }) {
 }
 
 export function SyncPanel({
-  lastMetabaseSync, lastVentasSync, lastReservasSync, recentLogs,
+  lastMetabaseSync, lastVentasSync, lastReservasSync, lastShopifySync, recentLogs,
 }: SyncPanelProps) {
   const router = useRouter()
 
   const [metaPending,     startMetaTrans]     = useTransition()
   const [ventasPending,   startVentasTrans]   = useTransition()
   const [reservasPending, startReservasTrans] = useTransition()
+  const [shopifyPending,  startShopifyTrans]  = useTransition()
 
   const [metaResult,     setMetaResult]     = useState<SyncActionResult | null>(null)
   const [ventasResult,   setVentasResult]   = useState<SyncActionResult | null>(null)
   const [reservasResult, setReservasResult] = useState<SyncActionResult | null>(null)
+  const [shopifyResult,  setShopifyResult]  = useState<SyncActionResult | null>(null)
 
   function handleMetaSync() {
     setMetaResult(null)
@@ -62,6 +66,11 @@ export function SyncPanel({
   function handleReservasSync() {
     setReservasResult(null)
     startReservasTrans(async () => { const res = await triggerReservasSync(); setReservasResult(res); router.refresh() })
+  }
+
+  function handleShopifySync() {
+    setShopifyResult(null)
+    startShopifyTrans(async () => { const res = await triggerShopifySync(); setShopifyResult(res); router.refresh() })
   }
 
   return (
@@ -105,6 +114,21 @@ export function SyncPanel({
             : <span>✕ {reservasResult.error ?? reservasResult.errors?.join(', ')}</span>
         ) : null}
         color="#3A9E6A"
+      />
+
+      <SyncCard
+        title="Shopify"
+        description="Sync de productos desde Shopify Admin API → product_shopify_data"
+        lastSync={lastShopifySync}
+        isPending={shopifyPending}
+        result={shopifyResult}
+        onSync={handleShopifySync}
+        statsComponent={shopifyResult ? (
+          shopifyResult.ok
+            ? <span>✓ {shopifyResult.shopifyDataUpserted} productos · {shopifyResult.imagesUpserted} imágenes{shopifyResult.skippedNoMatch ? ` · ${shopifyResult.skippedNoMatch} sin match` : ''}</span>
+            : <span>✕ {shopifyResult.error ?? shopifyResult.errors?.join(', ')}</span>
+        ) : null}
+        color="#96BF48"
       />
 
       {/* Sync log */}

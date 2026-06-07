@@ -8,9 +8,9 @@ Este archivo define el contexto completo del proyecto. Léelo íntegro antes de 
 
 Un PIM (Product Information Manager) multi-zona para el equipo de una cadena de joyerías con **19 tiendas en Canarias**. Agrega datos de Metabase (solo lectura), permite enriquecer fichas con campos propios del equipo, y tiene módulos diferenciados por perfil de usuario (Category Manager, Ventas, Stock, Tiendas).
 
-**No es** un ecommerce. **No es** un backoffice de Shopify. Es una fuente de verdad interna organizada por zonas funcionales.
+**No es** un ecommerce. **No es** un backoffice de Shopify. Es una fuente de verdad interna organizada por zonas funcionales, con integración Shopify para enriquecer fichas y exportar al canal ecommerce.
 
-> **Shopify eliminado:** la integración con Shopify Admin API fue descartada. No hay sync de Shopify, ni tabla `product_shopify_data`. Los datos vienen exclusivamente de Metabase (CSV).
+> **Shopify reintegrado (junio 2026):** la integración con Shopify Admin API fue recuperada. Existe tabla `product_shopify_data`, sync desde Shopify Admin API, tab Shopify en la ficha de producto, y export CSV para importación en Shopify. Los datos de catálogo base siguen viniendo de Metabase (CSV).
 
 ---
 
@@ -196,6 +196,10 @@ METABASE_RESERVAS_CSV_URL=    # Reservas activas
 # Anthropic
 ANTHROPIC_API_KEY=
 
+# Shopify Admin API
+SHOPIFY_SHOP_DOMAIN=          # formato: mi-tienda.myshopify.com
+SHOPIFY_ACCESS_TOKEN=         # token de acceso (o usar OAuth)
+
 # Seguridad
 CRON_SECRET=                  # Protege /api/sync/run
 
@@ -204,7 +208,7 @@ NEXT_PUBLIC_APP_URL=          # URL pública de la app
 APP_URL=                      # Para callbacks internos
 ```
 
-**Variables eliminadas:** `SHOPIFY_*`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `GOOGLE_DRIVE_FOLDER_ID`, `MCP_SERVICE_TOKEN`.
+**Variables eliminadas:** `GOOGLE_SERVICE_ACCOUNT_KEY`, `GOOGLE_DRIVE_FOLDER_ID`, `MCP_SERVICE_TOKEN`.
 
 **Regla crítica:** `SUPABASE_SERVICE_ROLE_KEY` y `ANTHROPIC_API_KEY` son secretos de servidor. Nunca en código cliente ni en variables `NEXT_PUBLIC_`.
 
@@ -447,4 +451,4 @@ Primer paso: [acción concreta]
 
 ---
 
-*Actualizado junio 2026. v2.0: arquitectura multi-zona · Shopify eliminado · Google Sheets eliminado · 3 CSVs de Metabase · exports PDF/ExcelJS · 19 tiendas · umbrales ABC×19 · migración 018 variant description.*
+*Actualizado junio 2026. v2.1: arquitectura multi-zona · Shopify reintegrado (lib/shopify.ts · product_shopify_data · ShopifyTab · export CSV) · Google Sheets eliminado · 3 CSVs de Metabase · exports PDF/ExcelJS · 19 tiendas · umbrales ABC×19 · migración 018 variant description.*

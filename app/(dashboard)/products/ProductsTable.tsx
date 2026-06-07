@@ -21,6 +21,7 @@ export type ProductTableRow = {
   is_discontinued:    boolean
   lifecycle_status:   string
   stock_total:        number
+  shopify_status:     string | null
 }
 
 type SortKey = 'stock_total' | 'ingresos_12m' | null
@@ -52,6 +53,20 @@ function CompletitudBar({ pct, nivel }: { pct: number; nivel: 'alta' | 'media' |
         <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: bar }} />
       </div>
     </div>
+  )
+}
+
+function ShopifyStatusBadge({ status }: { status: string | null }) {
+  const cfg = {
+    active:   { bg: 'rgba(58,158,106,0.12)',  text: '#2d7a54', label: 'Activo'    },
+    draft:    { bg: 'rgba(200,132,42,0.12)',   text: '#a06818', label: 'Borrador'  },
+    archived: { bg: 'rgba(192,57,43,0.12)',    text: '#992d22', label: 'Archivado' },
+  }[status ?? ''] ?? { bg: 'rgba(0,85,127,0.06)', text: '#b2b2b2', label: 'Sin sync' }
+
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: cfg.bg, color: cfg.text }}>
+      {cfg.label}
+    </span>
   )
 }
 
@@ -174,6 +189,7 @@ export function ProductsTable({
               <SortableHeader label="Ingresos 12m" sortKey="ingresos_12m" current={sortKey} dir={sortDir} onSort={handleSort} />
               <th className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Vars</th>
               <SortableHeader label="Stock" sortKey="stock_total" current={sortKey} dir={sortDir} onSort={handleSort} />
+              <th className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Shopify</th>
               {(['Completitud'] as const).map(h => (
                 <th key={h} className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
                   {h}
@@ -266,7 +282,10 @@ export function ProductsTable({
                   <StockCell stock={p.stock_total} />
                 </td>
 
-
+                {/* Shopify */}
+                <td className="px-3 py-2">
+                  <ShopifyStatusBadge status={p.shopify_status} />
+                </td>
 
                 {/* Completitud */}
                 <td className="px-3 py-2 w-28">

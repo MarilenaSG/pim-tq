@@ -2,6 +2,24 @@
 // PIM Te Quiero — TypeScript Types
 // ============================================================
 
+// ── Shopify ───────────────────────────────────────────────────
+
+export interface ProductShopifyData {
+  codigo_modelo: string
+  shopify_product_id: string | null
+  shopify_title: string | null
+  shopify_description: string | null
+  shopify_tags: string[]
+  shopify_status: 'active' | 'draft' | 'archived' | null
+  shopify_handle: string | null
+  shopify_vendor: string | null
+  shopify_seo_title: string | null
+  shopify_seo_desc: string | null
+  synced_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ── Products ─────────────────────────────────────────────────
 
 export type AbcRating = 'A' | 'B' | 'C' | null
@@ -136,7 +154,7 @@ export interface CustomFieldDefinition {
 
 // ── Sync ─────────────────────────────────────────────────────
 
-export type SyncSource = 'metabase' | 'ventas' | 'reservas'
+export type SyncSource = 'metabase' | 'ventas' | 'reservas' | 'shopify'
 export type SyncStatus = 'success' | 'error' | 'running'
 export type SyncTrigger = 'cron' | 'manual'
 
