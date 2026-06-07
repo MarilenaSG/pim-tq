@@ -10,12 +10,12 @@ export async function PATCH(
     const body = await req.json() as Record<string, unknown>
 
     const allowed = ['shopify_title', 'shopify_description', 'shopify_seo_title', 'shopify_seo_desc', 'shopify_tags']
-    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    const payload: Record<string, unknown> = {}
     for (const key of allowed) {
       if (key in body) payload[key] = body[key]
     }
 
-    if (Object.keys(payload).length === 1) {
+    if (Object.keys(payload).length === 0) {
       return NextResponse.json({ error: 'Sin campos válidos para actualizar' }, { status: 400 })
     }
 
