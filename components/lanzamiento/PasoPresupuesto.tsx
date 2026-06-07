@@ -68,16 +68,24 @@ export function PasoPresupuesto({ lanzamiento, step = 6 }: { lanzamiento: Lanzam
   const [opexGastosPct, setOpexGastosPct] = useState<number>(
     lanzamiento.opex_gastos_pct ?? 9,
   )
+  const [costeUnitario, setCosteUnitario] = useState<string>(
+    lanzamiento.coste?.toString() ?? '',
+  )
+  const costeNum = parseFloat(costeUnitario) || null
+
+  function handleCoste(v: string) {
+    setCosteUnitario(v)
+    const n = parseFloat(v)
+    if (!isNaN(n) && n > 0) save({ coste: n })
+  }
 
   // Métricas derivadas del simulador base
-  const inversionCompra = lanzamiento.output_presupuesto_compra ?? null
+  const costeEfectivo   = costeNum ?? lanzamiento.coste ?? null
+  const totalUds        = lanzamiento.unidades_compra_total ?? null
+  const inversionCompra = costeEfectivo && totalUds
+    ? Math.round(totalUds * costeEfectivo)
+    : (lanzamiento.output_presupuesto_compra ?? null)
   const inversionTotal  = (inversionCompra ?? 0) + presupuestoMarketing
-  const mbBase          = lanzamiento.output_margen_proyectado != null && lanzamiento.output_unidades_total != null
-    ? (lanzamiento.output_margen_proyectado / ((lanzamiento.output_unidades_total ?? 1) * (lanzamiento.precio_venta ?? 0))) * 100
-    : null
-  // Aproximación EBITDA si tenemos MB del output
-  const ebitdaPct = mbBase != null ? mbBase - opexPersonalPct - opexGastosPct : null
-
   function handleMarketing(v: number) {
     const safe = Math.max(0, Math.round(v))
     setPresupuestoMarketing(safe)
@@ -119,25 +127,59 @@ export function PasoPresupuesto({ lanzamiento, step = 6 }: { lanzamiento: Lanzam
 
       {/* ── Inversión en producto ─────────────────────── */}
       <div
-        className="rounded-xl p-4 mb-5"
+        className="rounded-xl p-4 mb-5 space-y-3"
         style={{ background: 'rgba(0,85,127,0.04)', border: '1px solid rgba(0,85,127,0.1)' }}
       >
-        <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: '#8fa8b8' }}>
+        <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>
           Inversión en producto (stock)
         </p>
-        <div className="flex items-center justify-between">
+
+        {/* Coste unitario — visible si no viene del paso de datos */}
+        {lanzamiento.tipo !== 'sku' && (
           <div>
-            <p className="text-[12px]" style={{ color: '#b2b2b2' }}>
-              {lanzamiento.unidades_compra_total?.toLocaleString('es-ES') ?? '—'} uds ×{' '}
-              {lanzamiento.coste ? fmtEur(lanzamiento.coste) : '—'} coste
-            </p>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#8fa8b8' }}>
+              Coste unitario medio <span style={{ color: '#C0392B' }}>*</span>
+            </label>
+            <div className="relative max-w-[180px]">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium" style={{ color: '#8fa8b8' }}>€</span>
+              <input
+                type="number"
+                value={costeUnitario}
+                onChange={e => handleCoste(e.target.value)}
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+                className="w-full rounded-lg pl-7 pr-3 py-2 text-[13px] font-bold focus:outline-none"
+                style={{
+                  border:     `1.5px solid ${costeNum ? '#00557f' : 'rgba(0,85,127,0.2)'}`,
+                  background: 'white',
+                  color:      '#00264d',
+                }}
+                onFocus={e  => (e.target.style.borderColor = '#00557f')}
+                onBlur={e   => (e.target.style.borderColor = costeNum ? '#00557f' : 'rgba(0,85,127,0.2)')}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Coste</span>
+            </div>
+            {!costeNum && (
+              <p className="text-[10px] mt-1" style={{ color: '#C8842A' }}>
+                Necesario para calcular la inversión total en stock
+              </p>
+            )}
           </div>
-          <p className="text-[20px] font-black" style={{ color: inversionCompra ? '#00264d' : '#c0cfd8' }}>
+        )}
+
+        {/* Resumen inversión */}
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[12px]" style={{ color: '#5a7a8a' }}>
+            {totalUds?.toLocaleString('es-ES') ?? '—'} uds ×{' '}
+            {costeEfectivo ? fmtEur(costeEfectivo) : '—'} coste
+          </p>
+          <p className="text-[20px] font-black" style={{ color: inversionCompra ? '#00264d' : '#8fa8b8' }}>
             {inversionCompra ? fmtEur(inversionCompra) : '—'}
           </p>
         </div>
-        {!inversionCompra && (
-          <p className="text-[11px] mt-1.5" style={{ color: '#C8842A' }}>
+        {!inversionCompra && !costeNum && lanzamiento.tipo === 'sku' && (
+          <p className="text-[11px]" style={{ color: '#C8842A' }}>
             Completa los pasos anteriores para ver el presupuesto de compra
           </p>
         )}
