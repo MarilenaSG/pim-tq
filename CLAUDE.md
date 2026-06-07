@@ -6,9 +6,11 @@ Este archivo define el contexto completo del proyecto. Léelo íntegro antes de 
 
 ## Qué es este proyecto
 
-Un PIM (Product Information Manager) ligero para el equipo de producto de una cadena de joyerías con 17 tiendas en Canarias. Agrega datos de Shopify y Metabase (solo lectura), permite enriquecer fichas con campos propios del equipo, y genera exports a Google Sheets y un catálogo público para tiendas.
+Un PIM (Product Information Manager) multi-zona para el equipo de una cadena de joyerías con **19 tiendas en Canarias**. Agrega datos de Metabase (solo lectura), permite enriquecer fichas con campos propios del equipo, y tiene módulos diferenciados por perfil de usuario (Category Manager, Ventas, Stock, Tiendas).
 
-**No es** un ecommerce. **No es** un backoffice de Shopify. Es una fuente de verdad interna para el equipo de producto.
+**No es** un ecommerce. **No es** un backoffice de Shopify. Es una fuente de verdad interna organizada por zonas funcionales.
+
+> **Shopify eliminado:** la integración con Shopify Admin API fue descartada. No hay sync de Shopify, ni tabla `product_shopify_data`. Los datos vienen exclusivamente de Metabase (CSV).
 
 ---
 
@@ -18,119 +20,193 @@ Un PIM (Product Information Manager) ligero para el equipo de producto de una ca
 |---|---|
 | Framework | Next.js 14 con App Router |
 | Base de datos | Supabase (PostgreSQL) |
-| Auth | Sin autenticación — aplicación interna, acceso libre por URL |
+| Auth | Sin autenticación — acceso libre por URL |
 | Hosting | Vercel (free tier) |
 | Estilos | Tailwind CSS |
-| Gráficos | Recharts (compatible con Next.js, sin config adicional) |
-| Fuentes externas | Shopify Admin API + CSV público de Metabase |
-| Exports | Google Sheets API v4 via Service Account |
-| AI | Anthropic API (`claude-haiku-4-5` para generación, `claude-sonnet-4-6` para chat) |
+| Gráficos | Recharts (siempre con `ResponsiveContainer`) |
+| Fuentes externas | 3 CSVs de Metabase: productos · ventas mensuales · reservas |
+| Exports | PDF via `@react-pdf/renderer` · Excel via `ExcelJS` |
+| AI | Anthropic API (`claude-haiku-4-5` generación · `claude-sonnet-4-6` chat/precio) |
+
+> Google Sheets fue eliminado. Los exports son ahora PDF y Excel descargables directamente.
 
 ---
 
-## Estructura de carpetas esperada
+## Arquitectura multi-zona
+
+La app está dividida en **4 zonas** accesibles desde `ZoneSidebar`. Cada zona tiene su propio dashboard y navegación lateral contextual.
+
+| Zona | Ruta home | Perfil |
+|---|---|---|
+| **CM** (Category Management) | `/` | Analítica de surtido, precio, ciclo de vida, rentabilidad |
+| **Ventas** | `/ventas` | Sell-out por tienda, análisis de campañas |
+| **Stock y Compras** | `/stock` | Cobertura, rotación, alertas de rotura y exceso |
+| **Tiendas** | `/tiendas/boletin` | Boletín de novedades y catálogo para equipos de tienda |
+
+La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con navegación secundaria propia.
+
+---
+
+## Estructura de carpetas real
 
 ```
 /
 ├── app/
 │   ├── (dashboard)/
-│   │   ├── page.tsx                  ← Dashboard home
+│   │   ├── page.tsx                        ← Dashboard CM home
+│   │   ├── layout.tsx                      ← ZoneSidebar + ToastProvider
 │   │   ├── products/
-│   │   │   ├── page.tsx              ← Lista de productos
+│   │   │   ├── page.tsx                    ← Lista de productos (global)
 │   │   │   └── [codigo_modelo]/
-│   │   │       └── page.tsx          ← Ficha de producto
-│   │   ├── export/
-│   │   │   └── page.tsx
-│   │   ├── settings/
-│   │   │   ├── sync/page.tsx
-│   │   │   ├── fields/page.tsx
-│   │   │   └── pricing/page.tsx
+│   │   │       └── page.tsx                ← Ficha de producto
+│   │   ├── campaigns/
+│   │   │   └── page.tsx                    ← Gestión de campañas
+│   │   ├── alerts/
+│   │   │   └── page.tsx                    ← Centro de alertas
+│   │   ├── suppliers/
+│   │   │   └── page.tsx                    ← Proveedores
+│   │   ├── category/
+│   │   │   └── page.tsx                    ← Category manager
+│   │   ├── compare/
+│   │   │   └── page.tsx                    ← Comparador de productos
+│   │   ├── ventas/
+│   │   │   ├── page.tsx                    ← Dashboard Ventas
+│   │   │   └── sell-out/page.tsx           ← Sell-out por tienda
+│   │   ├── stock/
+│   │   │   └── page.tsx                    ← Dashboard Stock
+│   │   ├── tiendas/
+│   │   │   ├── boletin/page.tsx            ← Boletín para tiendas
+│   │   │   └── catalogo/page.tsx           ← Catálogo para tiendas
 │   │   ├── analytics/
+│   │   │   ├── layout.tsx                  ← Layout analítica con tabs
 │   │   │   ├── surtido/page.tsx
 │   │   │   ├── precio/page.tsx
+│   │   │   ├── price-ladder/page.tsx       ← Escalera de precios
 │   │   │   ├── ciclo-vida/page.tsx
 │   │   │   ├── rentabilidad/page.tsx
-│   │   │   └── stock/page.tsx
+│   │   │   ├── stock/page.tsx              ← Analítica stock (≠ dashboard stock)
+│   │   │   └── ventas/page.tsx
+│   │   ├── settings/
+│   │   │   ├── sync/page.tsx
+│   │   │   ├── pricing/page.tsx
+│   │   │   └── alerts/page.tsx
 │   │   └── help/page.tsx
-│   ├── catalog/
-│   │   └── page.tsx                  ← PÚBLICO, sin auth
 │   └── api/
 │       ├── sync/
-│       │   ├── metabase/route.ts
-│       │   ├── shopify/route.ts
-│       │   └── run/route.ts          ← Endpoint cron
+│       │   ├── metabase/route.ts           ← Sync productos CSV
+│       │   ├── ventas/route.ts             ← Sync ventas_mensuales CSV
+│       │   ├── reservas/route.ts           ← Sync reservas CSV
+│       │   └── run/route.ts               ← Cron endpoint
+│       ├── ventas/
+│       │   ├── summary/route.ts
+│       │   └── por-modelo/route.ts
+│       ├── stock/
+│       │   ├── summary/route.ts
+│       │   └── por-modelo/route.ts
+│       ├── cm/
+│       │   └── summary/route.ts
+│       ├── campaigns/
+│       │   ├── route.ts
+│       │   └── [id]/
+│       │       ├── route.ts
+│       │       ├── products/route.ts
+│       │       └── export/
+│       │           ├── pdf/route.ts
+│       │           └── excel/route.ts
+│       ├── alerts/
+│       │   ├── list/route.ts
+│       │   └── summary/route.ts
+│       ├── catalog/
+│       │   ├── export-pdf/route.ts         ← PDF catálogo tiendas
+│       │   └── pedidos-excel/route.ts      ← Plantilla pedido Excel
 │       ├── export/
-│       │   └── sheets/route.ts
+│       │   ├── pdf/route.ts
+│       │   ├── excel/route.ts
+│       │   └── csv-template/route.ts
 │       ├── ai/
-│       │   ├── generate-content/route.ts
-│       │   └── chat/route.ts
-│       └── mcp/                      ← Endpoints para el MCP server
-│           ├── product/[id]/route.ts
+│       │   ├── price-suggestion/route.ts
+│       │   └── ladder-insights/route.ts
+│       ├── boletin/route.ts
+│       ├── batch/update/route.ts
+│       └── products/
+│           ├── filter/route.ts
+│           ├── filter-options/route.ts
 │           ├── search/route.ts
-│           ├── pending/route.ts
-│           ├── summary/route.ts
-│           └── sync-status/route.ts
+│           ├── lifecycle/route.ts
+│           ├── by-codes/route.ts
+│           └── [codigo_modelo]/
+│               ├── lifecycle/route.ts
+│               └── comments/route.ts
 ├── components/
-│   ├── ui/
-│   │   ├── KpiCard.tsx
-│   │   ├── StatusBadge.tsx
-│   │   ├── SyncIndicator.tsx
-│   │   ├── FeatureCard.tsx
-│   │   ├── ActivityFeed.tsx
-│   │   ├── PageHeader.tsx
-│   │   ├── EmptyState.tsx
-│   │   ├── Toast.tsx
-│   │   └── AnalyticsFilters.tsx     ← Filtros globales del módulo analítico
-│   ├── products/
-│   ├── export/
-│   ├── analytics/                   ← Gráficos reutilizables (Recharts wrappers)
-│   └── catalog/
+│   └── ui/
+│       ├── KpiCard.tsx
+│       ├── StatusBadge.tsx
+│       ├── SyncIndicator.tsx
+│       ├── FeatureCard.tsx
+│       ├── ActivityFeed.tsx
+│       ├── PageHeader.tsx
+│       ├── EmptyState.tsx
+│       ├── Toast.tsx
+│       ├── AnalyticsFilters.tsx
+│       ├── ZoneSidebar.tsx             ← Barra lateral multi-zona
+│       ├── ZoneCardsSection.tsx        ← Cards de acceso rápido por zona
+│       ├── ZoneSummaryWidget.tsx       ← Widget de resumen por zona en home
+│       ├── SidebarAlertBadge.tsx       ← Badge de alertas en sidebar
+│       └── index.ts
 ├── lib/
 │   ├── supabase/
 │   │   ├── client.ts
-│   │   └── server.ts
-│   ├── shopify.ts
-│   ├── metabase.ts
-│   ├── google-sheets.ts
-│   └── anthropic.ts
+│   │   └── server.ts                  ← createServerClient() + createServiceClient()
+│   ├── metabase.ts                    ← Sync productos desde CSV
+│   ├── ventas.ts                      ← Sync ventas_mensuales desde CSV
+│   ├── reservas.ts                    ← Sync reservas desde CSV
+│   ├── alerts.ts                      ← Lógica de alertas (stock crítico, etc.)
+│   ├── completitud.ts                 ← Score de completitud de ficha
+│   ├── zones.ts                       ← Configuración de zonas (ZONES[])
+│   ├── catalog-pdf.tsx                ← Componente PDF catálogo tiendas
+│   ├── campaign-pdf.tsx               ← Componente PDF campañas
+│   └── pdf-catalog.tsx                ← (legacy, puede consolidarse)
 ├── types/
-│   └── index.ts                      ← Todos los tipos TypeScript
-├── CLAUDE.md                         ← Este archivo
-└── .env.local                        ← Nunca commitear
+│   └── index.ts                       ← Todos los tipos TypeScript
+├── supabase/
+│   └── migrations/                    ← 18 migraciones (001–018)
+├── public/
+│   └── brand/
+│       ├── icon_cream.png             ← Logo para fondos oscuros (PDF, etc.)
+│       └── icon_navy.png              ← Logo para fondos blancos
+├── CLAUDE.md
+└── .env.local                         ← Nunca commitear
 ```
 
 ---
 
 ## Variables de entorno
 
-Todas deben estar en `.env.local` (local) y en Vercel Dashboard → Settings → Environment Variables (producción).
-
 ```env
-# Supabase (sin auth de usuarios)
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# Metabase
-METABASE_CSV_URL=
-
-# Shopify
-SHOPIFY_SHOP_DOMAIN=            # formato: mi-tienda.myshopify.com (sin https://)
-SHOPIFY_ACCESS_TOKEN=
-
-# Google
-GOOGLE_SERVICE_ACCOUNT_KEY=     # JSON completo en base64
-GOOGLE_DRIVE_FOLDER_ID=
+# Metabase — 3 CSVs separados
+METABASE_CSV_URL=             # Productos + variantes (≈800 filas, una por SKU)
+METABASE_VENTAS_CSV_URL=      # Ventas mensuales por tienda y SKU
+METABASE_RESERVAS_CSV_URL=    # Reservas activas
 
 # Anthropic
 ANTHROPIC_API_KEY=
 
 # Seguridad
-CRON_SECRET=                    # string aleatorio largo, protege el endpoint del cron
-MCP_SERVICE_TOKEN=              # token para autenticar el MCP server contra esta app
+CRON_SECRET=                  # Protege /api/sync/run
+
+# URLs (opcional en local, requerido en Vercel)
+NEXT_PUBLIC_APP_URL=          # URL pública de la app
+APP_URL=                      # Para callbacks internos
 ```
 
-**Regla crítica:** `SUPABASE_SERVICE_ROLE_KEY`, `SHOPIFY_ACCESS_TOKEN`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `ANTHROPIC_API_KEY` y `MCP_SERVICE_TOKEN` son secretos de servidor. Nunca deben aparecer en código cliente ni en variables con prefijo `NEXT_PUBLIC_`.
+**Variables eliminadas:** `SHOPIFY_*`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `GOOGLE_DRIVE_FOLDER_ID`, `MCP_SERVICE_TOKEN`.
+
+**Regla crítica:** `SUPABASE_SERVICE_ROLE_KEY` y `ANTHROPIC_API_KEY` son secretos de servidor. Nunca en código cliente ni en variables `NEXT_PUBLIC_`.
 
 ---
 
@@ -139,163 +215,158 @@ MCP_SERVICE_TOKEN=              # token para autenticar el MCP server contra est
 ### Tablas principales
 
 **`products`** — clave primaria: `codigo_modelo` (TEXT, ej: "002AA")
-- Campos base: `description`, `category`, `familia`, `metal`, `karat`, `supplier_name`, `primera_entrada`, `num_variantes`, `lista_variantes`, `variante_lider`
-- Agregados calculados al hacer sync (de las variantes): `ingresos_modelo_12m`, `abc_ventas`, `abc_unidades`
-- Control: `metabase_synced_at`, `shopify_synced_at`, `created_at`, `updated_at`
+- `description`, `category`, `familia`, `metal`, `karat`, `supplier_name`
+- `primera_entrada`, `num_variantes`, `lista_variantes`, `variante_lider`
+- Agregados: `ingresos_12m`, `unidades_12m`, `abc_ventas`, `abc_unidades`
+- Estado: `is_discontinued` (AND de todas sus variantes), `lifecycle_status`
+- Control: `metabase_synced_at`, `created_at`, `updated_at`
 
-**`product_variants`** — clave primaria: `codigo_interno` (TEXT, ej: "002AA08") — el SKU real del ERP
-- `slug` (TEXT) — igual que `codigo_interno`
-- `codigo_modelo` (TEXT) FK → `products`
-- `variante` (TEXT) — el valor de la variante (ej: "8", "45", "M")
-- `es_variante_lider` (BOOLEAN)
+**`product_variants`** — clave primaria: `codigo_interno` (TEXT, ej: "002AA08")
+- `slug` (= `codigo_interno`), `codigo_modelo` FK, `variante`, `description` ← por variante
+- `es_variante_lider`, `is_discontinued`
 - Precios: `precio_venta`, `precio_tachado`, `descuento_aplicado`
 - Costes: `cost_price_medio`, `ultimo_coste_compra`, `ultimo_precio_venta`
 - Rentabilidad: `margen_bruto`, `pct_margen_bruto`
 - Ventas: `abc_ventas`, `abc_unidades`, `ingresos_slug_12m`, `ingresos_variante_lider_12m`, `unidades_mes_anterior`
-- Stock: `stock_variante`
-- Distribución: `num_tiendas_activo`
+- Stock: `stock_variante`, `num_tiendas_activo`
 - Control: `metabase_synced_at`, `updated_at`
 
-**`product_shopify_data`** — FK: `codigo_modelo`
-- `shopify_product_id`, `shopify_title`, `shopify_description` (HTML), `shopify_tags` (array), `shopify_seo_title`, `shopify_seo_desc`, `shopify_status`, `shopify_handle`, `shopify_vendor`, `synced_at`
+> `description` en `product_variants` es la descripción específica de cada SKU (migración 018). Distinto del `description` de `products` que es el del modelo líder.
+
+**`ventas_mensuales`** — ventas históricas por SKU, tienda y mes
+- `slug` (= `codigo_interno`), `codigo_modelo`, `tienda`, `anyo`, `mes`
+- `unidades_vendidas`, `ingresos_netos`, `coste_total`
+- Clave única: `(slug, tienda, anyo, mes)`
 
 **`product_images`** — FK: `codigo_modelo`
-- `id` (UUID), `url`, `source` (s3|shopify|manual), `variante`, `alt_text`, `orden`, `is_primary`, `created_at`
+- `id` (UUID), `url`, `source` (s3|manual), `variante`, `alt_text`, `orden`, `is_primary`
 
 **`product_custom_fields`** — FK: `codigo_modelo`
-- `id` (UUID), `field_key`, `field_value`, `field_type` (text|textarea|date|boolean|select), `updated_by` (email), `updated_at`
+- `field_key`, `field_value`, `field_type` (text|textarea|date|boolean|select), `updated_by`, `updated_at`
 
 **`custom_field_definitions`**
-- `id` (UUID), `field_key` (UNIQUE), `label`, `field_type`, `options` (array), `is_active`, `created_at`
+- `field_key` (UNIQUE), `label`, `field_type`, `options` (array), `is_active`
+
+**`pricing_rules`** — reglas de pricing por category management
+- `familia`, `metal`, `karat`, `margen_objetivo_pct`, `redondeo` (text|99|00), `descuento_minimo_pct`
 
 **`sync_log`**
-- `id` (UUID), `source` (metabase|shopify), `status` (success|error), `records_updated`, `error_message`, `triggered_by` (cron|manual|email), `started_at`, `finished_at`
+- `source` (metabase|ventas|reservas), `status` (success|error|running), `records_updated`, `error_message`, `triggered_by`, `started_at`, `finished_at`
 
-**`pricing_rules`** — reglas de category management para sugerencia de precios IA
-- `id` (UUID), `familia` (TEXT), `metal` (TEXT), `karat` (TEXT), `margen_objetivo_pct` (NUMERIC), `redondeo` (text|99|00), `descuento_minimo_pct` (NUMERIC), `updated_by` (email), `updated_at`
+### Vistas y RPCs
+- `product_stock_summary` — vista: stock total por modelo
+- RPCs de ventas: `ventas_por_modelo_v2`, otras funciones de agregación
 
-### Campos adicionales en `products` para analítica avanzada
-Añadir cuando estén disponibles en Metabase (no bloquean el arranque del proyecto):
-- `cost_ultima_compra` NUMERIC — coste de la última orden de compra
-- `fecha_ultima_venta` DATE — fecha de la última transacción
-- `unidades_mes_anterior` INTEGER — unidades vendidas el mes anterior
-- `num_tiendas_activo` INTEGER — número de tiendas donde está disponible
+### Umbrales de stock (19 tiendas)
+| ABC | Mínimo | Normal | Sobrante |
+|---|---|---|---|
+| A | < 57 uds → bajo | 57–114 uds | > 114 uds |
+| B | < 38 uds → bajo | 38–76 uds | > 76 uds |
+| C | < 19 uds → bajo | 19–38 uds | > 38 uds |
 
-### RLS (Row Level Security)
-- Usar el cliente `anon` de Supabase para todas las queries de la app (sin auth de usuario)
-- RLS desactivado o con política de lectura libre para todas las tablas excepto escrituras sensibles
-- Las escrituras (sync, campos custom, pricing rules) se hacen desde API routes del servidor usando `SUPABASE_SERVICE_ROLE_KEY` — nunca desde el cliente
-- El catálogo público nunca selecciona campos financieros (ver regla 4)
-
----
-
-## Rutas y autenticación
-
-| Ruta | Acceso | Descripción |
-|---|---|---|
-| `/` | 🌐 Libre | Dashboard home |
-| `/products` | 🌐 Libre | Lista de productos |
-| `/products/[codigo_modelo]` | 🌐 Libre | Ficha de producto |
-| `/export` | 🌐 Libre | Generador de exports |
-| `/settings/sync` | 🌐 Libre | Panel de sincronización |
-| `/settings/fields` | 🌐 Libre | Gestión de campos custom |
-| `/settings/pricing` | 🌐 Libre | Reglas de pricing por category management |
-| `/analytics/surtido` | 🌐 Libre | Analítica: amplitud, profundidad, Pareto |
-| `/analytics/precio` | 🌐 Libre | Analítica: mapas de precio, márgenes, descuentos |
-| `/analytics/ciclo-vida` | 🌐 Libre | Analítica: ciclo de vida, renovación, anomalías |
-| `/analytics/rentabilidad` | 🌐 Libre | Analítica: BCG, contribución por familia/metal/proveedor |
-| `/analytics/stock` | 🌐 Libre | Analítica: cobertura, rotación, capital inmovilizado |
-| `/help` | 🌐 Libre | Manual de usuario |
-| `/catalog` | 🌐 Libre | Catálogo para equipos de tienda |
-| `/api/sync/run` | 🔑 CRON_SECRET | Endpoint del cron de Vercel |
-| `/api/sync/metabase` | 🔑 CRON_SECRET | Sync manual Metabase |
-| `/api/sync/shopify` | 🔑 CRON_SECRET | Sync manual Shopify |
-| `/api/mcp/*` | 🔑 MCP_SERVICE_TOKEN | Endpoints para el MCP server |
-
-Sin autenticación de usuario. Los únicos endpoints protegidos son los de sync y MCP (via header `x-api-key`).
+`bestAbc()`: toma el más estricto entre `abc_ventas` y `abc_unidades` (protege la plata, que tiene alta rotación por unidades).
 
 ---
 
 ## Integraciones externas
 
-### Metabase CSV
-- Descarga el CSV desde `METABASE_CSV_URL`
-- El CSV es a nivel de **variante** — 788 filas (una por SKU), 440 modelos únicos
-- Columnas exactas: `slug, codigo_modelo, codigo_interno, variante, description, category, familia, metal, karat, supplier_name, primera_entrada_catalogo, image_url, imagen_formula_excel, num_variantes, lista_variantes, variante_lider, es_variante_lider, ingresos_variante_lider_12m, stock_variante, precio_venta, precio_tachado, descuento_aplicado, cost_price_medio, ultimo_coste_compra, ultimo_precio_venta, margen_bruto, pct_margen_bruto, abc_ventas, abc_unidades, ingresos_modelo_12m, unidades_modelo_12m, ingresos_slug_12m, unidades_mes_anterior, num_tiendas_activo`
-- **Atención:** los números usan formato europeo (coma decimal, punto miles) — ej: "162.010,03". Parsear con `parseFloat(value.replace(/\./g, '').replace(',', '.'))`
-- Lógica de sync en dos pasos:
-  1. UPSERT en `products` usando `codigo_modelo` como clave (campos del modelo + imagen de la variante líder)
-  2. UPSERT en `product_variants` usando `codigo_interno` como clave
-- Guardar `image_url` en `product_images` con `source='s3'` e `is_primary=true` solo para la variante líder (`es_variante_lider = true`)
+### Metabase CSV — Productos (`METABASE_CSV_URL`)
+- ~800 filas (una por `codigo_interno`/SKU), ~440 modelos únicos
+- Formato europeo para números: `"162.010,03"` → parsear con `parseFloat(val.replace(/\./g,'').replace(',','.'))`
+- Sync en 3 pasos: UPSERT `products` (desde variante líder) → UPSERT `product_variants` → UPSERT `product_images` (solo líder, `source='s3'`)
+- Un modelo es `is_discontinued` solo si **todas** sus variantes lo son (AND lógico)
 
-### Shopify Admin API
-- Endpoint base: `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/2024-01`
-- Autenticación: header `X-Shopify-Access-Token: ${SHOPIFY_ACCESS_TOKEN}`
-- Paginar todos los productos con `GET /products.json?limit=250`
-- **Matching con el PIM:** usar el SKU del variant de Shopify para hacer match directo contra `codigo_interno` en `product_variants` (ej: SKU "002AA08" → `codigo_interno` "002AA08"). El `codigo_modelo` se obtiene del campo homónimo en `product_variants`.
-- Guardar en `product_shopify_data` + imágenes en `product_images` con `source='shopify'`
-- **No traer:** inventory/stock (viene de Metabase)
+### Metabase CSV — Ventas (`METABASE_VENTAS_CSV_URL`)
+- Columnas: `codigo_interno, tienda_nombre, anyo, mes, unidades_vendidas, ingresos_netos, coste_total`
+- UPSERT en `ventas_mensuales` con clave `(slug, tienda, anyo, mes)`
+- `slug` = `codigo_interno` en la tabla
 
-### Google Sheets export
-- Usar Google Service Account (decodificar `GOOGLE_SERVICE_ACCOUNT_KEY` desde base64)
-- Crear un nuevo Spreadsheet en la carpeta `GOOGLE_DRIVE_FOLDER_ID`
-- Nombre: `Catálogo TQ Export - ${fecha}`
-- Compartir automáticamente con "anyone with link can view"
-- Columnas de imagen: usar fórmula `=IMAGE("url")` — esto hace visible la foto en Sheets
-- Cabeceras en negrita, primera fila fija (freeze)
-- Devolver la URL del Sheet creado para redirigir al usuario
+### Metabase CSV — Reservas (`METABASE_RESERVAS_CSV_URL`)
+- Reservas activas de productos; sync en tabla `reservas`
+
+### Exports (sin dependencias externas)
+- **PDF catálogo tiendas:** `@react-pdf/renderer`, logo `icon_cream.png` (28px, fondos oscuros), cabecera en todas las páginas, numeración, disclaimer de precios
+- **Excel plantilla pedido:** `ExcelJS`, columnas Metal / Familia / Descripción (por variante) / Uds. a pedir
+- **Export CM:** PDF y Excel del módulo de campañas y catálogo general
 
 ### Cron job (Vercel)
 ```json
 // vercel.json
 {
-  "crons": [{
-    "path": "/api/sync/run",
-    "schedule": "0 5 * * *"
-  }]
+  "crons": [{ "path": "/api/sync/run", "schedule": "0 5 * * *" }]
 }
 ```
-Ejecuta a las 05:00 UTC (06:00-07:00 hora Canarias según época del año).
+Ejecuta a las 05:00 UTC. El endpoint `run` lanza sync de productos + ventas en secuencia.
 
 ---
 
 ## Integración con Claude AI
 
-### Nivel 1 — Generación de contenido y sugerencia de precios (`/api/ai/generate-content`)
-- Modelo: `claude-haiku-4-5` para texto; `claude-sonnet-4-6` para sugerencia de precio
-- Tipos de generación: `shopify_description`, `seo_title`, `tags`, `catalog_description`, `price_suggestion`
-- El prompt incluye los datos del producto + instrucciones de marca TQ Jewels
-- Para `price_suggestion`: incluir también las reglas de pricing de `/settings/pricing` + datos financieros del producto. Respuesta en JSON estricto: `{ precio_venta_sugerido, precio_tachado_sugerido, margen_resultante, razonamiento, alertas }`
-- Los precios sugeridos se guardan como campos custom (`precio_sugerido_ia`, `precio_tachado_sugerido_ia`) — nunca sobreescriben datos de Metabase
-- Nueva ruta en scope: `/settings/pricing` — reglas de pricing configurables por familia/metal/karat
-
-### Nivel 2 — Chat analítico (`/api/ai/chat`)
+### Sugerencia de precio (`/api/ai/price-suggestion`)
 - Modelo: `claude-sonnet-4-6`
-- Contexto inyectado dinámicamente según el tipo de pregunta detectada
-- Máximo ~8.000 tokens de contexto por consulta
-- No persiste historial entre sesiones
-- No escribe en la BD — solo responde
+- Input: datos del producto + reglas de pricing de la familia
+- Output JSON: `{ precio_venta_sugerido, precio_tachado_sugerido, margen_resultante, razonamiento, alertas }`
+- Los precios sugeridos se guardan como campos custom — nunca sobreescriben datos de Metabase
+
+### Price Ladder Insights (`/api/ai/ladder-insights`)
+- Modelo: `claude-haiku-4-5`
+- Analiza la escalera de precios de una familia y detecta huecos o solapamientos
 
 ---
 
-## Componentes UI obligatorios
+## Rutas y acceso
 
-Construir estos componentes en `components/ui/` antes de empezar las páginas. Todas las páginas deben usarlos — no reinventar en cada vista.
+| Ruta | Zona | Descripción |
+|---|---|---|
+| `/` | CM | Dashboard Category Management |
+| `/products` | Global | Lista de productos con filtros |
+| `/products/[codigo_modelo]` | Global | Ficha de producto |
+| `/campaigns` | CM/Ventas | Gestión de campañas |
+| `/alerts` | CM/Stock | Centro de alertas |
+| `/suppliers` | Stock | Proveedores |
+| `/category` | CM | Category manager |
+| `/compare` | CM | Comparador de productos |
+| `/ventas` | Ventas | Dashboard sell-out |
+| `/ventas/sell-out` | Ventas | Sell-out por tienda |
+| `/stock` | Stock | Dashboard stock operativo |
+| `/tiendas/boletin` | Tiendas | Boletín de novedades |
+| `/tiendas/catalogo` | Tiendas | Catálogo para equipos de tienda |
+| `/analytics/surtido` | CM | Amplitud, profundidad, Pareto |
+| `/analytics/precio` | CM | Mapas de precio, márgenes, descuentos |
+| `/analytics/price-ladder` | CM | Escalera de precios |
+| `/analytics/ciclo-vida` | CM | Ciclo de vida, renovación, anomalías |
+| `/analytics/rentabilidad` | CM | BCG, contribución por familia/metal |
+| `/analytics/stock` | CM | Cobertura, rotación (analítica) |
+| `/analytics/ventas` | Ventas | Analítica de ventas |
+| `/settings/sync` | CM | Panel de sincronización |
+| `/settings/pricing` | CM | Reglas de pricing |
+| `/settings/alerts` | CM | Configuración alertas |
+| `/help` | Global | Manual de usuario |
+| `/api/sync/run` | 🔑 CRON_SECRET | Cron de Vercel |
+| `/api/sync/*` | 🔑 CRON_SECRET | Sync manual por fuente |
+
+Sin auth de usuario. Solo los endpoints de sync están protegidos (header `x-api-key: CRON_SECRET`).
+
+---
+
+## Componentes UI
 
 | Componente | Props clave |
 |---|---|
 | `KpiCard` | `label`, `value`, `sub`, `color` (blue\|green\|amber\|red\|neutral) |
-| `StatusBadge` | `status` (ok\|warn\|error\|info\|shopify\|imagen) |
+| `StatusBadge` | `status` (ok\|warn\|error\|info) |
 | `SyncIndicator` | `lastSync: Date`, `status` |
-| `FeatureCard` | `icon`, `name`, `description`, `href` |
-| `ActivityFeed` | `items: ActivityItem[]` |
-| `PageHeader` | `title`, `subtitle`, `actions?: ReactNode` |
+| `PageHeader` | `title`, `subtitle`, `eyebrow?`, `actions?: ReactNode` |
 | `EmptyState` | `icon`, `message`, `cta?: { label, href }` |
-| `Toast` | Global, via contexto. Variantes: success\|error\|info |
+| `Toast` | Global via contexto. Variantes: success\|error\|info |
+| `ZoneSidebar` | Lee zona de `localStorage`, renderiza nav contextual |
+| `ZoneCardsSection` | Cards de acceso rápido en home de cada zona |
+| `ZoneSummaryWidget` | Widget de KPIs de zona en el dashboard CM |
+| `SidebarAlertBadge` | Badge numérico de alertas activas |
 
 ---
 
-## Paleta de colores (provisional hasta recibir manual de marca)
+## Paleta de colores
 
 ```css
 --color-accent:       #C8842A   /* Dorado — acento corporativo */
@@ -305,116 +376,75 @@ Construir estos componentes en `components/ui/` antes de empezar las páginas. T
 --status-warn:        #C8842A
 --status-error:       #C0392B
 --status-info:        #2A5F9E
+--tq-bg:              fondo general de la app
 ```
-
-Cuando el cliente entregue el manual de marca oficial, reemplazar estos valores con los hex corporativos de TQ Jewels sin cambiar los nombres de las variables.
 
 ---
 
 ## Reglas de desarrollo
 
 1. **TypeScript estricto** — sin `any`. Todos los tipos en `types/index.ts`.
-2. **Server Components por defecto** — usar Client Components (`'use client'`) solo cuando sea imprescindible (interactividad, hooks de estado).
-3. **Datos financieros: solo lectura** — los campos de margen, coste y ventas nunca tienen formulario de edición. Se muestran, nunca se modifican desde la UI.
-4. **`/catalog` nunca expone datos financieros** — la query de Supabase para el catálogo no debe seleccionar: `cost_price_medio`, `ultimo_coste_compra`, `margen_bruto`, `pct_margen_bruto`, `ingresos_modelo_12m`, `abc_ventas`, `abc_unidades`.
-5b. **Sin middleware de auth** — no usar `middleware.ts` para proteger rutas de usuario. La app es completamente abierta salvo los endpoints de API protegidos con `CRON_SECRET` y `MCP_SERVICE_TOKEN`.
-5. **Imágenes como URL, nunca upload** — no hay funcionalidad de subida de archivos. Las imágenes se añaden pegando una URL.
-6. **Un rol único** — no hay sistema de permisos granular. Todos los usuarios autenticados tienen los mismos permisos.
-7. **Errores visibles** — cualquier error de sync, de API o de guardado debe aparecer en la UI con un mensaje claro. No silenciar errores con `catch(() => {})`.
-8. **Mobile-first solo en `/catalog`** — el resto de la app es desktop-first.
-9. **Recharts siempre con ResponsiveContainer** — todos los gráficos deben adaptarse al ancho del contenedor. Nunca fijar width en píxeles en un gráfico Recharts.
-10. **Redondear todos los números mostrados** — sin decimales flotantes de JS. Usar `toFixed(1)` para porcentajes, `toLocaleString('es-ES')` para euros, `Math.round()` para enteros.
-11. **Módulo analítico: datos calculados en servidor** — las queries de agregación (sumas, medias, conteos por grupo) se hacen en Supabase con RPC o vistas, no en el cliente con arrays de JS. Esto evita transferir los 440 productos al cliente para cada gráfico.
-12. **`/analytics` nunca expone costes a usuarios no autorizados** — los campos `cost_price_ponderado`, `cost_ultima_compra` solo se usan en cálculos server-side. No incluirlos en respuestas de API que puedan ser interceptadas.
+2. **Server Components por defecto** — `'use client'` solo cuando hay interactividad/hooks.
+3. **Datos financieros: solo lectura** — margen, coste y ventas nunca tienen formulario de edición.
+4. **`/tiendas/catalogo` nunca expone datos financieros** — excluir de la query: `cost_price_medio`, `ultimo_coste_compra`, `margen_bruto`, `pct_margen_bruto`, `ingresos_*`, `abc_ventas`, `abc_unidades`.
+5. **Sin middleware de auth** — la app es completamente abierta salvo endpoints protegidos por `CRON_SECRET`.
+6. **Imágenes como URL, nunca upload** — las imágenes se añaden pegando una URL.
+7. **Errores visibles** — cualquier error de sync o guardado debe aparecer en la UI. No silenciar con `catch(() => {})`.
+8. **Mobile-first solo en `/tiendas/catalogo`** — el resto es desktop-first.
+9. **Recharts siempre con `ResponsiveContainer`** — nunca fijar width en píxeles.
+10. **Redondear números** — `toFixed(1)` para %, `toLocaleString('es-ES')` para €, `Math.round()` para enteros.
+11. **Agregaciones en servidor** — queries con sumas/medias/conteos se hacen en Supabase con RPC o vistas, no en cliente con arrays de JS.
+12. **`/analytics` nunca expone costes en respuestas de API** — `cost_price_medio`, `coste_total` solo en cálculos server-side.
+13. **`bestAbc()`** — siempre usar el más estricto entre `abc_ventas` y `abc_unidades` para umbrales de stock.
+14. **`createServerClient()`** para lecturas (anon key) · **`createServiceClient()`** para escrituras (service role key). Nunca usar `createAuthServerClient()` — la app no tiene auth de usuario.
+15. **Supabase límite 1000 filas** — cuando se fetchen variantes de múltiples modelos, siempre acotar con `.in('codigo_modelo', codes)` para evitar cortes silenciosos.
 
 ---
 
-## Orden de construcción recomendado
+## Estado actual del proyecto (junio 2026)
 
-Seguir este orden. No saltar fases.
+### Completado y funcionando
+- ✅ Sync Metabase productos (CSV → `products` + `product_variants` + `product_images`)
+- ✅ Sync Metabase ventas (CSV → `ventas_mensuales`)
+- ✅ Lista de productos con filtros
+- ✅ Ficha de producto (datos Metabase + campos custom + precios + IA)
+- ✅ Arquitectura multi-zona con `ZoneSidebar`
+- ✅ Zona CM: dashboard + analítica completa (surtido, precio, ciclo vida, rentabilidad, stock, ventas)
+- ✅ Zona Ventas: dashboard + sell-out por tienda
+- ✅ Zona Stock: dashboard con alertas ABC, donut nivel stock, inventario expandible
+- ✅ Zona Tiendas: catálogo (con exports PDF y Excel) + boletín
+- ✅ Campañas: CRUD + export PDF/Excel
+- ✅ Alertas: stock crítico, sin ventas, precio anomalía
+- ✅ Sugerencia de precio IA + price ladder insights
+- ✅ Reglas de pricing por familia/metal/karat
+- ✅ Settings de sync con panel de estado
 
-```
-── BLOQUE 1: FUNDAMENTOS ──────────────────────────────────────────
-Sesión 1  → Setup Next.js 14 + Supabase + Tailwind (sin auth de usuario)
-             Verificar: página de inicio carga · conexión a Supabase funciona
-
-Sesión 2  → Esquema BD completo en Supabase + tipos TypeScript + componentes UI base
-             (KpiCard, StatusBadge, PageHeader, EmptyState, Toast, AnalyticsFilters)
-             Verificar: tablas visibles en Supabase · página /test con todos los componentes
-
-── BLOQUE 2: DATOS ────────────────────────────────────────────────
-Sesión 3  → Sync Metabase CSV → tabla products + panel /settings/sync
-             Verificar: 440 productos en Supabase tras ejecutar sync manual
-
-Sesión 4  → Sync Shopify → product_shopify_data + product_images
-             Verificar: fichas enriquecidas con datos de Shopify visibles en Supabase
-
-── BLOQUE 3: PRODUCTO CORE ────────────────────────────────────────
-Sesión 5  → Lista de productos /products con filtros funcionales
-             Verificar: filtrar por metal=Oro devuelve solo productos de Oro
-
-Sesión 6  → Ficha de producto /products/[codigo_modelo] — las 5 secciones/tabs
-             Verificar: ficha de "002AA" muestra datos de las 3 fuentes correctamente
-
-Sesión 7  → Campos custom: /settings/fields + edición inline en ficha
-             Verificar: crear campo "Campaña activa" y rellenarlo en una ficha
-
-Sesión 8  → Reglas de pricing /settings/pricing
-             Verificar: guardar márgenes objetivo por familia y recuperarlos
-
-── BLOQUE 4: OUTPUTS ──────────────────────────────────────────────
-Sesión 9  → Dashboard home / con KPIs reales + widgets analíticos básicos + alertas
-             Verificar: los KPIs cuadran con los datos reales de Supabase
-
-Sesión 10 → Export a Google Sheets /export
-             Verificar: Sheet generado con imágenes visibles (fórmula IMAGE)
-
-Sesión 11 → Catálogo público /catalog (responsive, mobile-first)
-             Verificar: accesible sin login · se ve bien en móvil · sin datos financieros
-
-── BLOQUE 5: ANALÍTICA ────────────────────────────────────────────
-Sesión 12 → /analytics/surtido + /analytics/precio
-             Verificar: Pareto real · scatter amplitud/profundidad · margen vs objetivo
-
-Sesión 13 → /analytics/ciclo-vida + /analytics/rentabilidad + /analytics/stock
-             Verificar: mapa de ciclo de vida · tabla anomalías · alertas de stock
-
-── BLOQUE 6: IA ───────────────────────────────────────────────────
-Sesión 14 → Claude AI Nivel 1: generación de contenido (haiku)
-             Verificar: botón "Generar descripción" devuelve texto real de Anthropic
-
-Sesión 15 → Claude AI Nivel 1: sugerencia de precio (sonnet) + Nivel 2: chat analítico
-             Verificar: panel de precio con razonamiento · chat responde sobre el catálogo
-
-── BLOQUE 7: EXTENSIONES ──────────────────────────────────────────
-Sesión 16 → MCP Server (proyecto separado en Vercel)
-             Verificar: conectado desde Cowork · responde preguntas sobre el catálogo
-
-Sesión 17 → Manual de usuario /help + polish + bugs + deploy final
-             Verificar: manual accesible · deploy en Vercel · cron configurado
-```
+### Pendiente
+- ⏳ `product_variants.description` poblada por variante (migración 018 aplicada; **sync de Metabase pendiente** para rellenar los datos)
+- ⏳ Sync de reservas (`METABASE_RESERVAS_CSV_URL` configurada, verificar en producción)
+- ⏳ Manual de usuario `/help` — contenido real
+- ⏳ Deploy final en Vercel + cron configurado
+- ⏳ MCP Server (proyecto separado, no iniciado)
 
 ---
 
 ## Cómo iniciar cada sesión
 
-Empieza siempre con este bloque (adaptando lo que ya esté hecho):
-
 ```
 Contexto: PIM Joyerías Te Quiero. Stack: Next.js 14 + Supabase + Tailwind + Vercel.
 Lee el CLAUDE.md antes de empezar.
+Rama activa: architecture/multi-zone-redesign (no mergeada a main aún)
 
-Sesiones completadas: [ej: 1, 2, 3]
-Lo que ya funciona: [ej: auth magic link · 440 productos en BD · lista con filtros]
-Objetivo hoy: Sesión X — [nombre de la sesión]
-Primer paso: [acción concreta, ej: "crear la API route /api/sync/shopify"]
+Lo que ya funciona: zonas CM/Ventas/Stock/Tiendas · sync Metabase · exports PDF/Excel · IA precio
+Objetivo hoy: [descripción]
+Primer paso: [acción concreta]
 ```
 
 **Regla de oro entre sesiones:**
-1. Termina la sesión → prueba en el navegador que funciona
-2. `git add . && git commit -m "Sesión X: [qué hiciste]" && git push`
-3. Siguiente sesión → `git pull` si cambias de PC → arranca con el bloque de contexto de arriba
+1. Prueba en el navegador que funciona
+2. `git add . && git commit -m "..." && git push origin architecture/multi-zone-redesign`
+3. Cuando esté listo para producción: PR de `architecture/multi-zone-redesign` → `main`
 
 ---
 
-*Generado en sesión de discovery — abril 2026. v1.2: sin autenticación de usuario · modelo de datos a nivel de variante · matching Shopify por codigo_interno · campos definitivos de Metabase · módulo analítico. Actualizar si cambia el stack, el esquema o las reglas de desarrollo.*
+*Actualizado junio 2026. v2.0: arquitectura multi-zona · Shopify eliminado · Google Sheets eliminado · 3 CSVs de Metabase · exports PDF/ExcelJS · 19 tiendas · umbrales ABC×19 · migración 018 variant description.*
