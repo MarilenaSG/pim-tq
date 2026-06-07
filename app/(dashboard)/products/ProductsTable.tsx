@@ -91,11 +91,13 @@ function SortableHeader({
   const active = current === sortKey
   return (
     <th
-      className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase cursor-pointer select-none hover:opacity-80 transition-opacity"
-      style={{ color: active ? '#00557f' : '#b2b2b2' }}
+      className={`sortable right${active ? ' sort-active' : ''}`}
       onClick={() => onSort(sortKey)}
     >
-      {label} {active ? (dir === 'desc' ? '↓' : '↑') : '↕'}
+      {label}
+      <span className="ml-1 opacity-40" style={{ fontSize: 8 }}>
+        {active ? (dir === 'desc' ? '▼' : '▲') : '⇅'}
+      </span>
     </th>
   )
 }
@@ -167,11 +169,11 @@ export function ProductsTable({
 
   return (
     <div className="relative">
-      <div className="bg-white rounded-xl overflow-hidden" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-        <table className="w-full text-sm">
+      <div className="tq-table-wrap">
+        <table className="tq-table">
           <thead>
-            <tr style={{ borderBottom: '1px solid rgba(0,85,127,0.08)' }}>
-              <th className="px-3 py-3 w-8">
+            <tr>
+              <th style={{ width: 32, paddingRight: 0 }}>
                 <input
                   type="checkbox"
                   checked={selected.size === rows.length && rows.length > 0}
@@ -180,35 +182,27 @@ export function ProductsTable({
                   className="cursor-pointer"
                 />
               </th>
-              <th className="w-14 px-3 py-3" />
-              {(['Código', 'Descripción', 'Metal / Qt', 'Familia', 'ABC'] as const).map(h => (
-                <th key={h} className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
-                  {h}
-                </th>
-              ))}
+              <th style={{ width: 52 }} />
+              <th>Código</th>
+              <th>Descripción</th>
+              <th>Metal / Qt</th>
+              <th>Familia</th>
+              <th>ABC</th>
               <SortableHeader label="Ingresos 12m" sortKey="ingresos_12m" current={sortKey} dir={sortDir} onSort={handleSort} />
-              <th className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Vars</th>
+              <th>Vars</th>
               <SortableHeader label="Stock" sortKey="stock_total" current={sortKey} dir={sortDir} onSort={handleSort} />
-              <th className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Shopify</th>
-              {(['Completitud'] as const).map(h => (
-                <th key={h} className="px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>
-                  {h}
-                </th>
-              ))}
+              <th>Shopify</th>
+              <th>Completitud</th>
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((p, i) => (
+            {sortedRows.map(p => (
               <tr
                 key={p.codigo_modelo}
-                className="hover:bg-[rgba(0,85,127,0.02)] transition-colors"
-                style={{
-                  borderBottom: i < rows.length - 1 ? '1px solid rgba(0,85,127,0.05)' : 'none',
-                  background: selected.has(p.codigo_modelo) ? 'rgba(0,153,242,0.04)' : undefined,
-                }}
+                className={selected.has(p.codigo_modelo) ? 'row-selected' : ''}
               >
                 {/* Checkbox */}
-                <td className="px-3 py-2">
+                <td style={{ paddingRight: 0 }}>
                   <input
                     type="checkbox"
                     checked={selected.has(p.codigo_modelo)}
@@ -218,79 +212,69 @@ export function ProductsTable({
                 </td>
 
                 {/* Imagen */}
-                <td className="px-3 py-2">
+                <td>
                   {p.imageUrl ? (
-                    <img src={p.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover" style={{ background: '#f5f3f0' }} />
+                    <img src={p.imageUrl} alt="" className="w-9 h-9 rounded-lg object-cover" style={{ background: '#f5f3f0' }} />
                   ) : (
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center text-base" style={{ background: 'rgba(0,85,127,0.06)', color: '#d0cdc9' }}>◫</div>
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,85,127,0.06)', color: '#d0cdc9', fontSize: 15 }}>◫</div>
                   )}
                 </td>
 
                 {/* Código */}
-                <td className="px-3 py-2 whitespace-nowrap">
+                <td className="whitespace-nowrap">
                   <Link href={`/products/${p.codigo_modelo}`} className="font-mono text-xs font-bold text-tq-sky hover:underline">
                     {p.codigo_modelo}
                   </Link>
                   {p.leaderSlug && (
-                    <div className="font-mono text-[10px] mt-0.5" style={{ color: '#b2b2b2' }}>{p.leaderSlug}</div>
+                    <div className="font-mono text-[10px] mt-0.5" style={{ color: '#8fa8b8' }}>{p.leaderSlug}</div>
                   )}
                 </td>
 
                 {/* Descripción */}
-                <td className="px-3 py-2 max-w-xs">
-                  <div className="flex flex-col gap-1">
+                <td style={{ maxWidth: 280 }}>
+                  <div className="flex flex-col gap-0.5">
                     {p.is_discontinued && (
-                      <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase w-fit"
-                        style={{ background: 'rgba(80,80,80,0.1)', color: '#555555', border: '1px solid rgba(80,80,80,0.2)' }}
-                      >
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase w-fit"
+                        style={{ background: 'rgba(80,80,80,0.08)', color: '#777', border: '1px solid rgba(80,80,80,0.15)' }}>
                         ✕ Descatalogado
                       </span>
                     )}
-                    <span className="line-clamp-2 text-xs leading-snug text-tq-snorkel">{p.description ?? '—'}</span>
+                    <span className="line-clamp-2 text-[13px] leading-snug" style={{ color: '#00264d' }}>{p.description ?? '—'}</span>
                   </div>
                 </td>
 
                 {/* Metal / Quilates */}
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <span className="text-xs font-medium text-tq-snorkel">{p.metal ?? '—'}</span>
+                <td className="whitespace-nowrap">
+                  <span className="text-[13px] font-medium" style={{ color: '#00264d' }}>{p.metal ?? '—'}</span>
                   {p.karat && (
-                    <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(200,161,100,0.15)', color: '#8a6830' }}>
+                    <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(200,161,100,0.15)', color: '#8a6830' }}>
                       {p.karat}
                     </span>
                   )}
                 </td>
 
                 {/* Familia */}
-                <td className="px-3 py-2 text-xs" style={{ color: '#b2b2b2' }}>{p.familia ?? '—'}</td>
+                <td style={{ color: '#8fa8b8', fontSize: 12 }}>{p.familia ?? '—'}</td>
 
                 {/* ABC */}
-                <td className="px-3 py-2"><AbcBadge abc={p.abc_ventas} /></td>
+                <td><AbcBadge abc={p.abc_ventas} /></td>
 
                 {/* Ingresos 12m */}
-                <td className="px-3 py-2 font-mono text-xs text-right text-tq-snorkel whitespace-nowrap">
+                <td className="right font-mono whitespace-nowrap" style={{ color: '#00264d', fontWeight: 500 }}>
                   {p.ingresos_12m != null ? p.ingresos_12m.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €' : '—'}
                 </td>
 
                 {/* Variantes */}
-                <td className="px-3 py-2 text-xs text-center" style={{ color: '#b2b2b2' }}>
-                  {p.num_variantes ?? '—'}
-                </td>
+                <td className="text-center" style={{ color: '#8fa8b8', fontSize: 12 }}>{p.num_variantes ?? '—'}</td>
 
                 {/* Stock */}
-                <td className="px-3 py-2 text-xs text-center whitespace-nowrap">
-                  <StockCell stock={p.stock_total} />
-                </td>
+                <td className="text-center whitespace-nowrap"><StockCell stock={p.stock_total} /></td>
 
                 {/* Shopify */}
-                <td className="px-3 py-2">
-                  <ShopifyStatusBadge status={p.shopify_status} />
-                </td>
+                <td><ShopifyStatusBadge status={p.shopify_status} /></td>
 
                 {/* Completitud */}
-                <td className="px-3 py-2 w-28">
-                  <CompletitudBar pct={p.completitudPct} nivel={p.completitudNivel} />
-                </td>
+                <td style={{ width: 110 }}><CompletitudBar pct={p.completitudPct} nivel={p.completitudNivel} /></td>
               </tr>
             ))}
           </tbody>

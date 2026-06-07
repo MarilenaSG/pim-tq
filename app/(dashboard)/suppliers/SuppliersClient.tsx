@@ -23,6 +23,17 @@ type SortKey = 'proveedor' | 'modelos' | 'ingresos' | 'margenMedio' | 'abcA'
 
 function fmtEuro(n: number) { return n.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €' }
 
+function MiniBar({ pct, color }: { pct: number; color: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-14 h-1 rounded-full" style={{ background: 'rgba(0,85,127,0.1)' }}>
+        <div className="h-1 rounded-full" style={{ width: `${Math.min(100, pct)}%`, background: color }} />
+      </div>
+      <span className="text-[11px] font-mono tabular-nums" style={{ color: '#8fa8b8' }}>{pct.toFixed(1)}%</span>
+    </div>
+  )
+}
+
 function AbcBars({ a, b, c, total, colorA = '#3A9E6A', colorB = '#0099f2', colorC = '#C8842A' }: {
   a: number; b: number; c: number; total: number
   colorA?: string; colorB?: string; colorC?: string
@@ -32,15 +43,24 @@ function AbcBars({ a, b, c, total, colorA = '#3A9E6A', colorB = '#0099f2', color
       {([['A', a, colorA], ['B', b, colorB], ['C', c, colorC]] as const).map(([label, count, color]) => (
         <div key={label} className="flex items-center gap-2 text-xs">
           <span className="w-4 font-bold shrink-0" style={{ color }}>{label}</span>
-          <div className="flex-1 h-2 rounded-full bg-[rgba(0,85,127,0.08)]">
-            <div className="h-2 rounded-full transition-all" style={{ width: `${total > 0 ? (count / total) * 100 : 0}%`, background: color }} />
+          <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(0,85,127,0.08)' }}>
+            <div className="h-1.5 rounded-full transition-all" style={{ width: `${total > 0 ? (count / total) * 100 : 0}%`, background: color }} />
           </div>
-          <span className="w-6 text-right shrink-0" style={{ color: '#b2b2b2' }}>{count}</span>
-          <span className="w-8 text-right shrink-0 text-[10px]" style={{ color: '#b2b2b2' }}>
+          <span className="w-5 text-right shrink-0 font-semibold" style={{ color: '#00264d' }}>{count}</span>
+          <span className="w-8 text-right shrink-0 text-[11px]" style={{ color: '#8fa8b8' }}>
             {total > 0 ? ((count / total) * 100).toFixed(0) + '%' : '—'}
           </span>
         </div>
       ))}
+    </div>
+  )
+}
+
+function PanelKpi({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="rounded-lg px-3 py-2.5" style={{ background: 'rgba(0,85,127,0.04)' }}>
+      <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#8fa8b8' }}>{label}</div>
+      <div className="text-sm font-semibold" style={{ color: color ?? '#00264d' }}>{value}</div>
     </div>
   )
 }
@@ -85,25 +105,26 @@ export function SuppliersClient({
     return sortDir === 'asc' ? cmp : -cmp
   })
 
-  const SortIcon = ({ k }: { k: SortKey }) => (
-    <span className="ml-1 opacity-40" style={{ fontSize: 9 }}>
-      {sortKey === k ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
-    </span>
-  )
+  function Th({ k, children, right }: { k: SortKey; children: React.ReactNode; right?: boolean }) {
+    const active = sortKey === k
+    return (
+      <th
+        className={`sortable${active ? ' sort-active' : ''}${right ? ' right' : ''}`}
+        onClick={() => toggleSort(k)}
+      >
+        {children}
+        <span className="ml-1 opacity-50" style={{ fontSize: 8 }}>
+          {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+        </span>
+      </th>
+    )
+  }
 
-  const Th = ({ k, children, right }: { k: SortKey; children: React.ReactNode; right?: boolean }) => (
-    <th onClick={() => toggleSort(k)}
-      className={`px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase cursor-pointer select-none hover:opacity-70 whitespace-nowrap ${right ? 'text-right' : ''}`}
-      style={{ color: sortKey === k ? '#00557f' : '#b2b2b2' }}>
-      {children}<SortIcon k={k} />
-    </th>
-  )
-
-  const ThPlain = ({ children, right }: { children: React.ReactNode; right?: boolean }) => (
-    <th className={`px-3 py-3 text-[10px] font-bold tracking-widest uppercase whitespace-nowrap ${right ? 'text-right' : 'text-left'}`} style={{ color: '#b2b2b2' }}>
-      {children}
-    </th>
-  )
+  const margenColor = (m: number | null) =>
+    m == null ? '#8fa8b8'
+    : m >= defaultMarginTarget       ? '#3A9E6A'
+    : m >= defaultMarginTarget * 0.8 ? '#C8842A'
+    : '#C0392B'
 
   return (
     <div className="flex h-full">
@@ -112,91 +133,75 @@ export function SuppliersClient({
         <div>
           <p className="text-[11px] font-bold tracking-widest uppercase mb-1" style={{ color: '#0099f2' }}>Operativo</p>
           <h1 className="text-2xl font-bold text-tq-snorkel">Proveedores</h1>
-          <p className="text-sm mt-1" style={{ color: '#b2b2b2' }}>
+          <p className="text-sm mt-1" style={{ color: '#8fa8b8' }}>
             {suppliers.length} proveedores · {totalProducts} modelos en catálogo
           </p>
         </div>
 
-        <div className="bg-white rounded-xl overflow-hidden" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
-          <table className="w-full text-sm">
+        <div className="tq-table-wrap">
+          <table className="tq-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(0,85,127,0.08)' }}>
+              <tr>
                 <Th k="proveedor">Proveedor</Th>
                 <Th k="modelos">Modelos</Th>
-                <ThPlain>% Catálogo</ThPlain>
+                <th>% Catálogo</th>
                 <Th k="ingresos" right>Ingresos 12m</Th>
-                <ThPlain>% Ingresos</ThPlain>
+                <th>% Ingresos</th>
                 <Th k="margenMedio" right>Margen medio</Th>
                 <Th k="abcA">ABC-A ingr.</Th>
-                <ThPlain>ABC-C ingr.</ThPlain>
+                <th>ABC-C ingr.</th>
               </tr>
             </thead>
             <tbody>
-              {sorted.map((s, i) => {
+              {sorted.map(s => {
+                const isActive   = selected?.proveedor === s.proveedor
                 const isHighlight = s.proveedor === highlight
                 return (
                   <tr
                     key={s.proveedor}
                     ref={isHighlight ? highlightRef : null}
-                    className="hover:bg-[rgba(0,85,127,0.02)] transition-colors cursor-pointer"
-                    onClick={() => setSelected(selected?.proveedor === s.proveedor ? null : s)}
-                    style={{
-                      borderBottom: i < sorted.length - 1 ? '1px solid rgba(0,85,127,0.05)' : 'none',
-                      background: selected?.proveedor === s.proveedor ? 'rgba(0,85,127,0.04)' : isHighlight ? 'rgba(0,153,242,0.04)' : undefined,
-                    }}
+                    className={isActive ? 'row-active' : ''}
+                    style={{ cursor: 'pointer', background: isHighlight && !isActive ? 'rgba(0,153,242,0.035)' : undefined }}
+                    onClick={() => setSelected(isActive ? null : s)}
                   >
-                    <td className="px-3 py-2.5">
-                      <span className="text-sm font-semibold text-tq-sky">{s.proveedor}</span>
+                    <td>
+                      <span className="font-medium" style={{ fontSize: 13, color: '#00557f' }}>{s.proveedor}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-sm text-tq-snorkel">{s.modelos}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-12 h-1.5 rounded-full bg-[rgba(0,85,127,0.08)]">
-                          <div className="h-1.5 rounded-full" style={{ width: `${Math.min(100, s.pctCatalogo)}%`, background: '#00557f' }} />
-                        </div>
-                        <span className="text-xs font-mono" style={{ color: '#b2b2b2' }}>{s.pctCatalogo.toFixed(1)}%</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-sm font-mono text-right text-tq-snorkel whitespace-nowrap">{fmtEuro(s.ingresos)}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 rounded-full bg-[rgba(0,85,127,0.08)]">
-                          <div className="h-1.5 rounded-full" style={{ width: `${s.pctIngresosMax}%`, background: '#0099f2' }} />
-                        </div>
-                        <span className="text-xs font-mono" style={{ color: '#b2b2b2' }}>{s.pctIngresos.toFixed(1)}%</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <td style={{ color: '#00264d' }}>{s.modelos}</td>
+                    <td><MiniBar pct={s.pctCatalogo} color="#00557f" /></td>
+                    <td className="right font-mono tabular-nums" style={{ color: '#00264d', fontWeight: 500 }}>{fmtEuro(s.ingresos)}</td>
+                    <td><MiniBar pct={s.pctIngresos} color="#0099f2" /></td>
+                    <td className="right">
                       {s.margenMedio == null
-                        ? <span style={{ color: '#b2b2b2' }}>—</span>
-                        : <span style={{ color: s.margenMedio >= defaultMarginTarget ? '#3A9E6A' : s.margenMedio >= defaultMarginTarget * 0.8 ? '#C8842A' : '#C0392B', fontWeight: 600 }}>{s.margenMedio.toFixed(1)}%</span>
+                        ? <span style={{ color: '#8fa8b8' }}>—</span>
+                        : <span style={{ color: margenColor(s.margenMedio), fontWeight: 600 }}>{s.margenMedio.toFixed(1)}%</span>
                       }
                     </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{
+                    <td>
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{
                         background: s.modelos > 0 && s.abcA / s.modelos > 0.2 ? 'rgba(58,158,106,0.12)' : 'rgba(0,85,127,0.06)',
-                        color: s.modelos > 0 && s.abcA / s.modelos > 0.2 ? '#2d7a54' : '#b2b2b2',
+                        color:      s.modelos > 0 && s.abcA / s.modelos > 0.2 ? '#2d7a54' : '#8fa8b8',
                       }}>{s.abcA}</span>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{
-                        background: s.modelos > 0 && s.abcC / s.modelos > 0.5 ? 'rgba(192,57,43,0.1)' : 'rgba(0,85,127,0.06)',
-                        color: s.modelos > 0 && s.abcC / s.modelos > 0.5 ? '#C0392B' : '#b2b2b2',
+                    <td>
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{
+                        background: s.modelos > 0 && s.abcC / s.modelos > 0.5 ? 'rgba(192,57,43,0.08)' : 'rgba(0,85,127,0.06)',
+                        color:      s.modelos > 0 && s.abcC / s.modelos > 0.5 ? '#C0392B' : '#8fa8b8',
                       }}>{s.abcC}</span>
                     </td>
                   </tr>
                 )
               })}
-
-              {/* Totals */}
-              <tr style={{ background: 'rgba(0,85,127,0.03)', borderTop: '2px solid rgba(0,85,127,0.1)' }}>
-                <td className="px-3 py-2.5 text-xs font-bold text-tq-snorkel">TOTAL</td>
-                <td className="px-3 py-2.5 text-xs font-bold text-tq-snorkel">{totalProducts}</td>
-                <td className="px-3 py-2.5 text-xs font-bold text-tq-snorkel">100%</td>
-                <td className="px-3 py-2.5 text-xs font-bold font-mono text-right text-tq-snorkel">{fmtEuro(totalIngresos)}</td>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>TOTAL</td>
+                <td>{totalProducts}</td>
+                <td>100%</td>
+                <td className="right font-mono">{fmtEuro(totalIngresos)}</td>
                 <td colSpan={4} />
               </tr>
-            </tbody>
+            </tfoot>
           </table>
         </div>
       </div>
@@ -205,84 +210,76 @@ export function SuppliersClient({
       {selected && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setSelected(null)} />
-          <aside className="fixed right-0 top-0 h-full w-96 bg-white z-30 flex flex-col overflow-y-auto"
-            style={{ boxShadow: '-4px 0 24px rgba(0,32,60,0.12)', borderLeft: '1px solid rgba(0,85,127,0.1)' }}>
-
+          <aside
+            className="fixed right-0 top-0 h-full w-[22rem] bg-white z-30 flex flex-col overflow-y-auto"
+            style={{ boxShadow: '-4px 0 24px rgba(0,32,60,0.1)', borderLeft: '1px solid rgba(0,85,127,0.08)' }}
+          >
             {/* Header */}
-            <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: 'rgba(0,85,127,0.1)' }}>
+            <div className="px-5 py-4 flex items-start justify-between" style={{ borderBottom: '1px solid rgba(0,85,127,0.08)' }}>
               <div>
-                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Proveedor</p>
-                <h2 className="text-base font-bold text-tq-snorkel">{selected.proveedor}</h2>
-                <p className="text-xs" style={{ color: '#b2b2b2' }}>{selected.modelos} modelos · {selected.familias.length} familias</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>Proveedor</p>
+                <h2 className="text-[15px] font-bold text-tq-snorkel leading-tight">{selected.proveedor}</h2>
+                <p className="text-xs mt-0.5" style={{ color: '#8fa8b8' }}>{selected.modelos} modelos · {selected.familias.length} familias</p>
               </div>
-              <button onClick={() => setSelected(null)} className="text-lg opacity-40 hover:opacity-70">✕</button>
+              <button onClick={() => setSelected(null)} className="mt-1 text-base opacity-30 hover:opacity-60 transition-opacity">✕</button>
             </div>
 
-            <div className="p-5 space-y-5">
+            <div className="p-5 space-y-5 flex-1">
 
               {/* KPIs */}
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Modelos',       value: selected.modelos },
-                  { label: 'Ingresos 12m',  value: fmtEuro(selected.ingresos) },
-                  {
-                    label: 'Precio medio',
-                    value: selected.precioMedio != null ? fmtEuro(selected.precioMedio) : '—',
-                  },
-                  {
-                    label: 'Margen medio',
-                    value: selected.margenMedio != null ? selected.margenMedio.toFixed(1) + '%' : '—',
-                    color: selected.margenMedio == null ? undefined
-                      : selected.margenMedio >= defaultMarginTarget ? '#3A9E6A'
-                      : selected.margenMedio >= defaultMarginTarget * 0.8 ? '#C8842A'
-                      : '#C0392B',
-                  },
-                ].map(k => (
-                  <div key={k.label} className="rounded-lg px-3 py-2.5" style={{ background: 'rgba(0,85,127,0.04)' }}>
-                    <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#b2b2b2' }}>{k.label}</div>
-                    <div className="text-sm font-bold" style={{ color: 'color' in k && k.color ? k.color : '#00264d' }}>{k.value}</div>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 gap-2.5">
+                <PanelKpi label="Modelos"      value={String(selected.modelos)} />
+                <PanelKpi label="Ingresos 12m" value={fmtEuro(selected.ingresos)} />
+                <PanelKpi label="Precio medio"
+                  value={selected.precioMedio != null ? fmtEuro(selected.precioMedio) : '—'} />
+                <PanelKpi label="Margen medio"
+                  value={selected.margenMedio != null ? selected.margenMedio.toFixed(1) + '%' : '—'}
+                  color={margenColor(selected.margenMedio)} />
               </div>
 
               {/* ABC por ingresos */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>ABC por ingresos</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-2.5" style={{ color: '#8fa8b8' }}>ABC por ingresos</p>
                 <AbcBars a={selected.abcA} b={selected.abcB} c={selected.abcC} total={selected.modelos} />
               </div>
 
               {/* ABC por rotación */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>ABC por rotación (uds.)</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-2.5" style={{ color: '#8fa8b8' }}>ABC por rotación (uds.)</p>
                 <AbcBars
                   a={selected.abcA_uni} b={selected.abcB_uni} c={selected.abcC_uni}
                   total={selected.modelos}
-                  colorA="#C8842A" colorB="#8B5E1A" colorC="#e8d5b7"
+                  colorA="#C8842A" colorB="#8B5E1A" colorC="#d4a87a"
                 />
               </div>
 
               {/* Familias */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>Familias</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-2.5" style={{ color: '#8fa8b8' }}>Familias</p>
                 <div className="flex flex-wrap gap-1.5">
                   {selected.familias.map(f => (
-                    <span key={f} className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,85,127,0.06)', color: '#00557f' }}>{f}</span>
+                    <span key={f} className="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: 'rgba(0,85,127,0.06)', color: '#00557f' }}>{f}</span>
                   ))}
                 </div>
               </div>
 
               {/* Top 5 */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>Top 5 por ingresos</p>
-                <div className="space-y-1">
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-2.5" style={{ color: '#8fa8b8' }}>Top 5 por ingresos</p>
+                <div className="space-y-0.5">
                   {selected.topProductos.map(p => (
                     <Link key={p.codigo_modelo} href={`/products/${p.codigo_modelo}`}
-                      className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-[rgba(0,85,127,0.04)] transition-colors">
-                      <div>
-                        <span className="font-mono text-xs font-bold text-tq-sky">{p.codigo_modelo}</span>
-                        {p.familia && <span className="ml-2 text-[10px]" style={{ color: '#b2b2b2' }}>{p.familia}</span>}
+                      className="flex items-center justify-between py-1.5 px-2 rounded-lg transition-colors"
+                      style={{ ['--hover-bg' as string]: 'rgba(0,85,127,0.04)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,85,127,0.04)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] font-bold text-tq-sky">{p.codigo_modelo}</span>
+                        {p.familia && <span className="text-[10px]" style={{ color: '#8fa8b8' }}>{p.familia}</span>}
                       </div>
-                      <span className="text-xs font-mono" style={{ color: '#b2b2b2' }}>
+                      <span className="text-[11px] font-mono tabular-nums" style={{ color: '#8fa8b8' }}>
                         {p.ingresos_12m != null ? fmtEuro(p.ingresos_12m) : '—'}
                       </span>
                     </Link>
@@ -290,13 +287,17 @@ export function SuppliersClient({
                 </div>
               </div>
 
-              <div className="pt-2">
-                <Link href={`/products?proveedor=${encodeURIComponent(selected.proveedor)}`}
-                  className="block text-sm font-semibold px-4 py-2.5 rounded-lg text-center text-white"
-                  style={{ background: '#00557f' }}>
-                  Ver todos sus productos →
-                </Link>
-              </div>
+            </div>
+
+            {/* Footer CTA */}
+            <div className="px-5 pb-5">
+              <Link
+                href={`/products?proveedor=${encodeURIComponent(selected.proveedor)}`}
+                className="block text-[13px] font-semibold px-4 py-2.5 rounded-lg text-center text-white transition-opacity hover:opacity-90"
+                style={{ background: '#00557f' }}
+              >
+                Ver todos sus productos →
+              </Link>
             </div>
           </aside>
         </>
