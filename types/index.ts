@@ -437,3 +437,48 @@ export interface Tienda {
   es_almacen:   boolean
   created_at:   string
 }
+
+// ── Tiendas Analytics ─────────────────────────────────────────
+
+export interface TiendaKpi {
+  tienda_nombre: string
+  ingresos_12m:  number
+  uds_12m:       number
+  coste_12m:     number
+  mb_pct:        number | null
+  n_modelos:     number
+}
+
+export interface TiendaTendencia {
+  anyo:     number
+  mes:      number
+  ingresos: number
+  uds:      number
+  coste:    number
+}
+
+export interface TiendaFamilia {
+  familia:   string
+  ingresos:  number
+  uds:       number
+  coste:     number
+  n_modelos: number
+}
+
+export interface TiendaMetal {
+  metal:    string
+  ingresos: number
+  uds:      number
+}
+
+export interface TiendaTopProducto {
+  codigo_modelo: string
+  description:   string | null
+  familia:       string | null
+  metal:         string | null
+  abc_ventas:    string | null
+  ingresos:      number
+  uds:           number
+  coste:         number
+  mb_pct:        number | null
+}

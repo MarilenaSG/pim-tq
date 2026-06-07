@@ -143,6 +143,7 @@ export const ZONES: ZoneConfig[] = [
       {
         label: 'Principal',
         items: [
+          { label: 'Red de tiendas',   href: '/tiendas',                 icon: '◫' },
           { label: 'Boletín',          href: '/tiendas/boletin',         icon: '◫' },
           { label: 'Catálogo',         href: '/tiendas/catalogo',        icon: '◻' },
           { label: 'Campañas',         href: '/campaigns',               icon: '◈' },
