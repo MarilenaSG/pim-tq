@@ -182,6 +182,12 @@ function fmtEuro(n: number | null): string {
   return n.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €'
 }
 
+// Precios unitarios — siempre con 2 decimales (ej: 199,95 €)
+function fmtPrecio(n: number | null): string {
+  if (n == null) return '—'
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
 function fmtPct(n: number | null): string {
   if (n == null) return '—'
   return n.toFixed(1) + '%'
@@ -286,7 +292,7 @@ function TabResumen({
             { label: 'ABC ventas',    value: <AbcChip abc={product.abc_ventas} /> },
             { label: 'Ingresos 12m',  value: fmtEuro(product.ingresos_12m) },
             { label: 'Variantes',     value: String(product.num_variantes ?? variants.length) },
-            { label: 'Precio líder',  value: fmtEuro(leader?.precio_venta ?? null) },
+            { label: 'Precio líder',  value: fmtPrecio(leader?.precio_venta ?? null) },
           ].map(kpi => (
             <div
               key={kpi.label}
@@ -457,13 +463,13 @@ function TabVariantes({ variants }: { variants: ProductVariant[] }) {
                 <td className="px-3 py-2 font-mono text-xs text-tq-snorkel">{v.codigo_interno}</td>
                 <td className="px-3 py-2 font-mono text-xs font-bold text-tq-snorkel">{v.variante ?? '—'}</td>
                 <td className="px-3 py-2 text-center text-xs" style={{ color: v.es_variante_lider ? '#C8842A' : '#e8e3df' }}>★</td>
-                <td className="px-3 py-2 font-mono text-xs text-right text-tq-snorkel">{fmtEuro(v.precio_venta)}</td>
-                <td className="px-3 py-2 font-mono text-xs text-right" style={{ color: '#b2b2b2' }}>{fmtEuro(v.precio_tachado)}</td>
+                <td className="px-3 py-2 font-mono text-xs text-right text-tq-snorkel">{fmtPrecio(v.precio_venta)}</td>
+                <td className="px-3 py-2 font-mono text-xs text-right" style={{ color: '#b2b2b2' }}>{fmtPrecio(v.precio_tachado)}</td>
                 <td className="px-3 py-2 text-xs text-right" style={{ color: v.descuento_aplicado ? '#C8842A' : '#b2b2b2' }}>
                   {v.descuento_aplicado ? fmtPct(v.descuento_aplicado) : '—'}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-right" style={{ color: '#b2b2b2' }}>{fmtEuro(v.cost_price_medio)}</td>
-                <td className="px-3 py-2 font-mono text-xs text-right" style={{ color: '#b2b2b2' }}>{fmtEuro(v.margen_bruto)}</td>
+                <td className="px-3 py-2 font-mono text-xs text-right" style={{ color: '#b2b2b2' }}>{fmtPrecio(v.cost_price_medio)}</td>
+                <td className="px-3 py-2 font-mono text-xs text-right" style={{ color: '#b2b2b2' }}>{fmtPrecio(v.margen_bruto)}</td>
                 <td className="px-3 py-2 text-xs text-right">
                   <span style={{ color: (v.pct_margen_bruto ?? 0) >= 40 ? '#3A9E6A' : '#C8842A' }}>
                     {fmtPct(v.pct_margen_bruto)}

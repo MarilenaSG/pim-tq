@@ -11,6 +11,7 @@ export interface SyncActionResult {
   variantsUpserted?: number
   imagesUpserted?: number
   rowsUpserted?: number
+  rowsDropped?:  number
   rowsInserted?: number
   errors?: string[]
   error?: string
@@ -75,6 +76,7 @@ export async function triggerVentasSync(): Promise<SyncActionResult> {
     return {
       ok:           result.errors.length === 0,
       rowsUpserted: result.rowsUpserted,
+      rowsDropped:  result.rowsDropped,
       errors:       result.errors,
     }
   })

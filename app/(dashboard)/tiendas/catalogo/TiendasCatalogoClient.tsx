@@ -1,290 +1,474 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useTransition } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 
-type Variant = {
-  variante: string | null
-  precio_venta: number | null
-  precio_tachado: number | null
-  descuento_aplicado: number | null
-  stock_variante: number | null
-  es_variante_lider: boolean
+function buildExportUrl(base: string, filters: ActiveFilters): string {
+  const p = new URLSearchParams()
+  if (filters.search)   p.set('search',   filters.search)
+  if (filters.metal)    p.set('metal',    filters.metal)
+  if (filters.familia)  p.set('familia',  filters.familia)
+  if (filters.category) p.set('category', filters.category)
+  if (filters.estado)   p.set('estado',   filters.estado)
+  return `${base}?${p.toString()}`
 }
 
-type Image = {
-  url: string
-  is_primary: boolean
-  orden: number
+async function triggerDownload(url: string, filename: string) {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(await res.text())
+  const blob = await res.blob()
+  const link = document.createElement('a')
+  link.href  = URL.createObjectURL(blob)
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(link.href)
 }
 
-type Product = {
-  codigo_modelo: string
-  description: string | null
-  familia: string | null
-  metal: string | null
-  karat: string | null
-  supplier_name: string | null
-  num_variantes: number | null
-  lista_variantes: string | null
-  primera_entrada: string | null
-  product_variants: Variant[]
-  product_images: Image[]
+interface Variant {
+  variante:        string | null
+  precio_venta:    number | null
+  stock:           number | null
+  is_discontinued: boolean
 }
 
-// ── Product card ──────────────────────────────────────────────
-function CatalogoCard({ p }: { p: Product }) {
-  const leader = p.product_variants.find(v => v.es_variante_lider) ?? p.product_variants[0]
-  const img    = p.product_images.find(i => i.is_primary) ?? p.product_images[0]
-  const stockTotal = p.product_variants.reduce((s, v) => s + (v.stock_variante ?? 0), 0)
+interface CatalogProduct {
+  codigo_modelo:   string
+  description:     string | null
+  category:        string | null
+  familia:         string | null
+  metal:           string | null
+  karat:           string | null
+  num_variantes:   number | null
+  image_url:       string | null
+  precio_venta:    number | null
+  slug_lider:      string | null
+  marca:           string | null
+  activo:          boolean
+  is_discontinued: boolean
+  stock_total:     number
+  variants:        Variant[]
+}
 
-  const tallas = [...(p.product_variants ?? [])]
-    .map(v => v.variante)
-    .filter(Boolean)
-    .sort((a, b) => {
-      const na = parseFloat(a!), nb = parseFloat(b!)
-      return !isNaN(na) && !isNaN(nb) ? na - nb : (a ?? '').localeCompare(b ?? '', 'es')
-    })
+interface FilterOptions {
+  metals:     string[]
+  familias:   string[]
+  categories: string[]
+}
 
-  const [imgError, setImgError] = useState(false)
+interface ActiveFilters {
+  search?:   string
+  metal?:    string
+  familia?:  string
+  category?: string
+  estado?:   string
+}
+
+function sortVariante(a: string | null, b: string | null): number {
+  const na = parseFloat(a ?? ''), nb = parseFloat(b ?? '')
+  if (!isNaN(na) && !isNaN(nb)) return na - nb
+  return (a ?? '').localeCompare(b ?? '', 'es')
+}
+
+// ── Product card ───────────────────────────────────────────────
+
+function ProductCard({ p }: { p: CatalogProduct }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasStock        = p.stock_total > 0
+  const allDiscontinued = p.is_discontinued
+
+  const visibleVariants = [
+    ...p.variants.filter(v => !v.is_discontinued).sort((a, b) => sortVariante(a.variante, b.variante)),
+    ...p.variants.filter(v =>  v.is_discontinued).sort((a, b) => sortVariante(a.variante, b.variante)),
+  ]
 
   return (
-    <div className="tq-card overflow-hidden hover:shadow-md transition-shadow">
+    <div
+      className="bg-white rounded-2xl overflow-hidden"
+      style={{
+        boxShadow: '0 2px 8px rgba(0,32,60,0.08)',
+        opacity: allDiscontinued && !hasStock ? 0.6 : 1,
+      }}
+    >
       {/* Image */}
-      <div className="aspect-square bg-[#f4f1ee] flex items-center justify-center overflow-hidden">
-        {img && !imgError ? (
+      <div className="relative aspect-square bg-[#f4f1ee]">
+        {allDiscontinued && (
+          <div
+            className="absolute top-0 left-0 right-0 text-center text-[10px] font-black tracking-widest uppercase py-1 z-10"
+            style={{ background: 'rgba(80,80,80,0.88)', color: '#ffffff' }}
+          >
+            ✕ Descatalogado
+          </div>
+        )}
+        {p.image_url ? (
           <img
-            src={img.url}
-            alt={p.description ?? ''}
+            src={p.image_url}
+            alt={p.description ?? p.codigo_modelo}
             className="w-full h-full object-cover"
-            onError={() => setImgError(true)}
+            loading="lazy"
+            style={{ filter: allDiscontinued ? 'grayscale(30%)' : 'none' }}
           />
         ) : (
-          <span className="text-4xl text-[#c6c6c6]">◻</span>
+          <div className="w-full h-full flex items-center justify-center text-3xl" style={{ color: '#d0cdc9' }}>
+            ◫
+          </div>
         )}
+
+        {/* Stock badge */}
+        <span
+          className="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+          style={
+            hasStock
+              ? { background: 'rgba(58,158,106,0.9)', color: '#fff' }
+              : { background: 'rgba(80,80,80,0.75)',  color: '#fff' }
+          }
+        >
+          {hasStock ? `${p.stock_total} uds` : 'Sin stock'}
+        </span>
       </div>
 
       {/* Info */}
-      <div className="p-3">
-        <p className="text-xs text-[#b2b2b2] font-mono">{p.codigo_modelo}</p>
-        <p className="text-sm font-semibold text-[#1d1d1b] leading-tight mt-0.5 line-clamp-2">
-          {p.description ?? '—'}
+      <div className="px-3 pt-3 pb-2">
+        {/* Categoría + marca + familia */}
+        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+          {p.category && (
+            <span
+              className="text-[10px] font-black tracking-widest uppercase px-1.5 py-0.5 rounded"
+              style={{ background: 'rgba(0,85,127,0.07)', color: '#00557f' }}
+            >
+              {p.category}
+            </span>
+          )}
+          {p.marca && (
+            <span className="text-[10px] font-bold tracking-wide uppercase" style={{ color: '#C8842A' }}>
+              {p.marca}
+            </span>
+          )}
+          {p.marca && p.familia && <span style={{ color: '#d0cdc9' }}>·</span>}
+          {p.familia && (
+            <span className="text-[10px]" style={{ color: '#b2b2b2' }}>{p.familia}</span>
+          )}
+        </div>
+
+        {/* Description */}
+        <p className="text-sm font-medium leading-snug text-[#00557f] line-clamp-2 mb-1.5">
+          {p.description ?? p.codigo_modelo}
         </p>
 
-        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+        {/* Metal + karat + code */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-2">
           {p.metal && (
-            <span className="text-xs rounded-full px-2 py-0.5 font-medium"
-              style={{ background: '#e8f4fb', color: '#00557f' }}>{p.metal}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+              style={{ background: 'rgba(0,85,127,0.07)', color: '#00557f' }}>
+              {p.metal}
+            </span>
           )}
           {p.karat && (
-            <span className="text-xs rounded-full px-2 py-0.5 font-medium"
-              style={{ background: '#fdf3e4', color: '#C8842A' }}>{p.karat}</span>
-          )}
-          {p.familia && (
-            <span className="text-xs rounded-full px-2 py-0.5 font-medium"
-              style={{ background: '#f4f1ee', color: '#666' }}>{p.familia}</span>
-          )}
-        </div>
-
-        {/* Price — shown without margins/costs */}
-        {leader && (
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-base font-bold text-[#00557f]">
-              {leader.precio_venta != null
-                ? leader.precio_venta.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-                : '—'}
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+              style={{ background: 'rgba(200,161,100,0.15)', color: '#8a6830' }}>
+              {p.karat}
             </span>
-            {leader.precio_tachado && leader.precio_tachado > (leader.precio_venta ?? 0) && (
-              <>
-                <span className="text-xs line-through text-[#b2b2b2]">
-                  {leader.precio_tachado.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
-                </span>
-                {leader.descuento_aplicado && leader.descuento_aplicado > 0 && (
-                  <span className="text-xs font-semibold text-[#C8842A]">
-                    -{Math.round(leader.descuento_aplicado)}%
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Sizes */}
-        {tallas.length > 0 && (
-          <div className="mt-2">
-            <p className="text-xs text-[#b2b2b2] mb-1">
-              {p.num_variantes === 1 ? 'Talla única' : `Tallas (${tallas.length})`}
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {tallas.slice(0, 8).map(t => (
-                <span key={t}
-                  className="text-xs border rounded px-1.5 py-0.5"
-                  style={{ borderColor: '#e8e3df', color: '#555' }}
-                >
-                  {t}
-                </span>
-              ))}
-              {tallas.length > 8 && (
-                <span className="text-xs text-[#b2b2b2]">+{tallas.length - 8}</span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Stock indicator */}
-        <div className="mt-2 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full flex-shrink-0"
-            style={{ background: stockTotal > 5 ? '#3A9E6A' : stockTotal > 0 ? '#C8842A' : '#C0392B' }} />
-          <span className="text-xs text-[#b2b2b2]">
-            {stockTotal > 0 ? `${stockTotal} uds. disponibles` : 'Sin stock'}
+          )}
+          <span className="text-[10px] font-mono ml-auto" style={{ color: '#b2b2b2' }}>
+            {p.slug_lider ?? p.codigo_modelo}
           </span>
         </div>
+
+        {/* Price */}
+        {p.precio_venta != null && (
+          <p className="text-base font-bold text-[#00557f] mb-2">
+            {p.precio_venta.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+          </p>
+        )}
+
+        {/* Variants toggle */}
+        {visibleVariants.length > 0 && (
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="w-full text-xs font-semibold py-1.5 rounded-lg transition-colors"
+            style={{
+              background: expanded ? 'rgba(0,85,127,0.08)' : 'rgba(0,85,127,0.04)',
+              color: '#00557f',
+            }}
+          >
+            {expanded
+              ? '▲ Ocultar tallas'
+              : `▼ Ver ${visibleVariants.length} talla${visibleVariants.length !== 1 ? 's' : ''}`}
+          </button>
+        )}
+
+        {/* Variants list */}
+        {expanded && (
+          <div className="mt-2 border-t border-[#f0ece8] pt-2 space-y-px">
+            {/* Header */}
+            <div className="flex justify-between text-[9px] font-semibold uppercase tracking-widest px-1 pb-1" style={{ color: '#c0bbb7' }}>
+              <span>Talla</span>
+              <div className="flex gap-4">
+                <span>Precio</span>
+                <span>Stock</span>
+              </div>
+            </div>
+            {visibleVariants.map((v, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between px-1 py-1"
+                style={{ opacity: v.is_discontinued ? 0.45 : 1 }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-medium" style={{ color: '#00557f' }}>
+                    {v.variante ?? '—'}
+                  </span>
+                  {v.is_discontinued && (
+                    <span className="text-[8px] font-bold tracking-wide uppercase px-1 py-px rounded"
+                      style={{ background: 'rgba(80,80,80,0.10)', color: '#888' }}>
+                      desc.
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 text-[11px]">
+                  <span style={{ color: '#555' }}>
+                    {v.precio_venta != null
+                      ? v.precio_venta.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+                      : '—'}
+                  </span>
+                  <span className="font-semibold w-10 text-right"
+                    style={{ color: v.is_discontinued ? '#b2b2b2' : (v.stock ?? 0) > 0 ? '#3A9E6A' : '#C0392B' }}>
+                    {v.stock ?? 0}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-// ── Main client ───────────────────────────────────────────────
+// ── Main client ────────────────────────────────────────────────
+
 export default function TiendasCatalogoClient({
   products,
-  familias,
-  metales,
-  initialSearch,
-  initialFamilia,
-  initialMetal,
+  filterOptions,
+  activeFilters,
 }: {
-  products: Product[]
-  familias: string[]
-  metales: string[]
-  initialSearch: string
-  initialFamilia: string
-  initialMetal: string
+  products:      CatalogProduct[]
+  filterOptions: FilterOptions
+  activeFilters: ActiveFilters
 }) {
-  const router       = useRouter()
-  const searchParams = useSearchParams()
+  const router   = useRouter()
+  const pathname = usePathname()
+  const [, startTransition] = useTransition()
+  const [search,       setSearch]       = useState(activeFilters.search ?? '')
+  const [downloading,  setDownloading]  = useState<'pdf' | 'excel' | null>(null)
 
-  const [search,  setSearch]  = useState(initialSearch)
-  const [familia, setFamilia] = useState(initialFamilia)
-  const [metal,   setMetal]   = useState(initialMetal)
-  const [view,    setView]    = useState<'grid' | 'list'>('grid')
-
-  function applyFilters(s: string, f: string, m: string) {
-    const p = new URLSearchParams(searchParams.toString())
-    if (s) p.set('q', s); else p.delete('q')
-    if (f && f !== 'all') p.set('familia', f); else p.delete('familia')
-    if (m && m !== 'all') p.set('metal', m); else p.delete('metal')
-    router.push(`?${p.toString()}`)
+  async function downloadPDF() {
+    if (downloading) return
+    setDownloading('pdf')
+    try {
+      const date = new Date().toISOString().slice(0, 10)
+      await triggerDownload(buildExportUrl('/api/catalog/export-pdf', activeFilters), `catalogo-tq-${date}.pdf`)
+    } catch { alert('No se pudo generar el PDF. Inténtalo de nuevo.') }
+    finally  { setDownloading(null) }
   }
 
-  function handleSearch(val: string) {
-    setSearch(val)
-    if (val.length === 0 || val.length >= 2) applyFilters(val, familia, metal)
+  async function downloadExcel() {
+    if (downloading) return
+    setDownloading('excel')
+    try {
+      const date = new Date().toISOString().slice(0, 10)
+      await triggerDownload(buildExportUrl('/api/catalog/pedidos-excel', activeFilters), `plantilla-pedido-tq-${date}.xlsx`)
+    } catch { alert('No se pudo generar la plantilla Excel. Inténtalo de nuevo.') }
+    finally  { setDownloading(null) }
   }
 
-  function handleFamilia(val: string) {
-    setFamilia(val)
-    applyFilters(search, val, metal)
+  function applyFilter(key: string, value: string) {
+    const params = new URLSearchParams()
+    if (search                                         ) params.set('search',   search)
+    if (key !== 'metal'    && activeFilters.metal     ) params.set('metal',    activeFilters.metal)
+    if (key !== 'familia'  && activeFilters.familia   ) params.set('familia',  activeFilters.familia)
+    if (key !== 'category' && activeFilters.category  ) params.set('category', activeFilters.category)
+    if (key !== 'estado'   && activeFilters.estado    ) params.set('estado',   activeFilters.estado)
+    if (value) params.set(key, value)
+    startTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
-  function handleMetal(val: string) {
-    setMetal(val)
-    applyFilters(search, familia, val)
+  function applySearch(value: string) {
+    const params = new URLSearchParams()
+    if (value)                  params.set('search',   value)
+    if (activeFilters.metal)    params.set('metal',    activeFilters.metal)
+    if (activeFilters.familia)  params.set('familia',  activeFilters.familia)
+    if (activeFilters.category) params.set('category', activeFilters.category)
+    if (activeFilters.estado)   params.set('estado',   activeFilters.estado)
+    startTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
-  const totalStock = useMemo(
-    () => products.reduce((s, p) => s + p.product_variants.reduce((vs, v) => vs + (v.stock_variante ?? 0), 0), 0),
-    [products]
-  )
+  const hasFilters = activeFilters.search || activeFilters.metal || activeFilters.familia || activeFilters.category || activeFilters.estado
 
   return (
     <>
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mt-6 mb-4">
+      {/* Search */}
+      <div className="relative mt-6 mb-4">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: '#b2b2b2' }}>🔍</span>
         <input
-          type="text"
-          placeholder="Buscar por descripción o código…"
+          type="search"
+          placeholder="Buscar por código o descripción…"
           value={search}
-          onChange={e => handleSearch(e.target.value)}
-          className="flex-1 min-w-52 border border-[#e8e3df] rounded-lg px-3 py-2 text-sm bg-white"
+          onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && applySearch(search)}
+          className="w-full pl-9 pr-4 py-3 rounded-xl text-sm border-0 focus:outline-none focus:ring-2"
+          style={{ background: '#fff', boxShadow: '0 2px 6px rgba(0,32,60,0.08)', color: '#00557f' }}
         />
-        <select
-          value={familia}
-          onChange={e => handleFamilia(e.target.value)}
-          className="border border-[#e8e3df] rounded-lg px-3 py-2 text-sm bg-white"
-        >
-          <option value="all">Todas las familias</option>
-          {familias.map(f => <option key={f} value={f}>{f}</option>)}
-        </select>
-        <select
-          value={metal}
-          onChange={e => handleMetal(e.target.value)}
-          className="border border-[#e8e3df] rounded-lg px-3 py-2 text-sm bg-white"
-        >
-          <option value="all">Todos los metales</option>
-          {metales.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-
-        <div className="flex border border-[#e8e3df] rounded-lg overflow-hidden bg-white">
+        {search && (
           <button
-            onClick={() => setView('grid')}
-            className="px-3 py-2 text-sm transition-colors"
-            style={{ background: view === 'grid' ? '#e8f4fb' : 'transparent', color: view === 'grid' ? '#00557f' : '#b2b2b2' }}
-          >▦</button>
-          <button
-            onClick={() => setView('list')}
-            className="px-3 py-2 text-sm transition-colors"
-            style={{ background: view === 'list' ? '#e8f4fb' : 'transparent', color: view === 'list' ? '#00557f' : '#b2b2b2' }}
-          >☰</button>
-        </div>
+            onClick={() => { setSearch(''); applySearch('') }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold"
+            style={{ color: '#b2b2b2' }}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
-      {/* Stats bar */}
-      <div className="flex gap-6 mb-4 text-sm text-[#b2b2b2]">
-        <span><b className="text-[#1d1d1b]">{products.length}</b> referencias</span>
-        <span><b className="text-[#1d1d1b]">{totalStock.toLocaleString('es-ES')}</b> unidades en stock</span>
+      {/* Filters */}
+      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
+        {/* Metal */}
+        <select
+          value={activeFilters.metal ?? ''}
+          onChange={e => applyFilter('metal', e.target.value)}
+          className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold border-0 focus:outline-none"
+          style={{
+            background: activeFilters.metal ? '#00557f' : '#fff',
+            color:      activeFilters.metal ? '#fff' : '#00557f',
+            boxShadow:  '0 1px 4px rgba(0,32,60,0.1)',
+          }}
+        >
+          <option value="">Metal</option>
+          {filterOptions.metals.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+
+        {/* Familia */}
+        <select
+          value={activeFilters.familia ?? ''}
+          onChange={e => applyFilter('familia', e.target.value)}
+          className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold border-0 focus:outline-none"
+          style={{
+            background: activeFilters.familia ? '#00557f' : '#fff',
+            color:      activeFilters.familia ? '#fff' : '#00557f',
+            boxShadow:  '0 1px 4px rgba(0,32,60,0.1)',
+          }}
+        >
+          <option value="">Familia</option>
+          {filterOptions.familias.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+
+        {/* Categoría */}
+        <select
+          value={activeFilters.category ?? ''}
+          onChange={e => applyFilter('category', e.target.value)}
+          className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold border-0 focus:outline-none"
+          style={{
+            background: activeFilters.category ? '#00557f' : '#fff',
+            color:      activeFilters.category ? '#fff' : '#00557f',
+            boxShadow:  '0 1px 4px rgba(0,32,60,0.1)',
+          }}
+        >
+          <option value="">Categoría</option>
+          {filterOptions.categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        {/* Estado */}
+        {(['catalogo', 'descatalogado'] as const).map(val => {
+          const active = activeFilters.estado === val
+          const label  = val === 'catalogo' ? '✓ En catálogo' : '✕ Descatalogado'
+          return (
+            <button
+              key={val}
+              onClick={() => applyFilter('estado', active ? '' : val)}
+              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+              style={{
+                background: active
+                  ? val === 'descatalogado' ? 'rgba(80,80,80,0.75)' : '#00557f'
+                  : '#fff',
+                color:     active ? '#fff' : '#00557f',
+                boxShadow: '0 1px 4px rgba(0,32,60,0.1)',
+              }}
+            >
+              {label}
+            </button>
+          )
+        })}
+
+        {/* Limpiar */}
+        {hasFilters && (
+          <button
+            onClick={() => { setSearch(''); startTransition(() => router.push(pathname)) }}
+            className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
+            style={{ background: 'rgba(192,57,43,0.1)', color: '#C0392B' }}
+          >
+            ✕ Limpiar
+          </button>
+        )}
       </div>
 
-      {/* Grid / List */}
+      {/* Results count + export buttons */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs" style={{ color: '#b2b2b2' }}>
+          {hasFilters
+            ? `${products.length} modelo${products.length !== 1 ? 's' : ''} encontrado${products.length !== 1 ? 's' : ''}`
+            : `${products.length} modelo${products.length !== 1 ? 's' : ''} en catálogo`}
+        </p>
+
+        {products.length > 0 && (
+          <div className="flex gap-2">
+            {/* PDF */}
+            <button
+              onClick={downloadPDF}
+              disabled={!!downloading}
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+              style={{
+                background: downloading === 'pdf' ? 'rgba(0,85,127,0.04)' : 'rgba(0,85,127,0.10)',
+                color:      downloading ? '#aaaaaa' : '#00557f',
+                cursor:     downloading ? 'wait' : 'pointer',
+                boxShadow:  '0 1px 4px rgba(0,32,60,0.08)',
+              }}
+            >
+              {downloading === 'pdf' ? (
+                <><span className="inline-block w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: '#aaa', borderTopColor: 'transparent' }} /> Generando…</>
+              ) : '↓ Catálogo PDF'}
+            </button>
+
+            {/* Excel plantilla pedido */}
+            <button
+              onClick={downloadExcel}
+              disabled={!!downloading}
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+              style={{
+                background: downloading === 'excel' ? 'rgba(58,158,106,0.04)' : 'rgba(58,158,106,0.10)',
+                color:      downloading ? '#aaaaaa' : '#3A9E6A',
+                cursor:     downloading ? 'wait' : 'pointer',
+                boxShadow:  '0 1px 4px rgba(0,32,60,0.08)',
+              }}
+            >
+              {downloading === 'excel' ? (
+                <><span className="inline-block w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: '#aaa', borderTopColor: 'transparent' }} /> Generando…</>
+              ) : '↓ Plantilla pedido Excel'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Grid */}
       {products.length === 0 ? (
-        <div className="rounded-xl p-12 text-center" style={{ background: 'rgba(139,94,26,0.04)', border: '1px solid rgba(139,94,26,0.12)' }}>
-          <p className="text-3xl mb-2">◻</p>
-          <p className="text-sm font-semibold text-[#8B5E1A]">Sin resultados</p>
-          <p className="text-xs text-[#b2b2b2] mt-1">Prueba a cambiar los filtros</p>
-        </div>
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {products.map(p => <CatalogoCard key={p.codigo_modelo} p={p} />)}
+        <div className="text-center py-16">
+          <p className="text-3xl mb-3">◫</p>
+          <p className="text-sm font-medium text-[#00557f]">Sin resultados</p>
+          <p className="text-xs mt-1" style={{ color: '#b2b2b2' }}>Prueba con otros filtros</p>
         </div>
       ) : (
-        <div className="tq-card divide-y divide-[#f4f1ee]">
-          {products.map(p => {
-            const leader = p.product_variants.find(v => v.es_variante_lider) ?? p.product_variants[0]
-            const img    = p.product_images.find(i => i.is_primary) ?? p.product_images[0]
-            const stock  = p.product_variants.reduce((s, v) => s + (v.stock_variante ?? 0), 0)
-            return (
-              <div key={p.codigo_modelo} className="flex items-center gap-4 px-4 py-3">
-                {img ? (
-                  <img src={img.url} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-[#f4f1ee] flex items-center justify-center flex-shrink-0">
-                    <span className="text-[#c6c6c6]">◻</span>
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#1d1d1b] truncate">{p.description ?? '—'}</p>
-                  <p className="text-xs text-[#b2b2b2]">{p.codigo_modelo} · {p.metal ?? '—'} {p.karat ?? ''} · {p.familia ?? '—'}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-bold text-[#00557f]">
-                    {leader?.precio_venta != null
-                      ? leader.precio_venta.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-                      : '—'}
-                  </p>
-                  <p className="text-xs text-[#b2b2b2]">{stock} uds.</p>
-                </div>
-              </div>
-            )
-          })}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {[...products]
+            .sort((a, b) => (b.stock_total > 0 ? 1 : 0) - (a.stock_total > 0 ? 1 : 0))
+            .map(p => <ProductCard key={p.codigo_modelo} p={p} />)}
         </div>
       )}
     </>

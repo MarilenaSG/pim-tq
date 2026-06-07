@@ -86,7 +86,7 @@ export function SyncPanel({
         onSync={handleVentasSync}
         statsComponent={ventasResult ? (
           ventasResult.ok
-            ? <span>✓ {ventasResult.rowsUpserted} filas actualizadas</span>
+            ? <span>✓ {ventasResult.rowsUpserted} filas actualizadas{ventasResult.rowsDropped ? ` · ${ventasResult.rowsDropped} ignoradas` : ''}</span>
             : <span>✕ {ventasResult.error ?? ventasResult.errors?.join(', ')}</span>
         ) : null}
         color="#C8842A"

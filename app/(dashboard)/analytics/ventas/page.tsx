@@ -5,116 +5,120 @@ import {
   type MonthlyPoint, type ModelPoint, type GroupPoint, type VentasKpis,
 } from './VentasAnalyticsClient'
 
+export const dynamic = 'force-dynamic'
+
 const MESES_CORTO = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function periodoAtras(curAnyo: number, curMes: number, meses: number) {
+  let a = curAnyo, m = curMes - meses
+  while (m <= 0) { m += 12; a-- }
+  return { anyo: a, mes: m }
+}
 
 export default async function VentasAnalyticsPage() {
   const supabase = createServerClient()
 
-  const [ventasRes, variantsRes, productsRes] = await Promise.all([
-    supabase.from('ventas_mensuales').select('slug, anyo, mes, unidades_vendidas, ingresos_netos, coste_total'),
-    supabase.from('product_variants').select('slug, codigo_modelo').eq('is_discontinued', false),
-    supabase.from('products').select('codigo_modelo, description, familia, metal').eq('is_discontinued', false),
+  const now     = new Date()
+  const curAnyo = now.getFullYear()
+  const curMes  = now.getMonth() + 1
+
+  const evo18start = periodoAtras(curAnyo, curMes, 17)  // 18 meses incl. el actual
+  const cut12      = periodoAtras(curAnyo, curMes, 11)  // inicio de los últimos 12m
+
+  // ── RPCs en paralelo — agregación en Supabase, no en JS ──────
+  const [evoRes, allModelsRes, famRes] = await Promise.all([
+    supabase.rpc('ventas_evolucion', {
+      p_anyo_desde: evo18start.anyo, p_mes_desde: evo18start.mes,
+      p_anyo_hasta: curAnyo,         p_mes_hasta: curMes,
+    }),
+    // Todos los modelos con ventas en 12m — usamos límite alto para cubrir el catálogo completo
+    supabase.rpc('ventas_top_modelos', {
+      p_anyo_desde: cut12.anyo, p_mes_desde: cut12.mes,
+      p_anyo_hasta: curAnyo,    p_mes_hasta: curMes,
+      p_limit:      500,
+    }),
+    supabase.rpc('ventas_por_familia', {
+      p_anyo_desde: cut12.anyo, p_mes_desde: cut12.mes,
+      p_anyo_hasta: curAnyo,    p_mes_hasta: curMes,
+      p_limit:      12,
+    }),
   ])
 
-  const ventas   = ventasRes.data   ?? []
-  const variants = variantsRes.data ?? []
-  const products = productsRes.data ?? []
-
-  // ventas_mensuales.slug joins directly to product_variants.slug
-  const variantToModel = new Map<string, string>()
-  for (const v of variants) if (v.slug) variantToModel.set(v.slug, v.codigo_modelo)
-
-  const modelMeta = new Map<string, { description: string | null; familia: string | null; metal: string | null }>()
-  for (const p of products) modelMeta.set(p.codigo_modelo, { description: p.description, familia: p.familia, metal: p.metal })
-
-  // ── Monthly aggregation ──────────────────────────────────────
-  type MonthKey = string
-  const byMonth = new Map<MonthKey, { anyo: number; mes: number; unidades: number; ingresos: number; margen: number }>()
-  for (const row of ventas) {
-    const key: MonthKey = `${row.anyo}-${String(row.mes).padStart(2, '0')}`
-    const ex = byMonth.get(key) ?? { anyo: Number(row.anyo), mes: Number(row.mes), unidades: 0, ingresos: 0, margen: 0 }
-    const ing = Number(row.ingresos_netos ?? 0)
-    const cst = Number(row.coste_total ?? 0)
-    ex.unidades += Number(row.unidades_vendidas ?? 0)
-    ex.ingresos += ing
-    ex.margen   += ing - cst
-    byMonth.set(key, ex)
-  }
-  const monthly: MonthlyPoint[] = Array.from(byMonth.values())
-    .sort((a, b) => a.anyo !== b.anyo ? a.anyo - b.anyo : a.mes - b.mes)
-    .map(d => ({
-      label:    `${MESES_CORTO[d.mes]} ${String(d.anyo).slice(2)}`,
-      unidades: d.unidades,
-      ingresos: Math.round(d.ingresos),
-      margen:   Math.round(d.margen),
+  const allModels: { codigo_modelo: string; ingresos_12m: number; unidades_12m: number }[] =
+    (allModelsRes.data ?? []).map((r: { codigo_modelo: string; ingresos_12m: number; unidades_12m: number }) => ({
+      codigo_modelo: r.codigo_modelo,
+      ingresos_12m:  Math.round(Number(r.ingresos_12m ?? 0)),
+      unidades_12m:  Number(r.unidades_12m ?? 0),
     }))
 
-  // ── By model ─────────────────────────────────────────────────
-  const byModel = new Map<string, { ingresos: number; unidades: number }>()
-  for (const row of ventas) {
-    const model = variantToModel.get(row.slug)
-    if (!model) continue
-    const ex = byModel.get(model) ?? { ingresos: 0, unidades: 0 }
-    ex.ingresos += Number(row.ingresos_netos ?? 0)
-    ex.unidades += Number(row.unidades_vendidas ?? 0)
-    byModel.set(model, ex)
+  // ── Enriquecer modelos con descripción + metal ─────────────────
+  const allCodes = allModels.map(r => r.codigo_modelo)
+  let prodMeta: Record<string, { description: string | null; metal: string | null }> = {}
+  if (allCodes.length > 0) {
+    const { data: prods } = await supabase
+      .from('products')
+      .select('codigo_modelo, description, metal')
+      .in('codigo_modelo', allCodes)
+    prodMeta = Object.fromEntries(
+      (prods ?? []).map(p => [p.codigo_modelo, { description: p.description ?? null, metal: p.metal ?? null }])
+    )
   }
-  const topModels: ModelPoint[] = Array.from(byModel.entries())
-    .sort((a, b) => b[1].ingresos - a[1].ingresos)
-    .slice(0, 10)
-    .map(([codigo_modelo, d]) => ({
-      codigo_modelo,
-      description: modelMeta.get(codigo_modelo)?.description ?? null,
-      ingresos:    Math.round(d.ingresos),
-      unidades:    d.unidades,
-    }))
 
-  // ── By familia ───────────────────────────────────────────────
-  const byFamilia = new Map<string, { ingresos: number; unidades: number }>()
-  for (const row of ventas) {
-    const model = variantToModel.get(row.slug)
-    const familia = model ? (modelMeta.get(model)?.familia ?? 'Sin familia') : 'Sin familia'
-    const ex = byFamilia.get(familia) ?? { ingresos: 0, unidades: 0 }
-    ex.ingresos += Number(row.ingresos_netos ?? 0)
-    ex.unidades += Number(row.unidades_vendidas ?? 0)
-    byFamilia.set(familia, ex)
+  // ── Evolución mensual: rellenar los 18 meses aunque no haya datos
+  const evoByPeriod = new Map<number, { ingresos: number; unidades: number }>()
+  for (const r of evoRes.data ?? []) {
+    evoByPeriod.set(Number(r.anyo) * 100 + Number(r.mes), {
+      ingresos: Math.round(Number(r.ingresos_netos ?? 0)),
+      unidades: Number(r.unidades_vendidas ?? 0),
+    })
   }
-  const familiaData: GroupPoint[] = Array.from(byFamilia.entries())
-    .sort((a, b) => b[1].ingresos - a[1].ingresos)
-    .slice(0, 12)
-    .map(([name, d]) => ({ name, ingresos: Math.round(d.ingresos), unidades: d.unidades }))
-
-  // ── By metal ─────────────────────────────────────────────────
-  const byMetal = new Map<string, { ingresos: number; unidades: number }>()
-  for (const row of ventas) {
-    const model = variantToModel.get(row.slug)
-    const metal = model ? (modelMeta.get(model)?.metal ?? 'Sin metal') : 'Sin metal'
-    const ex = byMetal.get(metal) ?? { ingresos: 0, unidades: 0 }
-    ex.ingresos += Number(row.ingresos_netos ?? 0)
-    ex.unidades += Number(row.unidades_vendidas ?? 0)
-    byMetal.set(metal, ex)
+  const monthly: MonthlyPoint[] = []
+  for (let i = 17; i >= 0; i--) {
+    const p    = periodoAtras(curAnyo, curMes, i)
+    const slot = evoByPeriod.get(p.anyo * 100 + p.mes) ?? { ingresos: 0, unidades: 0 }
+    monthly.push({ label: `${MESES_CORTO[p.mes]} ${String(p.anyo).slice(2)}`, ...slot })
   }
-  const metalData: GroupPoint[] = Array.from(byMetal.entries())
+
+  // ── Top 10 modelos ─────────────────────────────────────────────
+  const topModels: ModelPoint[] = allModels.slice(0, 10).map(r => ({
+    codigo_modelo: r.codigo_modelo,
+    description:   prodMeta[r.codigo_modelo]?.description ?? null,
+    ingresos:      r.ingresos_12m,
+    unidades:      r.unidades_12m,
+  }))
+
+  // ── Por familia ────────────────────────────────────────────────
+  const byFamilia: GroupPoint[] = (famRes.data ?? []).map((r: { familia: string; ingresos: number; unidades: number }) => ({
+    name:     r.familia,
+    ingresos: Math.round(Number(r.ingresos ?? 0)),
+    unidades: Number(r.unidades ?? 0),
+  }))
+
+  // ── Por metal: agregar todos los modelos con ventas ────────────
+  const metalAgg = new Map<string, { ingresos: number; unidades: number }>()
+  for (const r of allModels) {
+    const metal = prodMeta[r.codigo_modelo]?.metal ?? 'Sin metal'
+    const ex    = metalAgg.get(metal) ?? { ingresos: 0, unidades: 0 }
+    ex.ingresos += r.ingresos_12m
+    ex.unidades += r.unidades_12m
+    metalAgg.set(metal, ex)
+  }
+  const byMetal: GroupPoint[] = Array.from(metalAgg.entries())
     .sort((a, b) => b[1].ingresos - a[1].ingresos)
-    .map(([name, d]) => ({ name, ingresos: Math.round(d.ingresos), unidades: d.unidades }))
+    .map(([name, d]) => ({ name, ingresos: d.ingresos, unidades: d.unidades }))
 
-  // ── KPIs ─────────────────────────────────────────────────────
-  const totalIngresos = ventas.reduce((s, r) => s + Number(r.ingresos_netos ?? 0), 0)
-  const totalCoste    = ventas.reduce((s, r) => s + Number(r.coste_total ?? 0), 0)
-  const totalUnidades = ventas.reduce((s, r) => s + Number(r.unidades_vendidas ?? 0), 0)
-  const numModelos    = byModel.size
+  // ── KPIs ───────────────────────────────────────────────────────
+  const totalIngresos = monthly.reduce((s, r) => s + r.ingresos, 0)
+  const totalUnidades = monthly.reduce((s, r) => s + r.unidades, 0)
 
-  const meses = Array.from(byMonth.keys()).sort()
-  const periodoLabel = meses.length > 0
-    ? `${meses[0].replace('-', '/')} – ${meses[meses.length - 1].replace('-', '/')}`
-    : 'Sin datos'
+  const ticketMedio = totalUnidades > 0 ? totalIngresos / totalUnidades : 0
 
   const kpis: VentasKpis = {
     totalUnidades,
-    totalIngresos: Math.round(totalIngresos),
-    totalMargen:   Math.round(totalIngresos - totalCoste),
-    numModelos,
-    periodoLabel,
+    totalIngresos,
+    ticketMedio,
+    numModelos:    allModels.length,
+    periodoLabel:  `${MESES_CORTO[evo18start.mes]} ${evo18start.anyo} – ${MESES_CORTO[curMes]} ${curAnyo}`,
   }
 
   return (
@@ -122,15 +126,15 @@ export default async function VentasAnalyticsPage() {
       <PageHeader
         eyebrow="Analítica"
         title="Ventas históricas"
-        subtitle="Evolución de ventas por mes, modelo, familia y metal"
+        subtitle="Evolución 18m · Top modelos · Ingresos por familia y metal"
       />
 
       <VentasAnalyticsClient
         kpis={kpis}
         monthly={monthly}
         topModels={topModels}
-        byFamilia={familiaData}
-        byMetal={metalData}
+        byFamilia={byFamilia}
+        byMetal={byMetal}
       />
     </div>
   )

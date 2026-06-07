@@ -1,43 +1,129 @@
+import { Suspense } from 'react'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui'
 import TiendasCatalogoClient from './TiendasCatalogoClient'
 
-export const revalidate = 300
+export const revalidate = 3600
 
-async function loadData(search: string, familia: string, metal: string) {
+interface SearchParams {
+  search?:   string
+  metal?:    string
+  familia?:  string
+  category?: string
+  estado?:   'catalogo' | 'descatalogado'
+}
+
+async function loadData(params: SearchParams) {
   const supabase = createServerClient()
 
+  // Base query — never expose financial fields (no margin, cost, ingresos)
   let query = supabase
     .from('products')
     .select(`
-      codigo_modelo, description, familia, metal, karat,
-      supplier_name, num_variantes, lista_variantes, primera_entrada,
-      product_variants(
-        variante, precio_venta, precio_tachado, descuento_aplicado,
-        stock_variante, es_variante_lider
-      ),
-      product_images(url, is_primary, orden)
+      codigo_modelo, description, category, familia, metal, karat,
+      num_variantes, lista_variantes, is_discontinued
     `)
-    .eq('is_discontinued', false)
-    .order('description', { ascending: true })
-    .limit(200)
+    .order('familia',     { ascending: true,  nullsFirst: false })
+    .order('description', { ascending: true,  nullsFirst: false })
 
-  if (search) query = query.ilike('description', `%${search}%`)
-  if (familia && familia !== 'all') query = query.eq('familia', familia)
-  if (metal && metal !== 'all') query = query.eq('metal', metal)
+  if (params.search)   query = query.or(`description.ilike.%${params.search}%,codigo_modelo.ilike.%${params.search}%`)
+  if (params.metal)    query = query.eq('metal',    params.metal)
+  if (params.familia)  query = query.eq('familia',  params.familia)
+  if (params.category) query = query.eq('category', params.category)
 
-  const [productsRes, familiasRes, metalesRes] = await Promise.all([
-    query,
-    supabase.from('products').select('familia').eq('is_discontinued', false).not('familia', 'is', null),
-    supabase.from('products').select('metal').eq('is_discontinued', false).not('metal', 'is', null),
+  const { data: products } = await query
+  if (!products?.length) {
+    const filterRes = await supabase.from('products').select('metal, familia, category')
+    const allOpts = filterRes.data ?? []
+    const uniq = (key: 'metal' | 'familia' | 'category') =>
+      Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
+    return { products: [], filterOptions: { metals: uniq('metal'), familias: uniq('familia'), categories: uniq('category') } }
+  }
+
+  const codes = products.map(p => p.codigo_modelo)
+
+  const [imagesRes, variantsRes, shopifyRes, filterRes] = await Promise.all([
+    supabase
+      .from('product_images')
+      .select('codigo_modelo, url, source')
+      .in('codigo_modelo', codes)
+      .eq('is_primary', true)
+      .order('source'),
+    supabase
+      .from('product_variants')
+      .select('codigo_modelo, slug, variante, precio_venta, stock_variante, es_variante_lider, is_discontinued')
+      .in('codigo_modelo', codes)
+      .order('es_variante_lider', { ascending: false }),
+    supabase
+      .from('product_shopify_data')
+      .select('codigo_modelo, shopify_vendor, shopify_status')
+      .in('codigo_modelo', codes),
+    supabase
+      .from('products')
+      .select('metal, familia, category'),
   ])
 
-  const familiasSet = new Set((familiasRes.data ?? []).map(p => p.familia as string))
-  const metalesSet  = new Set((metalesRes.data ?? []).map(p => p.metal as string))
-  const familias = Array.from(familiasSet).sort()
-  const metales  = Array.from(metalesSet).sort()
+  const imageMap = Object.fromEntries(
+    (imagesRes.data ?? []).map(r => [r.codigo_modelo as string, r.url as string])
+  )
 
-  return { products: productsRes.data ?? [], familias, metales }
+  const variantMap = new Map<string, typeof variantsRes.data>()
+  for (const v of variantsRes.data ?? []) {
+    if (!variantMap.has(v.codigo_modelo)) variantMap.set(v.codigo_modelo, [])
+    variantMap.get(v.codigo_modelo)!.push(v)
+  }
+
+  const shopifyMap = Object.fromEntries(
+    (shopifyRes.data ?? []).map(r => [r.codigo_modelo as string, r])
+  )
+
+  const allOpts = filterRes.data ?? []
+  const uniq = (key: 'metal' | 'familia' | 'category') =>
+    Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
+
+  const enriched = products.map(p => {
+    const variants   = variantMap.get(p.codigo_modelo) ?? []
+    const shopify    = shopifyMap[p.codigo_modelo]
+
+    // Model is discontinued only when ALL variants are discontinued
+    const allDiscontinued = variants.length > 0 && variants.every(v => v.is_discontinued)
+
+    const leader     = variants.find(v => v.es_variante_lider) ?? variants[0]
+    const stockTotal = variants.reduce((acc, v) => acc + (v.stock_variante ?? 0), 0)
+
+    return {
+      ...p,
+      image_url:       imageMap[p.codigo_modelo] ?? null,
+      precio_venta:    leader?.precio_venta      ?? null,
+      slug_lider:      leader?.slug              ?? null,
+      marca:           shopify?.shopify_vendor   ?? null,
+      activo:          shopify?.shopify_status === 'active',
+      stock_total:     stockTotal,
+      is_discontinued: allDiscontinued,
+      variants: variants.map(v => ({
+        variante:        v.variante,
+        precio_venta:    v.precio_venta,
+        stock:           v.stock_variante,
+        is_discontinued: v.is_discontinued ?? false,
+      })),
+    }
+  })
+  .filter(p => {
+    // Ocultar solo cuando TODOS los variantes están descatalogados Y sin stock
+    if (p.is_discontinued && p.stock_total === 0) return false
+    if (params.estado === 'catalogo')      return !p.is_discontinued
+    if (params.estado === 'descatalogado') return p.is_discontinued
+    return true
+  })
+
+  return {
+    products: enriched,
+    filterOptions: {
+      metals:     uniq('metal'),
+      familias:   uniq('familia'),
+      categories: uniq('category'),
+    },
+  }
 }
 
 export default async function TiendasCatalogoPage({
@@ -46,27 +132,31 @@ export default async function TiendasCatalogoPage({
   searchParams?: Record<string, string>
 }) {
   const sp = searchParams ?? {}
-  const { products, familias, metales } = await loadData(
-    sp.q ?? '',
-    sp.familia ?? 'all',
-    sp.metal ?? 'all',
-  )
+  const rawEstado = sp.estado ?? ''
+  const params: SearchParams = {
+    search:   sp.search   || undefined,
+    metal:    sp.metal    || undefined,
+    familia:  sp.familia  || undefined,
+    category: sp.category || undefined,
+    estado:   (rawEstado === 'catalogo' || rawEstado === 'descatalogado') ? rawEstado : undefined,
+  }
+
+  const { products, filterOptions } = await loadData(params)
 
   return (
     <div className="p-6 max-w-7xl">
       <PageHeader
         eyebrow="Zona Tiendas"
         title="Catálogo"
-        subtitle={`${products.length} productos activos — sin datos financieros`}
+        subtitle={`${products.length} productos — sin datos financieros`}
       />
-      <TiendasCatalogoClient
-        products={products as Parameters<typeof TiendasCatalogoClient>[0]['products']}
-        familias={familias}
-        metales={metales}
-        initialSearch={sp.q ?? ''}
-        initialFamilia={sp.familia ?? 'all'}
-        initialMetal={sp.metal ?? 'all'}
-      />
+      <Suspense>
+        <TiendasCatalogoClient
+          products={products}
+          filterOptions={filterOptions}
+          activeFilters={params}
+        />
+      </Suspense>
     </div>
   )
 }

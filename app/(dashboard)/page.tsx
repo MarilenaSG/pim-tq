@@ -8,7 +8,7 @@ import type { SyncLog } from '@/types'
 async function getDashboardData() {
   const supabase = createServerClient()
 
-  const [activeRes, varRes, syncRes, imgRes] = await Promise.all([
+  const [activeRes, varRes, syncRes, imgRes, discRes] = await Promise.all([
     supabase
       .from('products')
       .select('codigo_modelo, ingresos_12m, abc_ventas', { count: 'exact' })
@@ -25,6 +25,10 @@ async function getDashboardData() {
       .from('product_images')
       .select('codigo_modelo', { count: 'exact', head: true })
       .eq('is_primary', true),
+    supabase
+      .from('products')
+      .select('codigo_modelo')
+      .eq('is_discontinued', true),
   ])
 
   const rows          = activeRes.data ?? []
@@ -34,14 +38,26 @@ async function getDashboardData() {
   const totalVariants = varRes.count ?? 0
   const sinImagen     = Math.max(0, total - (imgRes.count ?? 0))
 
-  const logs           = (syncRes.data ?? []) as SyncLog[]
-  const lastMetabase   = logs.find(l => l.source === 'metabase'  && l.status !== 'running') ?? null
+  const logs         = (syncRes.data ?? []) as SyncLog[]
+  const lastMetabase = logs.find(l => l.source === 'metabase' && l.status !== 'running') ?? null
 
-  return { total, totalVariants, abcACount, totalIngresos, lastMetabase, sinImagen }
+  // Descatalogadas con stock: productos is_discontinued=true que aún tienen variantes con stock_variante > 0
+  const discCodes = (discRes.data ?? []).map(p => p.codigo_modelo as string)
+  let descatalogadasConStock = 0
+  if (discCodes.length > 0) {
+    const { data: withStock } = await supabase
+      .from('product_variants')
+      .select('codigo_modelo')
+      .in('codigo_modelo', discCodes)
+      .gt('stock_variante', 0)
+    descatalogadasConStock = new Set((withStock ?? []).map(v => v.codigo_modelo as string)).size
+  }
+
+  return { total, totalVariants, abcACount, totalIngresos, lastMetabase, sinImagen, descatalogadasConStock }
 }
 
 export default async function DashboardPage() {
-  const { total, totalVariants, abcACount, totalIngresos, lastMetabase, sinImagen } =
+  const { total, totalVariants, abcACount, totalIngresos, lastMetabase, sinImagen, descatalogadasConStock } =
     await getDashboardData()
 
   const abcAPct   = total > 0 ? Math.round((abcACount / total) * 100) : 0
@@ -58,7 +74,7 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="mb-6">
         <p className="text-[11px] font-bold tracking-widest uppercase" style={{ color: '#0099f2' }}>
-          Te Quiero Joyerías
+          Te Quiero Jewels
         </p>
         <h1 className="text-4xl font-bold text-[#00557f] mt-1 mb-1"
           style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
@@ -108,6 +124,37 @@ export default async function DashboardPage() {
           color="amber"
           icon="★"
         />
+      </div>
+
+      {/* Alerta: descatalogadas con stock */}
+      <div className="mb-6">
+        <Link
+          href="/products?lifecycle=descatalogado&con_stock=1"
+          className="block tq-card p-4 border-l-4 hover:opacity-90 transition-opacity"
+          style={{ borderLeftColor: descatalogadasConStock > 0 ? '#C0392B' : '#3A9E6A' }}
+        >
+          <div className="flex items-center gap-4">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold text-white flex-shrink-0"
+              style={{ background: descatalogadasConStock > 0 ? '#C0392B' : '#3A9E6A' }}
+            >
+              {descatalogadasConStock > 0 ? '!' : '✓'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: descatalogadasConStock > 0 ? '#C0392B' : '#3A9E6A' }}>
+                {descatalogadasConStock > 0
+                  ? `${descatalogadasConStock} referencia${descatalogadasConStock !== 1 ? 's' : ''} descatalogada${descatalogadasConStock !== 1 ? 's' : ''} con stock`
+                  : 'Sin referencias descatalogadas con stock'}
+              </p>
+              <p className="text-xs text-[#888] mt-0.5">
+                {descatalogadasConStock > 0
+                  ? 'Capital inmovilizado en productos fuera de catálogo — revisar liquidación'
+                  : 'Todo el stock está en productos activos'}
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-[#0099f2] flex-shrink-0">Ver →</span>
+          </div>
+        </Link>
       </div>
 
       {/* Sync + Completitud row */}

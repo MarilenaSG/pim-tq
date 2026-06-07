@@ -44,6 +44,11 @@ function fmtEuro(n: number | null) {
   return n.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €'
 }
 
+function fmtPrecio(n: number | null) {
+  if (n == null) return '—'
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
 function AbcBadge({ abc }: { abc: string | null }) {
   if (!abc) return <span style={{ color: '#d0cdc9' }}>—</span>
   const cfg: Record<string, { bg: string; text: string }> = {
@@ -253,8 +258,8 @@ export function PriceLadderClient({
                     <td className="px-3 py-2 text-xs text-tq-snorkel max-w-[200px]">
                       <span className="line-clamp-1">{p.description ?? '—'}</span>
                     </td>
-                    <td className="px-3 py-2 text-xs font-mono text-right">{fmtEuro(p.precio_venta)}</td>
-                    <td className="px-3 py-2 text-xs font-mono text-right" style={{ color: '#b2b2b2' }}>{fmtEuro(p.precio_tachado)}</td>
+                    <td className="px-3 py-2 text-xs font-mono text-right">{fmtPrecio(p.precio_venta)}</td>
+                    <td className="px-3 py-2 text-xs font-mono text-right" style={{ color: '#b2b2b2' }}>{fmtPrecio(p.precio_tachado)}</td>
                     <td className="px-3 py-2 text-xs text-right" style={{ color: p.descuento ? '#C8842A' : '#b2b2b2' }}>
                       {p.descuento != null ? p.descuento.toFixed(0) + '%' : '—'}
                     </td>

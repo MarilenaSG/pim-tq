@@ -4,14 +4,26 @@ import { SurtidoCharts } from './SurtidoCharts'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SurtidoPage() {
-  const supabase = createServerClient()
+export interface HeatmapData {
+  familias: string[]
+  metales:  string[]
+  cells:    Record<string, Record<string, { count: number; ingresos: number }>>
+}
 
-  const { data: products } = await supabase
+export default async function SurtidoPage({ searchParams }: { searchParams: { familia?: string; metal?: string } }) {
+  const supabase = createServerClient()
+  const { familia, metal } = searchParams
+
+  let query = supabase
     .from('products')
     .select('codigo_modelo, familia, category, metal, num_variantes, ingresos_12m, abc_ventas')
-    .eq('is_discontinued', false)
+    .neq('is_discontinued', true)
     .not('familia', 'is', null)
+
+  if (familia) query = query.eq('familia', familia)
+  if (metal)   query = query.eq('metal', metal)
+
+  const { data: products } = await query
 
   const rows = products ?? []
 
@@ -83,6 +95,27 @@ export default async function SurtidoPage() {
     { name: 'S/D', value: abcCounts.null, color: '#b2b2b2' },
   ].filter(d => d.value > 0)
 
+  // ── Heat map familia × metal ──────────────────────────────────
+  const allMetales = Array.from(new Set(
+    rows.map(r => r.metal as string | null).filter(Boolean) as string[]
+  )).sort()
+
+  const heatCells: Record<string, Record<string, { count: number; ingresos: number }>> = {}
+  for (const r of rows) {
+    const f = r.familia as string
+    const m = (r.metal as string | null) ?? 'N/A'
+    if (!heatCells[f]) heatCells[f] = {}
+    if (!heatCells[f][m]) heatCells[f][m] = { count: 0, ingresos: 0 }
+    heatCells[f][m].count++
+    heatCells[f][m].ingresos += Number(r.ingresos_12m ?? 0)
+  }
+
+  const heatmapData: HeatmapData = {
+    familias: Array.from(familiaMap.keys()).sort((a, b) => (familiaMap.get(b)?.modelos ?? 0) - (familiaMap.get(a)?.modelos ?? 0)),
+    metales:  allMetales,
+    cells:    heatCells,
+  }
+
   return (
     <>
       <PageHeader
@@ -122,6 +155,7 @@ export default async function SurtidoPage() {
         amplitudData={amplitudData}
         paretoData={paretoData}
         abcData={abcData}
+        heatmapData={heatmapData}
       />
     </>
   )

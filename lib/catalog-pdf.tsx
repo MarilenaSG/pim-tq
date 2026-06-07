@@ -33,13 +33,17 @@ export type CatalogPDFFilters = {
   estado?:   string
 }
 
+export type CatalogPDFOptions = {
+  logoSrc?: string   // absolute file path to the logo PNG
+}
+
 // ── Constants ──────────────────────────────────────────────────────
 
 const TQ_BLUE      = '#00557f'
 const TQ_GOLD      = '#C8842A'
 const H_PAD        = 28
 const HEADER_H     = 46
-const FOOTER_H     = 28
+const FOOTER_H     = 42
 const COL_GAP      = 10
 const ROW_GAP      = 8
 const CARD_PAD     = 10
@@ -108,10 +112,19 @@ const s = StyleSheet.create({
   headerBar: {
     backgroundColor:   TQ_BLUE,
     paddingHorizontal: H_PAD,
-    paddingVertical:   8,
+    paddingVertical:   7,
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           8,
+  },
+  headerLogo: {
+    width:  28,
+    height: 28,
   },
   headerBrand: {
     fontSize:      9,
@@ -151,10 +164,14 @@ const s = StyleSheet.create({
     borderTopWidth:    1,
     borderTopColor:    'rgba(0,85,127,0.10)',
     paddingHorizontal: H_PAD,
-    paddingVertical:   8,
-    flexDirection:     'row',
-    alignItems:        'center',
-    justifyContent:    'space-between',
+    paddingTop:        5,
+    paddingBottom:     6,
+  },
+  footerTop: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    marginBottom:   3,
   },
   footerText: {
     fontSize: 7,
@@ -164,6 +181,13 @@ const s = StyleSheet.create({
     fontSize:   7.5,
     color:      TQ_BLUE,
     fontFamily: 'Helvetica-Bold',
+  },
+  footerDisclaimer: {
+    fontSize:   6.5,
+    color:      '#888888',
+    fontFamily: 'Helvetica-Oblique',
+    textAlign:  'center' as unknown as 'center',
+    lineHeight: 1.3,
   },
 
   // Grid
@@ -273,9 +297,14 @@ const s = StyleSheet.create({
     borderRadius:      3,
   },
   cardCodigo: {
-    fontSize:   7,
-    color:      '#c8c5c1',
-    marginLeft: 'auto' as unknown as number,
+    fontSize:          9,
+    color:             TQ_BLUE,
+    fontFamily:        'Helvetica-Bold',
+    backgroundColor:   'rgba(0,85,127,0.08)',
+    paddingHorizontal: 5,
+    paddingVertical:   2,
+    borderRadius:      3,
+    marginLeft:        'auto' as unknown as number,
   },
   priceRow: {
     flexDirection: 'row',
@@ -532,26 +561,35 @@ function ProductCard({ p }: { p: CatalogPDFProduct }) {
 export function CatalogPDF({
   products,
   filters,
+  options = {},
 }: {
   products: CatalogPDFProduct[]
   filters:  CatalogPDFFilters
+  options?: CatalogPDFOptions
 }) {
   const fecha         = fmtDate(new Date())
   const filterSummary = buildFilterSummary(filters)
-  // Agrupamos en filas de 2; wrap={false} en cada fila evita que se parta entre páginas
   const rows          = chunk(products, 2)
 
   return (
     <Document
-      title="Te Quiero Joyerias - Catalogo de productos"
-      author="Te Quiero Joyerias"
+      title="Te Quiero Jewels - Catálogo de productos"
+      author="Te Quiero Jewels"
     >
       <Page size="A4" style={s.page}>
 
-        {/* ── Cabecera fija ── */}
+        {/* ── Cabecera fija en todas las páginas ── */}
         <View style={s.header} fixed>
           <View style={s.headerBar}>
-            <Text style={s.headerBrand}>TE QUIERO JOYERIAS</Text>
+            <View style={s.headerLeft}>
+              {options.logoSrc && (
+                <Image
+                  src={options.logoSrc}
+                  style={s.headerLogo}
+                />
+              )}
+              <Text style={s.headerBrand}>TE QUIERO JEWELS</Text>
+            </View>
             <Text style={s.headerMeta}>
               {products.length} referencia{products.length !== 1 ? 's' : ''}  ·  {fecha}
             </Text>
@@ -564,15 +602,19 @@ export function CatalogPDF({
           )}
         </View>
 
-        {/* ── Pie fijo ── */}
+        {/* ── Pie fijo con número de página ── */}
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>
-            Joyerias Te Quiero  ·  Catalogo de productos  ·  Uso interno
+          <View style={s.footerTop}>
+            <Text style={s.footerText}>Te Quiero Jewels  ·  Catálogo de productos</Text>
+            <Text
+              style={s.footerPage}
+              render={({ pageNumber, totalPages }) => `Pág. ${pageNumber} de ${totalPages}`}
+            />
+          </View>
+          <Text style={s.footerDisclaimer}>
+            Los precios de este catálogo son válidos durante los 7 días posteriores a su emisión (ver fecha en la esquina superior derecha).
+            Transcurrido dicho plazo, los precios podrían estar sujetos a modificaciones.
           </Text>
-          <Text
-            style={s.footerPage}
-            render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-          />
         </View>
 
         {/* ── Cuadricula de productos (2 columnas) ── */}

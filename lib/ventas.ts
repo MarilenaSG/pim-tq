@@ -7,13 +7,13 @@ function parseEuNum(s: string): number | null {
 }
 
 function parseAnyo(s: string): number {
-  // "2.026" → remove dots → "2026" → 2026
   return parseInt(s.trim().replace(/\./g, ''), 10)
 }
 
 export interface SyncVentasResult {
   rowsUpserted: number
-  errors: string[]
+  rowsDropped:  number
+  errors:       string[]
 }
 
 export async function syncVentas(): Promise<SyncVentasResult> {
@@ -23,51 +23,70 @@ export async function syncVentas(): Promise<SyncVentasResult> {
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) throw new Error(`Error descargando CSV ventas: ${res.status} ${res.statusText}`)
 
-  const text = await res.text()
+  const text  = await res.text()
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
   if (lines.length < 2) throw new Error('CSV ventas vacío o sin datos')
 
   const header = lines[0].split(',').map(h => h.trim())
   const idx = {
+    codigo_interno:    header.indexOf('codigo_interno'),   // CSV column → stored as slug
+    tienda_nombre:     header.indexOf('tienda_nombre'),
     anyo:              header.indexOf('anyo'),
     mes:               header.indexOf('mes'),
-    codigo_interno:    header.indexOf('codigo_interno'),
     unidades_vendidas: header.indexOf('unidades_vendidas'),
     ingresos_netos:    header.indexOf('ingresos_netos'),
     coste_total:       header.indexOf('coste_total'),
   }
 
+  const missing = (['codigo_interno', 'anyo', 'mes'] as const).filter(k => idx[k] === -1)
+  if (missing.length > 0) {
+    throw new Error(`CSV ventas: columnas no encontradas: ${missing.join(', ')}. Cabecera: ${header.join(', ')}`)
+  }
+
+  const hasTienda = idx.tienda_nombre >= 0
+
+  // La tabla ventas_mensuales usa "slug" como nombre de columna
+  // (mismo valor que codigo_interno del CSV). codigo_modelo = primeros 5 chars del slug.
   const rows: {
-    codigo_interno: string
-    anyo: number
-    mes: number
+    slug:              string
+    codigo_modelo:     string
+    tienda:            string
+    anyo:              number
+    mes:               number
     unidades_vendidas: number | null
-    ingresos_netos: number | null
-    coste_total: number | null
-    synced_at: string
+    ingresos_netos:    number | null
+    coste_total:       number | null
+    synced_at:         string
   }[] = []
 
   const errors: string[] = []
+  let rowsDropped = 0
   const now = new Date().toISOString()
 
   for (let i = 1; i < lines.length; i++) {
-    // CSV values may be quoted (e.g. "550,99")
     const cols = parseCSVLine(lines[i])
-    if (cols.length < 4) continue
+    if (cols.length < 4) { rowsDropped++; continue }
 
-    const codigo_interno = cols[idx.codigo_interno]?.trim()
-    if (!codigo_interno) continue
+    const slug = cols[idx.codigo_interno]?.trim()
+    if (!slug) { rowsDropped++; continue }
 
     const anyo = parseAnyo(cols[idx.anyo] ?? '')
     const mes  = parseInt((cols[idx.mes] ?? '').trim(), 10)
 
-    if (isNaN(anyo) || isNaN(mes)) {
+    if (isNaN(anyo) || isNaN(mes) || mes < 1 || mes > 12) {
       errors.push(`Línea ${i + 1}: anyo/mes inválido`)
+      rowsDropped++
       continue
     }
 
+    const tienda = hasTienda
+      ? (cols[idx.tienda_nombre]?.trim() || 'sin_tienda')
+      : 'sin_tienda'
+
     rows.push({
-      codigo_interno,
+      slug,
+      codigo_modelo: slug.substring(0, 5),
+      tienda,
       anyo,
       mes,
       unidades_vendidas: parseInt((cols[idx.unidades_vendidas] ?? '').trim(), 10) || null,
@@ -79,40 +98,25 @@ export async function syncVentas(): Promise<SyncVentasResult> {
 
   if (rows.length === 0) {
     errors.push('No se encontraron filas válidas en el CSV')
-    return { rowsUpserted: 0, errors }
+    return { rowsUpserted: 0, rowsDropped, errors }
   }
+
+  // Deduplicar por (slug, tienda, anyo, mes)
+  const dedupeMap = new Map<string, typeof rows[0]>()
+  for (const r of rows) {
+    dedupeMap.set(`${r.slug}|${r.tienda}|${r.anyo}|${r.mes}`, r)
+  }
+  const dedupedRows = Array.from(dedupeMap.values())
 
   const supabase = createServiceClient()
-
-  // Look up codigo_modelo via product_variants.codigo_interno
-  const allCodigos = Array.from(new Set(rows.map(r => r.codigo_interno)))
-  const variantMap = new Map<string, string>() // codigo_interno → codigo_modelo
-  const LOOKUP_CHUNK = 500
-  for (let i = 0; i < allCodigos.length; i += LOOKUP_CHUNK) {
-    const { data } = await supabase
-      .from('product_variants')
-      .select('codigo_interno, codigo_modelo')
-      .in('codigo_interno', allCodigos.slice(i, i + LOOKUP_CHUNK))
-    for (const v of data ?? []) if (v.codigo_interno) variantMap.set(v.codigo_interno, v.codigo_modelo)
-  }
-
-  // Enrich rows with codigo_modelo, skip rows with no match (descatalogued)
-  const enrichedRows = rows
-    .map(r => ({ ...r, codigo_modelo: variantMap.get(r.codigo_interno) ?? null }))
-    .filter((r): r is typeof r & { codigo_modelo: string } => r.codigo_modelo !== null)
-
-  if (enrichedRows.length === 0) {
-    errors.push('Ningún codigo_interno del CSV coincide con product_variants. Ejecuta primero el sync de Metabase.')
-    return { rowsUpserted: 0, errors }
-  }
-
   let rowsUpserted = 0
   const CHUNK = 500
-  for (let i = 0; i < enrichedRows.length; i += CHUNK) {
-    const chunk = enrichedRows.slice(i, i + CHUNK)
+
+  for (let i = 0; i < dedupedRows.length; i += CHUNK) {
+    const chunk = dedupedRows.slice(i, i + CHUNK)
     const { error } = await supabase
       .from('ventas_mensuales')
-      .upsert(chunk, { onConflict: 'codigo_interno,anyo,mes' })
+      .upsert(chunk, { onConflict: 'slug,tienda,anyo,mes' })
 
     if (error) {
       errors.push(`Upsert ventas (chunk ${Math.floor(i / CHUNK) + 1}): ${error.message}`)
@@ -121,15 +125,13 @@ export async function syncVentas(): Promise<SyncVentasResult> {
     }
   }
 
-  return { rowsUpserted, errors }
+  return { rowsUpserted, rowsDropped, errors }
 }
 
-// Handles quoted CSV values like: 001AA21,6,"149,94","57,4"
 function parseCSVLine(line: string): string[] {
   const result: string[] = []
   let current = ''
   let inQuotes = false
-
   for (let i = 0; i < line.length; i++) {
     const ch = line[i]
     if (ch === '"') {

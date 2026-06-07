@@ -10,8 +10,8 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
-  title: 'PIM · Te Quiero Joyerías',
-  description: 'Gestor de información de producto — Te Quiero Joyerías',
+  title: 'PIM · Te Quiero Jewels',
+  description: 'Gestor de información de producto — Te Quiero Jewels',
 }
 
 export default function RootLayout({

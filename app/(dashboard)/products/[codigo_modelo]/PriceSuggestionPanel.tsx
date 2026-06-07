@@ -67,14 +67,14 @@ export function PriceSuggestionPanel({ codigoModelo }: Props) {
             <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(0,85,127,0.04)', border: '1px solid rgba(0,85,127,0.1)' }}>
               <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#b2b2b2' }}>Precio sugerido</p>
               <p className="text-2xl font-bold text-[#00557f]">
-                {result.precio_venta_sugerido.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                {result.precio_venta_sugerido.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(200,132,42,0.04)', border: '1px solid rgba(200,132,42,0.1)' }}>
               <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#b2b2b2' }}>Precio tachado</p>
               <p className="text-2xl font-bold text-[#C8842A]">
                 {result.precio_tachado_sugerido
-                  ? result.precio_tachado_sugerido.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+                  ? result.precio_tachado_sugerido.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : <span className="text-base font-normal" style={{ color: '#b2b2b2' }}>Sin descuento</span>
                 }
               </p>

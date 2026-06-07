@@ -15,7 +15,15 @@
       "Bash(gh auth *)",
       "Bash(git rm *)",
       "Bash(git status *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(git add *)",
+      "PowerShell(cd \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\"; npx next build 2>&1 | Select-String -Pattern \"\\(Error|error|warn|Warning\\)\" | Where-Object { $_ -notmatch \"node_modules\" } | Select-Object -First 20)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

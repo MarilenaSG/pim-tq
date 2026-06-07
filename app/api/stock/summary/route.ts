@@ -56,12 +56,41 @@ export interface StockSummary {
 
   // Distribución por familia
   por_familia: { familia: string; stock: number; modelos: number; pct: number }[]
+  // Desglose familia × metal para gráfico apilado
+  por_familia_metal: { familia: string; metal: string; stock: number }[]
+}
+
+const TIENDAS = 19
+const MIN_STOCK: Record<string, number> = { A: 3 * TIENDAS, B: 2 * TIENDAS, C: 1 * TIENDAS }
+const DEFAULT_MIN = 1 * TIENDAS
+
+function bestAbc(a: string | null, b: string | null): string | null {
+  if (!a && !b) return null
+  if (!a) return b
+  if (!b) return a
+  return a < b ? a : b
+}
+
+function nivelStock(stock: number, abc: string | null) {
+  if (stock === 0) return 'sin_stock' as const
+  const min = MIN_STOCK[abc ?? ''] ?? DEFAULT_MIN
+  if (stock < min)      return 'bajo'    as const
+  if (stock <= min * 2) return 'normal'  as const
+  return 'alto' as const
 }
 
 export async function GET() {
   const supabase = createServerClient()
 
-  // ── Fetch variants con stock y datos de ventas ───────────────
+  // ── Fetch productos activos ───────────────────────────────────
+  const { data: products } = await supabase
+    .from('products')
+    .select('codigo_modelo, description, familia, metal, is_discontinued, primera_entrada, abc_ventas, abc_unidades')
+    .eq('is_discontinued', false)
+
+  const productCodes = (products ?? []).map(p => p.codigo_modelo as string)
+
+  // ── Fetch variants (solo de productos activos, evita límite 1000) ─
   const { data: variants, error } = await supabase
     .from('product_variants')
     .select(`
@@ -69,19 +98,23 @@ export async function GET() {
       unidades_mes_anterior, cost_price_medio, precio_venta,
       es_variante_lider
     `)
+    .in('codigo_modelo', productCodes)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // ── Fetch productos activos ───────────────────────────────────
-  const { data: products } = await supabase
-    .from('products')
-    .select('codigo_modelo, description, familia, metal, is_discontinued')
-    .eq('is_discontinued', false)
 
   const activeSet = new Set((products ?? []).map(p => p.codigo_modelo as string))
   const prodMap   = Object.fromEntries(
     (products ?? []).map(p => [p.codigo_modelo, p])
   )
+
+  // Meses en catálogo por modelo (para excluir novedades del sobrante)
+  const now = new Date()
+  const mesesMap = new Map<string, number>()
+  for (const p of products ?? []) {
+    if (!p.primera_entrada) continue
+    const meses = Math.round((now.getTime() - new Date(p.primera_entrada as string).getTime()) / (1000 * 60 * 60 * 24 * 30))
+    mesesMap.set(p.codigo_modelo as string, meses)
+  }
 
   // ── Fetch primary images ──────────────────────────────────────
   const { data: images } = await supabase
@@ -153,7 +186,11 @@ export async function GET() {
     } else {
       modelosSinStock++
     }
-    if (agg.stock > 0 && agg.stock <= 3) modelosStockBajo++
+    const abc = bestAbc(
+      (prodMap[code] as { abc_ventas?: string | null })?.abc_ventas ?? null,
+      (prodMap[code] as { abc_unidades?: string | null })?.abc_unidades ?? null,
+    )
+    if (nivelStock(agg.stock, abc) === 'bajo') modelosStockBajo++
 
     if (agg.hasCoste && agg.costeMedio != null && agg.stock > 0) {
       capitalInmov += agg.costeMedio * agg.stock
@@ -167,15 +204,20 @@ export async function GET() {
     }
   }
 
-  // ── Distribución por nivel de stock ──────────────────────────
+  // ── Distribución por nivel de stock (basada en ABC × tiendas) ─
   let sinStock = 0, bajo = 0, medio = 0, alto = 0
   let unSinStock = 0, unBajo = 0, unMedio = 0, unAlto = 0
 
-  for (const [, agg] of Array.from(modelAgg.entries())) {
-    if (agg.stock === 0)        { sinStock++;  unSinStock += 0 }
-    else if (agg.stock <= 3)    { bajo++;      unBajo     += agg.stock }
-    else if (agg.stock <= 10)   { medio++;     unMedio    += agg.stock }
-    else                        { alto++;      unAlto     += agg.stock }
+  for (const [code, agg] of Array.from(modelAgg.entries())) {
+    const abc = bestAbc(
+      (prodMap[code] as { abc_ventas?: string | null })?.abc_ventas ?? null,
+      (prodMap[code] as { abc_unidades?: string | null })?.abc_unidades ?? null,
+    )
+    const niv = nivelStock(agg.stock, abc)
+    if      (niv === 'sin_stock') { sinStock++;  unSinStock += 0 }
+    else if (niv === 'bajo')      { bajo++;      unBajo     += agg.stock }
+    else if (niv === 'normal')    { medio++;     unMedio    += agg.stock }
+    else                          { alto++;      unAlto     += agg.stock }
   }
 
   const distribucion = [
@@ -186,9 +228,16 @@ export async function GET() {
   ]
 
   // ── Alertas de rotura ─────────────────────────────────────────
-  // Modelos con stock ≤ 2 Y ventas recientes (unidades_mes > 0)
+  // Nivel "bajo" (stock < mínimo ABC × tiendas) con ventas recientes
   const alertas_rotura = Array.from(modelAgg.entries())
-    .filter(([code, agg]) => activeSet.has(code) && agg.stock <= 2 && agg.unidadesMes > 0)
+    .filter(([code, agg]) => {
+      if (!activeSet.has(code) || agg.unidadesMes === 0) return false
+      const abc = bestAbc(
+        (prodMap[code] as { abc_ventas?: string | null })?.abc_ventas ?? null,
+        (prodMap[code] as { abc_unidades?: string | null })?.abc_unidades ?? null,
+      )
+      return nivelStock(agg.stock, abc) === 'bajo'
+    })
     .sort((a, b) => {
       // Priorizar por días de cobertura (más urgente primero)
       const da = a[1].unidadesMes > 0 ? (a[1].stock / a[1].unidadesMes) * 30 : 999
@@ -212,9 +261,19 @@ export async function GET() {
     })
 
   // ── Alertas de exceso ─────────────────────────────────────────
-  // Stock > 10 unidades y ventas_mes < 1 (posible sobrante)
+  // Nivel "alto" (stock > 2× mínimo ABC), sin ventas, y ≥6 meses en catálogo
   const alertas_exceso = Array.from(modelAgg.entries())
-    .filter(([code, agg]) => activeSet.has(code) && agg.stock > 10 && agg.unidadesMes === 0)
+    .filter(([code, agg]) => {
+      if (!activeSet.has(code)) return false
+      if (agg.unidadesMes > 0) return false
+      const abc = bestAbc(
+        (prodMap[code] as { abc_ventas?: string | null })?.abc_ventas ?? null,
+        (prodMap[code] as { abc_unidades?: string | null })?.abc_unidades ?? null,
+      )
+      if (nivelStock(agg.stock, abc) !== 'alto') return false
+      const meses = mesesMap.get(code) ?? 999
+      return meses >= 6
+    })
     .sort((a, b) => b[1].stock - a[1].stock)
     .slice(0, 15)
     .map(([code, agg]) => ({
@@ -259,13 +318,33 @@ export async function GET() {
 
   const por_familia = Array.from(famMap.entries())
     .sort((a, b) => b[1].stock - a[1].stock)
-    .slice(0, 8)
     .map(([familia, v]) => ({
       familia,
       stock:   v.stock,
       modelos: v.modelos,
       pct:     totalUnidades > 0 ? Math.round((v.stock / totalUnidades) * 1000) / 10 : 0,
     }))
+
+  // ── Por familia × metal (para gráfico apilado) ────────────────
+  const famMetalMap = new Map<string, Map<string, number>>()
+  for (const [code, agg] of Array.from(modelAgg.entries())) {
+    if (!activeSet.has(code) || agg.stock === 0) continue
+    const fam   = prodMap[code]?.familia ?? 'Sin familia'
+    const metal = (prodMap[code] as { metal?: string | null })?.metal ?? 'Otros'
+    if (!famMetalMap.has(fam)) famMetalMap.set(fam, new Map())
+    const metalMap = famMetalMap.get(fam)!
+    metalMap.set(metal, (metalMap.get(metal) ?? 0) + agg.stock)
+  }
+
+  const por_familia_metal: { familia: string; metal: string; stock: number }[] = []
+  for (const [familia, metals] of Array.from(famMetalMap.entries())) {
+    for (const [metal, stock] of Array.from(metals.entries())) {
+      por_familia_metal.push({ familia, metal, stock })
+    }
+  }
+  // Sort consistent with por_familia order
+  const famOrder = new Map(por_familia.map((f, i) => [f.familia, i]))
+  por_familia_metal.sort((a, b) => (famOrder.get(a.familia) ?? 99) - (famOrder.get(b.familia) ?? 99))
 
   const summary: StockSummary = {
     total_unidades:       totalUnidades,
@@ -280,6 +359,7 @@ export async function GET() {
     alertas_exceso,
     top_stock,
     por_familia,
+    por_familia_metal,
   }
 
   return NextResponse.json(summary, {

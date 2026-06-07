@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ScatterChart, Scatter,
-  ReferenceLine,
+  ReferenceLine, ReferenceArea,
 } from 'recharts'
 import { ChartCard } from '@/components/analytics/ChartCard'
 import { ProductActionList } from '@/components/products/ProductActionList'
@@ -37,6 +37,13 @@ async function fetchFilter(params: Record<string, string>): Promise<string[]> {
 export function RentabilidadCharts({ familiaData, metalData, top10, scatterData }: Props) {
   const familias = Array.from(new Set(scatterData.map(d => d.familia)))
   const colorByFamilia = Object.fromEntries(familias.map((f, i) => [f, COLORS[i % COLORS.length]]))
+
+  // Median ingresos for BCG quadrant divider
+  const medianIngresos = useMemo(() => {
+    if (scatterData.length === 0) return 0
+    const sorted = [...scatterData].sort((a, b) => a.ingresos - b.ingresos)
+    return sorted[Math.floor(sorted.length / 2)].ingresos
+  }, [scatterData])
 
   const [actionCodes, setActionCodes] = useState<string[]>([])
   const [actionTitle, setActionTitle] = useState('')
@@ -130,12 +137,12 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
       {/* Row 2: scatter ingresos vs margen + top10 */}
       <div className="grid grid-cols-2 gap-6">
         <ChartCard
-          title="Ingresos vs Margen"
-          subtitle="Cada punto es un modelo · clic para ver"
-          height={340}
+          title="Mapa ingresos × margen"
+          subtitle="Cada punto es un modelo · clic para ver · línea = mediana ingresos"
+          height={380}
         >
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 8, right: 16, bottom: 24, left: 8 }}>
+            <ScatterChart margin={{ top: 16, right: 16, bottom: 28, left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0ece8" />
               <XAxis
                 type="number"
@@ -143,7 +150,7 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
                 name="Ingresos"
                 tick={{ fontSize: 10, fill: '#b2b2b2' }}
                 tickFormatter={fmtEur}
-                label={{ value: 'Ingresos 12m', position: 'insideBottom', offset: -12, fontSize: 10, fill: '#b2b2b2' }}
+                label={{ value: 'Ingresos 12m →', position: 'insideBottom', offset: -14, fontSize: 10, fill: '#b2b2b2' }}
               />
               <YAxis
                 type="number"
@@ -151,9 +158,21 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
                 name="Margen"
                 tick={{ fontSize: 10, fill: '#b2b2b2' }}
                 tickFormatter={(v: unknown) => `${Number(v)}%`}
+                label={{ value: '% Margen', angle: -90, position: 'insideLeft', offset: 12, fontSize: 10, fill: '#b2b2b2' }}
               />
-              <ReferenceLine x={0} stroke="#e2ddd9" />
-              <ReferenceLine y={50} stroke="#C0392B" strokeDasharray="4 2" strokeWidth={1} />
+              {/* BCG quadrant backgrounds */}
+              <ReferenceArea x1={medianIngresos} y1={50} fillOpacity={0.04} fill="#3A9E6A"
+                label={{ value: '★ Estrellas', position: 'insideTopLeft', fontSize: 9, fill: '#3A9E6A', fontWeight: 600 }} />
+              <ReferenceArea x2={medianIngresos} y1={50} fillOpacity={0.04} fill="#C8842A"
+                label={{ value: '? Oportunidades', position: 'insideTopRight', fontSize: 9, fill: '#C8842A', fontWeight: 600 }} />
+              <ReferenceArea x1={medianIngresos} y2={50} fillOpacity={0.04} fill="#00557f"
+                label={{ value: '◈ Volumen', position: 'insideBottomLeft', fontSize: 9, fill: '#00557f', fontWeight: 600 }} />
+              <ReferenceArea x2={medianIngresos} y2={50} fillOpacity={0.04} fill="#C0392B"
+                label={{ value: '✕ Revisar', position: 'insideBottomRight', fontSize: 9, fill: '#C0392B', fontWeight: 600 }} />
+              {/* Dividing lines */}
+              <ReferenceLine x={medianIngresos} stroke="#e2ddd9" strokeDasharray="4 2" strokeWidth={1.5} />
+              <ReferenceLine y={50} stroke="#C0392B" strokeDasharray="4 2" strokeWidth={1.5}
+                label={{ value: '50%', position: 'right', fontSize: 9, fill: '#C0392B' }} />
               <Tooltip
                 cursor={{ strokeDasharray: '3 3' }}
                 content={({ active, payload }) => {
@@ -162,6 +181,7 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
                   return (
                     <div className="bg-white border border-[#e2ddd9] rounded-lg p-3 shadow text-xs space-y-1">
                       <p className="font-bold text-[#00557f] truncate max-w-[180px]">{d.desc}</p>
+                      <p className="font-mono text-[10px] text-[#b2b2b2]">{d.codigo}</p>
                       <p>Ingresos: <span className="font-semibold">{fmtEur(d.ingresos)}</span></p>
                       <p>Margen: <span className="font-semibold">{d.margen}%</span></p>
                       <p className="text-[#b2b2b2]">{d.familia} · ABC {d.abc}</p>
@@ -176,7 +196,7 @@ export function RentabilidadCharts({ familiaData, metalData, top10, scatterData 
                   name={f}
                   data={scatterData.filter(d => d.familia === f)}
                   fill={colorByFamilia[f]}
-                  opacity={0.65}
+                  opacity={0.7}
                   r={4}
                   cursor="pointer"
                   onClick={(d: any) => selectByCodigo(d.codigo, d.desc)}

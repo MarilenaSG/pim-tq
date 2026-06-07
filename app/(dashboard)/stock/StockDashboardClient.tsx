@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, Cell,
-  XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Legend,
+  XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie,
 } from 'recharts'
 import type { StockSummary } from '@/app/api/stock/summary/route'
 import type { StockPorModelo } from '@/app/api/stock/por-modelo/route'
@@ -181,91 +181,85 @@ export default function StockDashboardClient() {
       </div>
 
       {/* Middle row: Distribución + Familias */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Distribución por nivel */}
         <div className="tq-card p-5">
           <h2 className="text-sm font-bold uppercase tracking-widest text-[#00557f] mb-3">
-            Distribución por nivel de stock
+            Por nivel de stock
           </h2>
-          <div className="flex gap-4 items-center">
-            <ResponsiveContainer width={160} height={160}>
-              <PieChart>
-                <Pie
-                  data={summary.distribucion}
-                  dataKey="count"
-                  nameKey="label"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={70}
-                  paddingAngle={2}
-                >
-                  {summary.distribucion.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e8e3df' }}
-                  formatter={(v) => [`${Number(v ?? 0)} modelos`, '']}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex-1 space-y-2">
-              {summary.distribucion.map(d => (
-                <div key={d.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: d.color }} />
-                    <span className="text-xs text-[#555]">{d.label}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold" style={{ color: d.color }}>{d.count}</span>
-                    {d.unidades > 0 && <span className="text-xs text-[#b2b2b2] ml-1">({d.unidades} uds.)</span>}
-                  </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie
+                data={summary.distribucion}
+                dataKey="count"
+                nameKey="label"
+                cx="50%"
+                cy="50%"
+                innerRadius={44}
+                outerRadius={72}
+                paddingAngle={2}
+              >
+                {summary.distribucion.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e8e3df' }}
+                formatter={(v) => [`${Number(v ?? 0)} modelos`, '']}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="mt-3 space-y-2">
+            {summary.distribucion.map(d => (
+              <div key={d.label} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: d.color }} />
+                  <span className="text-xs text-[#555] truncate">{d.label}</span>
                 </div>
-              ))}
-            </div>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-xs font-bold" style={{ color: d.color }}>{d.count}</span>
+                  {d.unidades > 0 && <span className="text-xs text-[#b2b2b2] ml-1">({d.unidades.toLocaleString('es-ES')})</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabla de umbrales por ABC */}
+          <div className="mt-4 pt-4 border-t border-[#f4f1ee]">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#b2b2b2] mb-2">Umbrales (19 tiendas)</p>
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-[#b2b2b2]">
+                  <th className="text-left font-semibold pb-1">ABC</th>
+                  <th className="text-right font-semibold pb-1 text-[#C8842A]">Bajo</th>
+                  <th className="text-right font-semibold pb-1 text-[#3A9E6A]">Normal</th>
+                  <th className="text-right font-semibold pb-1 text-[#00557f]">Alto</th>
+                </tr>
+              </thead>
+              <tbody className="text-[#555]">
+                {[
+                  { abc: 'A', min: 57,  max: 114 },
+                  { abc: 'B', min: 38,  max: 76  },
+                  { abc: 'C', min: 19,  max: 38  },
+                ].map(r => (
+                  <tr key={r.abc} className="border-t border-[#f4f1ee]">
+                    <td className="py-1 font-bold text-[#00557f]">{r.abc}</td>
+                    <td className="py-1 text-right text-[#C8842A]">&lt;{r.min}</td>
+                    <td className="py-1 text-right text-[#3A9E6A]">{r.min}–{r.max}</td>
+                    <td className="py-1 text-right text-[#00557f]">&gt;{r.max}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Por familia */}
-        <div className="tq-card p-5">
+        {/* Stock por familia — gráfico apilado Oro/Plata */}
+        <div className="tq-card p-5 lg:col-span-2">
           <h2 className="text-sm font-bold uppercase tracking-widest text-[#00557f] mb-3">
-            Stock por familia
+            Stock por familia · Oro vs Plata
           </h2>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart
-              data={summary.por_familia}
-              layout="vertical"
-              margin={{ top: 0, right: 50, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0ece8" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10, fill: '#b2b2b2' }} axisLine={false} tickLine={false} />
-              <YAxis
-                type="category"
-                dataKey="familia"
-                tick={{ fontSize: 11, fill: '#555' }}
-                axisLine={false}
-                tickLine={false}
-                width={82}
-              />
-              <Tooltip
-                contentStyle={{ fontSize: 12, border: '1px solid #e8e3df', borderRadius: 8 }}
-                formatter={(v) => [`${Number(v ?? 0).toLocaleString('es-ES')} uds.`, 'Stock']}
-              />
-              <Bar dataKey="stock" fill={TQ_GREEN} radius={[0, 4, 4, 0]} barSize={14}
-                label={{
-                  position: 'right',
-                  formatter: (v: unknown) => {
-                    const n = Number(v ?? 0)
-                    const row = summary.por_familia.find(f => f.stock === n)
-                    return row ? `${row.pct}%` : ''
-                  },
-                  fontSize: 10,
-                  fill: '#b2b2b2',
-                }}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <FamiliaStackedChart data={summary.por_familia_metal ?? []} famOrder={summary.por_familia.map(f => f.familia)} />
         </div>
       </div>
 
@@ -397,98 +391,265 @@ export default function StockDashboardClient() {
         )}
 
         {tab === 'inventario' && (
-          <div>
-            {/* Filters */}
-            <div className="flex flex-wrap gap-3 mb-4">
-              <input
-                type="text"
-                placeholder="Buscar modelo…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="border border-[#e8e3df] rounded-lg px-3 py-2 text-sm bg-white w-52"
-              />
-              {(['all', 'sin_stock', 'bajo', 'normal', 'alto'] as NivelFilter[]).map(n => (
-                <button
-                  key={n}
-                  onClick={() => setNivelFilter(n)}
-                  className="px-3 py-2 rounded-lg text-xs font-semibold border transition-colors"
-                  style={{
-                    borderColor: nivelFilter === n ? TQ_BLUE : '#e8e3df',
-                    background:  nivelFilter === n ? '#e8f4fb' : 'white',
-                    color:       nivelFilter === n ? TQ_BLUE : '#b2b2b2',
-                  }}
-                >
-                  {n === 'all' ? 'Todos' : n === 'sin_stock' ? 'Sin stock' : n.charAt(0).toUpperCase() + n.slice(1)}
-                </button>
-              ))}
-              <span className="text-sm text-[#b2b2b2] self-center ml-auto">
-                {filteredInv.length} referencias
-              </span>
-            </div>
-
-            {loadingInv ? (
-              <div className="py-10 text-center text-sm text-[#b2b2b2]">Cargando inventario…</div>
-            ) : (
-              <div className="tq-card overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#f4f1ee]">
-                      {['Referencia', 'Familia', 'Nivel', 'Stock', 'Variantes c/stock', 'Uds/mes', 'Cobertura', 'ABC'].map(h => (
-                        <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#b2b2b2]">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f4f1ee]">
-                    {filteredInv.slice(0, 200).map(r => (
-                      <tr key={r.codigo_modelo} className="hover:bg-[#fafaf9] transition-colors">
-                        <td className="px-3 py-2">
-                          <p className="text-xs font-semibold text-[#1d1d1b] truncate max-w-[200px]">{r.description ?? r.codigo_modelo}</p>
-                          <p className="text-xs text-[#b2b2b2]">{r.codigo_modelo}</p>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-[#555]">{r.familia ?? '—'}</td>
-                        <td className="px-3 py-2"><NivelBadge nivel={r.nivel} /></td>
-                        <td className="px-3 py-2 text-xs font-bold" style={{
-                          color: r.stock_total === 0 ? TQ_RED : r.stock_total <= 3 ? TQ_GOLD : TQ_GREEN,
-                        }}>{r.stock_total}</td>
-                        <td className="px-3 py-2 text-xs text-[#555]">
-                          {r.variantes_con_stock}/{r.num_variantes}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-[#555]">{r.unidades_mes || '—'}</td>
-                        <td className="px-3 py-2 text-xs">
-                          {r.cobertura_dias != null ? (
-                            <span style={{
-                              color: r.cobertura_dias <= 14 ? TQ_RED
-                                : r.cobertura_dias <= 30 ? TQ_GOLD
-                                : r.cobertura_dias >= 180 ? '#b2b2b2'
-                                : TQ_GREEN,
-                            }}>{r.cobertura_dias}d</span>
-                          ) : <span className="text-[#b2b2b2]">—</span>}
-                        </td>
-                        <td className="px-3 py-2">
-                          {r.abc_ventas ? (
-                            <span className="text-xs font-bold rounded px-1.5 py-0.5"
-                              style={{
-                                background: r.abc_ventas === 'A' ? '#e8f5f0' : r.abc_ventas === 'B' ? '#fdf3e4' : '#f4f1ee',
-                                color:      r.abc_ventas === 'A' ? TQ_GREEN  : r.abc_ventas === 'B' ? TQ_GOLD   : '#888',
-                              }}>
-                              {r.abc_ventas}
-                            </span>
-                          ) : <span className="text-[#b2b2b2] text-xs">—</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {filteredInv.length > 200 && (
-                  <p className="text-xs text-center text-[#b2b2b2] py-3 border-t border-[#f4f1ee]">
-                    Mostrando 200 de {filteredInv.length}. Usa los filtros para acotar.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+          <InventarioTable
+            rows={filteredInv}
+            loading={loadingInv}
+            search={search}
+            setSearch={setSearch}
+            nivelFilter={nivelFilter}
+            setNivelFilter={setNivelFilter}
+          />
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Stacked bar chart Familia × Metal ─────────────────────────────
+
+function FamiliaStackedChart({
+  data,
+  famOrder,
+}: {
+  data: { familia: string; metal: string; stock: number }[]
+  famOrder: string[]
+}) {
+  const metales = useMemo(() => Array.from(new Set(data.map(d => d.metal))).sort(), [data])
+
+  const chartData = useMemo(() => {
+    const byFam = new Map<string, Record<string, number>>()
+    for (const d of data) {
+      if (!byFam.has(d.familia)) byFam.set(d.familia, {})
+      byFam.get(d.familia)![d.metal] = d.stock
+    }
+    return famOrder
+      .filter(f => byFam.has(f))
+      .map(f => ({ familia: f, ...byFam.get(f)! }))
+  }, [data, famOrder])
+
+  const METAL_COLOR: Record<string, string> = {
+    Oro:   '#C8842A',
+    Plata: '#8fadb8',
+  }
+  const fallbackColors = ['#3A9E6A', '#00557f', '#C0392B', '#7B68EE']
+
+  const height = Math.max(260, chartData.length * 28 + 40)
+
+  if (chartData.length === 0) return (
+    <p className="text-xs text-[#b2b2b2] py-8 text-center">Sin datos</p>
+  )
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart
+        data={chartData}
+        layout="vertical"
+        margin={{ top: 0, right: 70, left: 0, bottom: 0 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="#f0ece8" horizontal={false} />
+        <XAxis
+          type="number"
+          tick={{ fontSize: 10, fill: '#b2b2b2' }}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={(v) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
+        />
+        <YAxis
+          type="category"
+          dataKey="familia"
+          tick={{ fontSize: 11, fill: '#555' }}
+          axisLine={false}
+          tickLine={false}
+          width={96}
+        />
+        <Tooltip
+          contentStyle={{ fontSize: 12, border: '1px solid #e8e3df', borderRadius: 8 }}
+          formatter={(v, name) => [
+            `${Number(v ?? 0).toLocaleString('es-ES')} uds.`,
+            String(name),
+          ]}
+        />
+        {metales.map((metal, i) => (
+          <Bar
+            key={metal}
+            dataKey={metal}
+            stackId="a"
+            fill={METAL_COLOR[metal] ?? fallbackColors[i % fallbackColors.length]}
+            radius={i === metales.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+            barSize={16}
+            label={i === metales.length - 1 ? {
+              position: 'right',
+              formatter: (_: unknown, __: unknown, index: number) => {
+                const row = chartData[index]
+                if (!row) return ''
+                const total = metales.reduce((s, m) => s + ((row as Record<string, number>)[m] ?? 0), 0)
+                return total >= 1000 ? `${Math.round(total / 1000)}k` : String(total)
+              },
+              fontSize: 10,
+              fill: '#b2b2b2',
+            } : undefined}
+          />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ── Inventario expandible por variante ────────────────────────────
+
+function InventarioTable({
+  rows, loading, search, setSearch, nivelFilter, setNivelFilter,
+}: {
+  rows: StockPorModelo[]
+  loading: boolean
+  search: string
+  setSearch: (v: string) => void
+  nivelFilter: NivelFilter
+  setNivelFilter: (v: NivelFilter) => void
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  function toggle(code: string) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      next.has(code) ? next.delete(code) : next.add(code)
+      return next
+    })
+  }
+
+  const visible = rows.slice(0, 200)
+
+  return (
+    <div>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="Buscar modelo…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="border border-[#e8e3df] rounded-lg px-3 py-2 text-sm bg-white w-52"
+        />
+        {(['all', 'sin_stock', 'bajo', 'normal', 'alto'] as NivelFilter[]).map(n => (
+          <button
+            key={n}
+            onClick={() => setNivelFilter(n)}
+            className="px-3 py-2 rounded-lg text-xs font-semibold border transition-colors"
+            style={{
+              borderColor: nivelFilter === n ? TQ_BLUE : '#e8e3df',
+              background:  nivelFilter === n ? '#e8f4fb' : 'white',
+              color:       nivelFilter === n ? TQ_BLUE : '#b2b2b2',
+            }}
+          >
+            {n === 'all' ? 'Todos' : n === 'sin_stock' ? 'Sin stock' : n.charAt(0).toUpperCase() + n.slice(1)}
+          </button>
+        ))}
+        <span className="text-sm text-[#b2b2b2] self-center ml-auto">
+          {rows.length} modelos · <span className="text-[#b2b2b2]">clic en fila para ver variantes</span>
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center text-sm text-[#b2b2b2]">Cargando inventario…</div>
+      ) : (
+        <div className="tq-card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#f4f1ee]">
+                <th className="w-6 px-2 py-2.5" />
+                {['Referencia', 'Familia', 'Nivel', 'Stock total', 'Variantes', 'Uds/mes', 'Cobertura', 'ABC'].map(h => (
+                  <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#b2b2b2]">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map(r => {
+                const isOpen = expanded.has(r.codigo_modelo)
+                const hasVariants = r.variantes && r.variantes.length > 0
+                return (
+                  <React.Fragment key={r.codigo_modelo}>
+                    {/* Model row */}
+                    <tr
+                      className="border-b border-[#f4f1ee] hover:bg-[#fafaf9] transition-colors cursor-pointer"
+                      onClick={() => hasVariants && toggle(r.codigo_modelo)}
+                    >
+                      <td className="px-2 py-2 text-center text-[#b2b2b2] select-none">
+                        {hasVariants ? (isOpen ? '▾' : '▸') : ''}
+                      </td>
+                      <td className="px-3 py-2">
+                        <p className="text-xs font-semibold text-[#1d1d1b] truncate max-w-[220px]">{r.description ?? r.codigo_modelo}</p>
+                        <p className="text-xs text-[#b2b2b2] font-mono">{r.codigo_modelo}</p>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-[#555]">{r.familia ?? '—'}</td>
+                      <td className="px-3 py-2"><NivelBadge nivel={r.nivel} /></td>
+                      <td className="px-3 py-2 text-xs font-bold" style={{
+                        color: r.stock_total === 0 ? TQ_RED : r.stock_total <= 3 ? TQ_GOLD : TQ_GREEN,
+                      }}>{r.stock_total.toLocaleString('es-ES')}</td>
+                      <td className="px-3 py-2 text-xs text-[#555]">
+                        {r.variantes_con_stock}/{r.num_variantes}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-[#555]">{r.unidades_mes || '—'}</td>
+                      <td className="px-3 py-2 text-xs">
+                        {r.cobertura_dias != null ? (
+                          <span style={{
+                            color: r.cobertura_dias <= 14 ? TQ_RED
+                              : r.cobertura_dias <= 30 ? TQ_GOLD
+                              : r.cobertura_dias >= 180 ? '#b2b2b2'
+                              : TQ_GREEN,
+                          }}>{r.cobertura_dias}d</span>
+                        ) : <span className="text-[#b2b2b2]">—</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        {r.abc_ventas ? (
+                          <span className="text-xs font-bold rounded px-1.5 py-0.5"
+                            style={{
+                              background: r.abc_ventas === 'A' ? '#e8f5f0' : r.abc_ventas === 'B' ? '#fdf3e4' : '#f4f1ee',
+                              color:      r.abc_ventas === 'A' ? TQ_GREEN  : r.abc_ventas === 'B' ? TQ_GOLD   : '#888',
+                            }}>
+                            {r.abc_ventas}
+                          </span>
+                        ) : <span className="text-[#b2b2b2] text-xs">—</span>}
+                      </td>
+                    </tr>
+
+                    {/* Variant sub-rows */}
+                    {isOpen && r.variantes?.map(v => (
+                      <tr
+                        key={v.codigo_interno}
+                        className="border-b border-[#f9f7f5] bg-[#fafaf9]"
+                      >
+                        <td className="px-2 py-1.5" />
+                        <td className="px-3 py-1.5 pl-8" colSpan={1}>
+                          <p className="text-xs text-[#555]">
+                            Talla / variante: <span className="font-semibold">{v.variante ?? '—'}</span>
+                          </p>
+                          <p className="text-[10px] text-[#b2b2b2] font-mono">{v.codigo_interno}</p>
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-[#b2b2b2]" />
+                        <td className="px-3 py-1.5">
+                          <span className="text-[10px] text-[#b2b2b2]">variante</span>
+                        </td>
+                        <td className="px-3 py-1.5 text-xs font-semibold" style={{
+                          color: v.stock === 0 ? TQ_RED : v.stock <= 2 ? TQ_GOLD : '#555',
+                        }}>{v.stock}</td>
+                        <td className="px-3 py-1.5 text-xs text-[#b2b2b2]">—</td>
+                        <td className="px-3 py-1.5 text-xs text-[#b2b2b2]">{v.unidades_mes || '—'}</td>
+                        <td className="px-3 py-1.5 text-xs text-[#b2b2b2]">—</td>
+                        <td className="px-3 py-1.5 text-xs text-[#b2b2b2]">—</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+          {rows.length > 200 && (
+            <p className="text-xs text-center text-[#b2b2b2] py-3 border-t border-[#f4f1ee]">
+              Mostrando 200 de {rows.length}. Usa los filtros para acotar.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

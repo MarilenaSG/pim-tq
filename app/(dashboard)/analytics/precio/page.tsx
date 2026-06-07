@@ -16,22 +16,26 @@ interface FamiliaStats {
 
 interface BucketRow { rango: string; count: number; min: number; max: number }
 
-export default async function PrecioPage() {
+export default async function PrecioPage({ searchParams }: { searchParams: { familia?: string; metal?: string } }) {
   const supabase = createServerClient()
+  const { familia, metal } = searchParams
 
-  // Leader variants with price + margin data (server-side only, aggregated)
-  const { data: variants } = await supabase
+  // Products for familia/metal mapping + filtering
+  let prodQuery = supabase.from('products').select('codigo_modelo, familia, metal').neq('is_discontinued', true)
+  if (familia) prodQuery = prodQuery.eq('familia', familia)
+  if (metal)   prodQuery = prodQuery.eq('metal', metal)
+  const { data: products } = await prodQuery
+
+  const allowedCodes = new Set((products ?? []).map(p => p.codigo_modelo as string))
+
+  // Leader variants filtered to allowed codes
+  let varQuery = supabase
     .from('product_variants')
     .select('codigo_modelo, precio_venta, precio_tachado, descuento_aplicado, pct_margen_bruto, es_variante_lider')
     .eq('es_variante_lider', true)
-    .eq('is_discontinued', false)
     .not('precio_venta', 'is', null)
-
-  // Products for familia mapping
-  const { data: products } = await supabase
-    .from('products')
-    .select('codigo_modelo, familia, metal')
-    .eq('is_discontinued', false)
+  if (familia || metal) varQuery = varQuery.in('codigo_modelo', Array.from(allowedCodes))
+  const { data: variants } = await varQuery
 
   const familiaByCode = new Map<string, string>(
     (products ?? []).map(p => [p.codigo_modelo as string, p.familia as string ?? ''])

@@ -10,7 +10,6 @@ export interface MonthlyPoint {
   label: string
   unidades: number
   ingresos: number
-  margen: number
 }
 
 export interface ModelPoint {
@@ -29,7 +28,7 @@ export interface GroupPoint {
 export interface VentasKpis {
   totalUnidades: number
   totalIngresos: number
-  totalMargen: number
+  ticketMedio: number
   numModelos: number
   periodoLabel: string
 }
@@ -59,9 +58,9 @@ export function VentasAnalyticsClient({ kpis, monthly, topModels, byFamilia, byM
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Unidades vendidas',  value: kpis.totalUnidades.toLocaleString('es-ES'),  sub: kpis.periodoLabel },
-          { label: 'Ingresos netos',      value: fmtEuro(kpis.totalIngresos),                  sub: kpis.periodoLabel },
-          { label: 'Margen bruto',        value: fmtEuro(kpis.totalMargen),                    sub: kpis.totalIngresos > 0 ? `${Math.round(kpis.totalMargen / kpis.totalIngresos * 100)}%` : '—' },
-          { label: 'Modelos con ventas',  value: kpis.numModelos.toLocaleString('es-ES'),      sub: 'modelos únicos' },
+          { label: 'Ingresos netos',     value: fmtEuro(kpis.totalIngresos),                  sub: kpis.periodoLabel },
+          { label: 'Ticket medio',       value: kpis.ticketMedio.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €', sub: 'ingresos ÷ unidades' },
+          { label: 'Modelos con ventas', value: kpis.numModelos.toLocaleString('es-ES'),      sub: 'modelos únicos en 18m' },
         ].map(kpi => (
           <div key={kpi.label} className="bg-white rounded-xl px-4 py-4" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
             <div className="text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: '#b2b2b2' }}>{kpi.label}</div>

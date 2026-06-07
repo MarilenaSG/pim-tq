@@ -4,19 +4,24 @@ import { StockCharts } from './StockCharts'
 
 export const dynamic = 'force-dynamic'
 
-export default async function StockPage() {
+export default async function StockPage({ searchParams }: { searchParams: { familia?: string; metal?: string } }) {
   const supabase = createServerClient()
+  const { familia, metal } = searchParams
 
-  const [productsRes, variantsRes] = await Promise.all([
-    supabase
-      .from('products')
-      .select('codigo_modelo, description, familia, abc_ventas')
-      .eq('is_discontinued', false),
-    supabase
-      .from('product_variants')
-      .select('codigo_modelo, stock_variante, unidades_mes_anterior, precio_venta, es_variante_lider')
-      .eq('is_discontinued', false),
-  ])
+  let prodQuery = supabase
+    .from('products')
+    .select('codigo_modelo, description, familia, abc_ventas, metal')
+    .neq('is_discontinued', true)
+  if (familia) prodQuery = prodQuery.eq('familia', familia)
+  if (metal)   prodQuery = prodQuery.eq('metal', metal)
+
+  const productsRes = await prodQuery
+  const productCodes = (productsRes.data ?? []).map(p => p.codigo_modelo as string)
+
+  const variantsRes = await supabase
+    .from('product_variants')
+    .select('codigo_modelo, stock_variante, unidades_mes_anterior, precio_venta, es_variante_lider')
+    .in('codigo_modelo', productCodes)
 
   const products = productsRes.data ?? []
   const variants = variantsRes.data ?? []

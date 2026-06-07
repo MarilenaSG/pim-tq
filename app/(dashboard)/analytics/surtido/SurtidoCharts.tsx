@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ComposedChart, Line, Cell, PieChart, Pie, Legend,
@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 import { ChartCard } from '@/components/analytics/ChartCard'
 import { ProductActionList } from '@/components/products/ProductActionList'
+import type { HeatmapData } from './page'
 
 interface AmplitudRow { familia: string; modelos: number; avgVariantes: number }
 interface ParetoRow   { rank: number; codigo: string; ingresos: number; pct: number }
@@ -17,6 +18,7 @@ interface Props {
   amplitudData: AmplitudRow[]
   paretoData:   ParetoRow[]
   abcData:      AbcRow[]
+  heatmapData:  HeatmapData
 }
 
 const fmtEur = (v: unknown) => {
@@ -30,9 +32,12 @@ async function fetchFilter(params: Record<string, string>): Promise<string[]> {
   return res.ok ? res.json() : []
 }
 
-export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
+type HeatMode = 'modelos' | 'ingresos'
+
+export function SurtidoCharts({ amplitudData, paretoData, abcData, heatmapData }: Props) {
   const [actionCodes, setActionCodes] = useState<string[]>([])
   const [actionTitle, setActionTitle] = useState('')
+  const [heatMode, setHeatMode]       = useState<HeatMode>('modelos')
 
   async function selectByFamilia(familia: string) {
     const codes = await fetchFilter({ familia })
@@ -49,6 +54,12 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
   function selectByCodigo(codigo: string) {
     setActionCodes([codigo])
     setActionTitle(`Producto ${codigo}`)
+  }
+
+  async function selectByFamiliaAndMetal(familia: string, metal: string) {
+    const codes = await fetchFilter({ familia, metal })
+    setActionCodes(codes)
+    setActionTitle(`${familia} · ${metal}`)
   }
 
   return (
@@ -216,6 +227,42 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
         </ChartCard>
       </div>
 
+      {/* Heat map familia × metal */}
+      {heatmapData.familias.length > 0 && heatmapData.metales.length > 0 && (
+        <div className="bg-white rounded-xl p-6" style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-[#00557f] uppercase tracking-wider">Surtido familia × metal</h3>
+              <p className="text-xs text-[#b2b2b2] mt-0.5">
+                Clic en celda para ver productos · colores por intensidad
+              </p>
+            </div>
+            <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'rgba(0,85,127,0.15)' }}>
+              {(['modelos', 'ingresos'] as HeatMode[]).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setHeatMode(m)}
+                  className="px-3 py-1.5 text-xs font-semibold transition-colors"
+                  style={{
+                    background: heatMode === m ? '#00557f' : 'white',
+                    color: heatMode === m ? 'white' : '#b2b2b2',
+                  }}
+                >
+                  {m === 'modelos' ? 'Modelos' : 'Ingresos'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <HeatGrid
+            heatmapData={heatmapData}
+            mode={heatMode}
+            onCellClick={selectByFamiliaAndMetal}
+            onFamiliaClick={selectByFamilia}
+          />
+        </div>
+      )}
+
       {/* Product action list */}
       {actionCodes.length > 0 && (
         <ProductActionList
@@ -225,6 +272,143 @@ export function SurtidoCharts({ amplitudData, paretoData, abcData }: Props) {
           context="analytics"
         />
       )}
+    </div>
+  )
+}
+
+// ── Heat grid sub-component ──────────────────────────────────────
+
+function HeatGrid({
+  heatmapData,
+  mode,
+  onCellClick,
+  onFamiliaClick,
+}: {
+  heatmapData: HeatmapData
+  mode: HeatMode
+  onCellClick: (familia: string, metal: string) => void
+  onFamiliaClick: (familia: string) => void
+}) {
+  const { familias, metales, cells } = heatmapData
+
+  const maxVal = useMemo(() => {
+    let m = 0
+    for (const f of familias) {
+      for (const metal of metales) {
+        const cell = cells[f]?.[metal]
+        if (!cell) continue
+        const v = mode === 'modelos' ? cell.count : cell.ingresos
+        if (v > m) m = v
+      }
+    }
+    return m
+  }, [familias, metales, cells, mode])
+
+  const fmtCell = (cell: { count: number; ingresos: number } | undefined) => {
+    if (!cell || cell.count === 0) return ''
+    if (mode === 'modelos') return String(cell.count)
+    const n = cell.ingresos
+    return n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n))
+  }
+
+  const rowTotal = (familia: string) => {
+    let total = 0
+    for (const m of metales) {
+      const cell = cells[familia]?.[m]
+      if (!cell) continue
+      total += mode === 'modelos' ? cell.count : cell.ingresos
+    }
+    return total
+  }
+
+  const colTotal = (metal: string) => {
+    let total = 0
+    for (const f of familias) {
+      const cell = cells[f]?.[metal]
+      if (!cell) continue
+      total += mode === 'modelos' ? cell.count : cell.ingresos
+    }
+    return total
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr>
+            <th className="text-left py-2 pr-4 font-bold text-[#00557f] uppercase tracking-wider whitespace-nowrap" style={{ minWidth: 120 }}>
+              Familia
+            </th>
+            {metales.map(m => (
+              <th key={m} className="py-2 px-2 font-bold text-[#b2b2b2] uppercase tracking-wider text-center whitespace-nowrap">
+                {m}
+              </th>
+            ))}
+            <th className="py-2 px-2 font-bold text-[#00557f] uppercase tracking-wider text-right whitespace-nowrap">
+              Total
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {familias.map(familia => (
+            <tr key={familia} className="border-t" style={{ borderColor: 'rgba(0,85,127,0.06)' }}>
+              <td className="py-1.5 pr-4 whitespace-nowrap">
+                <button
+                  onClick={() => onFamiliaClick(familia)}
+                  className="font-medium text-[#00557f] hover:underline text-left"
+                >
+                  {familia}
+                </button>
+              </td>
+              {metales.map(metal => {
+                const cell  = cells[familia]?.[metal]
+                const val   = cell ? (mode === 'modelos' ? cell.count : cell.ingresos) : 0
+                const ratio = maxVal > 0 && val > 0 ? val / maxVal : 0
+                const alpha = Math.round((0.08 + ratio * 0.72) * 100) / 100
+                const light = ratio > 0.55
+
+                return (
+                  <td
+                    key={metal}
+                    onClick={() => val > 0 && onCellClick(familia, metal)}
+                    title={val > 0 ? `${familia} · ${metal}: ${fmtCell(cell)}` : undefined}
+                    className="py-1.5 px-2 text-center font-semibold rounded transition-all"
+                    style={{
+                      background: val > 0 ? `rgba(0,85,127,${alpha})` : '#f9f8f7',
+                      color: light ? 'white' : val > 0 ? '#00557f' : '#e8e3df',
+                      cursor: val > 0 ? 'pointer' : 'default',
+                      minWidth: 56,
+                    }}
+                  >
+                    {fmtCell(cell)}
+                  </td>
+                )
+              })}
+              <td className="py-1.5 px-2 text-right font-bold" style={{ color: '#00557f' }}>
+                {(() => {
+                  const t = rowTotal(familia)
+                  return mode === 'ingresos'
+                    ? (t >= 1000 ? `${Math.round(t / 1000)}k` : String(Math.round(t)))
+                    : String(t)
+                })()}
+              </td>
+            </tr>
+          ))}
+          {/* Total row */}
+          <tr className="border-t-2" style={{ borderColor: 'rgba(0,85,127,0.15)' }}>
+            <td className="py-2 pr-4 font-bold text-[#00557f] uppercase tracking-wider text-xs">Total</td>
+            {metales.map(metal => {
+              const t = colTotal(metal)
+              return (
+                <td key={metal} className="py-2 px-2 text-center font-bold text-[#00557f] text-xs">
+                  {mode === 'ingresos' ? (t >= 1000 ? `${Math.round(t / 1000)}k` : String(Math.round(t))) : String(t)}
+                </td>
+              )
+            })}
+            <td />
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }

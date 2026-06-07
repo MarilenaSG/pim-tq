@@ -275,6 +275,7 @@ export async function syncMetabase(): Promise<SyncResult> {
     slug:                        r.slug,
     codigo_modelo:               r.codigo_modelo,
     variante:                    r.variante,
+    description:                 r.description,   // descripción propia de cada variante/SKU
     es_variante_lider:           r.es_variante_lider,
     precio_venta:                r.precio_venta,
     precio_tachado:              r.precio_tachado,
