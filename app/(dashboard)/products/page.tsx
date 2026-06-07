@@ -261,11 +261,20 @@ export default async function ProductsPage({
 
   return (
     <div className="p-6 max-w-[1400px] space-y-5">
-      <PageHeader
-        eyebrow="Catálogo"
-        title="Productos"
-        subtitle={`${total.toLocaleString('es-ES')} modelos${hasFilters ? ' encontrados' : ' en el catálogo'}`}
-      />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader
+          eyebrow="Catálogo"
+          title="Productos"
+          subtitle={`${total.toLocaleString('es-ES')} modelos${hasFilters ? ' encontrados' : ' en el catálogo'}`}
+        />
+        <Link
+          href="/products/batch"
+          className="shrink-0 mt-1 text-sm px-3 py-1.5 rounded-lg border font-medium transition-colors hover:bg-slate-50"
+          style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+        >
+          Edición en lote
+        </Link>
+      </div>
 
       <Suspense>
         <ProductFilters
