@@ -417,62 +417,77 @@ function TopMetalTable({
 }) {
   return (
     <section>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <span
-          className="w-2.5 h-2.5 rounded-full shrink-0"
+          className="w-2 h-2 rounded-full shrink-0"
           style={{ background: color }}
         />
-        <h2 className="text-base font-semibold" style={{ color: '#00557f' }}>
+        <h2 className="text-sm font-semibold" style={{ color: '#00557f' }}>
           {titulo}
         </h2>
         <span
-          className="text-[10px] font-semibold px-2 py-0.5 rounded-full ml-auto"
+          className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ml-auto"
           style={{ background: bgColor, color }}
         >
-          por unidades
+          por uds
         </span>
       </div>
 
       {productos.length === 0 ? (
         <div
-          className="rounded-xl p-8 text-center text-sm"
+          className="rounded-xl p-6 text-center text-xs"
           style={{ background: bgColor, color: '#8fa8b8' }}
         >
           Sin ventas en los últimos 12 meses
         </div>
       ) : (
-        <div className="tq-table-wrap">
-          <table className="tq-table">
+        <div className="tq-table-wrap overflow-x-auto">
+          {/* Padding más ajustado que el global .tq-table */}
+          <style>{`
+            .top-metal-table td, .top-metal-table th {
+              padding: 5px 9px !important;
+              font-size: 11px !important;
+              line-height: 1.35 !important;
+            }
+          `}</style>
+          <table className="tq-table top-metal-table" style={{ fontSize: 11 }}>
             <thead>
               <tr>
-                <th style={{ width: 28 }}>#</th>
-                <th>Código</th>
+                <th style={{ width: 22 }}>#</th>
+                <th style={{ width: 68 }}>Código</th>
                 <th>Descripción</th>
-                <th>Familia</th>
-                <th>Kt</th>
-                <th>ABC</th>
-                <th className="right">Uds</th>
-                <th className="right">MB%</th>
+                <th style={{ width: 30 }}>Kt</th>
+                <th style={{ width: 36 }}>ABC</th>
+                <th className="right" style={{ width: 44 }}>Uds</th>
+                <th className="right" style={{ width: 46 }}>MB%</th>
               </tr>
             </thead>
             <tbody>
               {productos.map((p, idx) => (
                 <tr key={p.codigo_modelo}>
-                  <td style={{ color: '#8fa8b8', fontWeight: 700, fontSize: 11 }}>{idx + 1}</td>
+                  <td style={{ color: '#8fa8b8', fontWeight: 700 }}>{idx + 1}</td>
                   <td>
                     <Link
                       href={`/products/${p.codigo_modelo}`}
-                      className="font-mono text-[12px] font-semibold"
-                      style={{ color: '#0099f2' }}
+                      className="font-mono font-semibold"
+                      style={{ color: '#0099f2', fontSize: 11 }}
                     >
                       {p.codigo_modelo}
                     </Link>
                   </td>
-                  <td style={{ color: '#00264d', maxWidth: 160 }}>
-                    <span className="line-clamp-2 text-[12px]">{p.description ?? '—'}</span>
+                  <td
+                    title={p.description ?? undefined}
+                    style={{
+                      color: '#00264d',
+                      maxWidth: 180,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {p.description ?? '—'}
                   </td>
-                  <td style={{ color: '#5a7a8a', fontSize: 12 }}>{p.familia ?? '—'}</td>
-                  <td style={{ color: '#8fa8b8', fontSize: 11 }}>{p.karat ?? '—'}</td>
+                  <td style={{ color: '#8fa8b8' }}>{p.karat ?? '—'}</td>
                   <td><AbcBadge abc={p.abc_ventas} /></td>
                   <td
                     className="text-right font-mono tabular-nums font-semibold"
