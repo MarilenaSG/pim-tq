@@ -30,7 +30,7 @@ type FilterOption = {
   category:      string | null
   familia:       string | null
   karat:         string | null
-  supplier_name: string | null
+  shopify_vendor: string | null
 }
 
 // ── Page ──────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export default async function ProductsPage({
   if (familia)  productsQuery = productsQuery.eq('familia', familia)
   if (karat)    productsQuery = productsQuery.eq('karat', karat)
   if (abc)      productsQuery = productsQuery.eq('abc_ventas', abc)
-  if (supplier) productsQuery = productsQuery.eq('supplier_name', supplier)
+  if (supplier) productsQuery = productsQuery.eq('shopify_vendor', supplier)
   if (estado === 'catalogo')      productsQuery = productsQuery.eq('is_discontinued', false)
   if (estado === 'descatalogado') productsQuery = productsQuery.eq('is_discontinued', true)
 
@@ -148,7 +148,7 @@ export default async function ProductsPage({
     const arr = Array.from(allowedCodes)
     if (arr.length === 0) {
       const [optRes, camRes] = await Promise.all([
-        supabase.from('products').select('metal, category, familia, karat, supplier_name'),
+        supabase.from('products').select('metal, category, familia, karat, shopify_vendor'),
         supabase.from('campaigns').select('id, nombre').eq('estado', 'activa').order('nombre'),
       ])
       const allOpts    = (optRes.data ?? []) as FilterOption[]
@@ -161,7 +161,7 @@ export default async function ProductsPage({
           <Suspense>
             <ProductFilters
               metals={uniq('metal')} categories={uniq('category')} familias={uniq('familia')}
-              karats={uniq('karat')} suppliers={uniq('supplier_name')} campaigns={campaigns}
+              karats={uniq('karat')} suppliers={uniq('shopify_vendor')} campaigns={campaigns}
             />
           </Suspense>
           <EmptyState icon="◻" message="Sin resultados" description="Ningún modelo coincide con los filtros activos." />
@@ -175,7 +175,7 @@ export default async function ProductsPage({
 
   const [productsResult, optionsResult, campaignsResult] = await Promise.all([
     paginatedQuery,
-    supabase.from('products').select('metal, category, familia, karat, supplier_name'),
+    supabase.from('products').select('metal, category, familia, karat, shopify_vendor'),
     supabase.from('campaigns').select('id, nombre').eq('estado', 'activa').order('nombre'),
   ])
 
@@ -282,7 +282,7 @@ export default async function ProductsPage({
           categories={uniq('category')}
           familias={uniq('familia')}
           karats={uniq('karat')}
-          suppliers={uniq('supplier_name')}
+          suppliers={uniq('shopify_vendor')}
           campaigns={campaignOpts}
         />
       </Suspense>

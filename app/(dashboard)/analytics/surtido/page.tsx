@@ -22,7 +22,7 @@ export default async function SurtidoPage({ searchParams }: { searchParams: { fa
 
   if (familia)   query = query.eq('familia', familia)
   if (metal)     query = query.eq('metal', metal)
-  if (supplier)  query = query.eq('supplier_name', supplier)
+  if (supplier)  query = query.eq('shopify_vendor', supplier)
 
   const { data: products } = await query
 

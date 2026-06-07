@@ -10,11 +10,11 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
 
   let prodQuery = supabase
     .from('products')
-    .select('codigo_modelo, description, familia, metal, supplier_name, abc_ventas, ingresos_12m')
+    .select('codigo_modelo, description, familia, metal, shopify_vendor, abc_ventas, ingresos_12m')
     .neq('is_discontinued', true)
   if (familia)   prodQuery = prodQuery.eq('familia', familia)
   if (metal)     prodQuery = prodQuery.eq('metal', metal)
-  if (supplier)  prodQuery = prodQuery.eq('supplier_name', supplier)
+  if (supplier)  prodQuery = prodQuery.eq('shopify_vendor', supplier)
 
   const [productsRes, variantsRes] = await Promise.all([
     prodQuery,
@@ -44,7 +44,7 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
     desc:     p.description as string | null,
     familia:  p.familia as string | null,
     metal:    p.metal as string | null,
-    proveedor: p.supplier_name as string | null,
+    proveedor: p.shopify_vendor as string | null,
     abc:      p.abc_ventas as string | null,
     ingresos: Number(p.ingresos_12m ?? 0),
     margen:   margenByCode.get(p.codigo_modelo as string) ?? null,

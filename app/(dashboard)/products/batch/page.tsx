@@ -20,7 +20,7 @@ export default async function BatchCustomFieldsPage() {
       .order('field_key'),
     supabase
       .from('products')
-      .select('codigo_modelo, description, supplier_name, metal, familia, category, is_discontinued')
+      .select('codigo_modelo, description, shopify_vendor, metal, familia, category, is_discontinued')
       .order('codigo_modelo'),
   ])
 
@@ -44,7 +44,7 @@ export default async function BatchCustomFieldsPage() {
   const initialRows = products.map(p => ({
     codigo_modelo:   p.codigo_modelo,
     description:     p.description ?? '',
-    supplier_name:   p.supplier_name ?? '',
+    supplier_name:   p.shopify_vendor ?? '',
     metal:           p.metal ?? '',
     familia:         p.familia ?? '',
     category:        p.category ?? '',
@@ -53,7 +53,7 @@ export default async function BatchCustomFieldsPage() {
   }))
 
   // Filter options
-  const suppliers  = uniq(products.map(p => p.supplier_name as string))
+  const suppliers  = uniq(products.map(p => p.shopify_vendor as string))
   const metals     = uniq(products.map(p => p.metal as string))
   const familias   = uniq(products.map(p => p.familia as string))
   const categories = uniq(products.map(p => p.category as string))

@@ -443,12 +443,21 @@ export async function syncShopify(): Promise<ShopifySyncResult> {
     }
   }
 
-  // 7 · Update shopify_synced_at on products
-  for (const batch of chunk(matchedModels, 250)) {
-    await supabase
-      .from('products')
-      .update({ shopify_synced_at: now, updated_at: now })
-      .in('codigo_modelo', batch)
+  // 7 · Update shopify_synced_at + shopify_vendor on products
+  // Group by vendor to minimize API calls
+  const vendorGroups = new Map<string | null, string[]>()
+  for (const row of uniqueShopifyDataRows) {
+    const list = vendorGroups.get(row.shopify_vendor) ?? []
+    list.push(row.codigo_modelo)
+    vendorGroups.set(row.shopify_vendor, list)
+  }
+  for (const [vendor, codes] of Array.from(vendorGroups)) {
+    for (const batch of chunk(codes, 250)) {
+      await supabase
+        .from('products')
+        .update({ shopify_vendor: vendor, shopify_synced_at: now, updated_at: now })
+        .in('codigo_modelo', batch)
+    }
   }
 
   return {

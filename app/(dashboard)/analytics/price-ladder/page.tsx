@@ -21,7 +21,7 @@ export default async function PriceLadderPage({
       )
     `)
     .eq('is_discontinued', false)
-  if (supplier) baseQuery = baseQuery.eq('supplier_name', supplier)
+  if (supplier) baseQuery = baseQuery.eq('shopify_vendor', supplier)
   const { data: rawProducts } = await baseQuery
 
   // Load ladder ranges from alert_settings

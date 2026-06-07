@@ -14,7 +14,7 @@ export default async function StockPage({ searchParams }: { searchParams: { fami
     .neq('is_discontinued', true)
   if (familia)   prodQuery = prodQuery.eq('familia', familia)
   if (metal)     prodQuery = prodQuery.eq('metal', metal)
-  if (supplier)  prodQuery = prodQuery.eq('supplier_name', supplier)
+  if (supplier)  prodQuery = prodQuery.eq('shopify_vendor', supplier)
 
   const productsRes = await prodQuery
   const productCodes = (productsRes.data ?? []).map(p => p.codigo_modelo as string)

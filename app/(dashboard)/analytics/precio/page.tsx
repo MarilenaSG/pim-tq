@@ -24,7 +24,7 @@ export default async function PrecioPage({ searchParams }: { searchParams: { fam
   let prodQuery = supabase.from('products').select('codigo_modelo, familia, metal').neq('is_discontinued', true)
   if (familia)   prodQuery = prodQuery.eq('familia', familia)
   if (metal)     prodQuery = prodQuery.eq('metal', metal)
-  if (supplier)  prodQuery = prodQuery.eq('supplier_name', supplier)
+  if (supplier)  prodQuery = prodQuery.eq('shopify_vendor', supplier)
   const { data: products } = await prodQuery
 
   const allowedCodes = new Set((products ?? []).map(p => p.codigo_modelo as string))

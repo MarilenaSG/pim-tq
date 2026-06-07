@@ -22,7 +22,7 @@ async function loadData(params: SearchParams) {
     .from('products')
     .select(`
       codigo_modelo, description, category, familia, metal, karat,
-      num_variantes, lista_variantes, is_discontinued, supplier_name
+      num_variantes, lista_variantes, is_discontinued, shopify_vendor
     `)
     .order('familia',     { ascending: true,  nullsFirst: false })
     .order('description', { ascending: true,  nullsFirst: false })
@@ -31,15 +31,15 @@ async function loadData(params: SearchParams) {
   if (params.metal)     query = query.eq('metal',         params.metal)
   if (params.familia)   query = query.eq('familia',       params.familia)
   if (params.category)  query = query.eq('category',      params.category)
-  if (params.supplier)  query = query.eq('supplier_name', params.supplier)
+  if (params.supplier)  query = query.eq('shopify_vendor', params.supplier)
 
   const { data: products } = await query
   if (!products?.length) {
-    const filterRes = await supabase.from('products').select('metal, familia, category, supplier_name')
+    const filterRes = await supabase.from('products').select('metal, familia, category, shopify_vendor')
     const allOpts = filterRes.data ?? []
-    const uniq = (key: 'metal' | 'familia' | 'category' | 'supplier_name') =>
+    const uniq = (key: 'metal' | 'familia' | 'category' | 'shopify_vendor') =>
       Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
-    return { products: [], filterOptions: { metals: uniq('metal'), familias: uniq('familia'), categories: uniq('category'), suppliers: uniq('supplier_name') } }
+    return { products: [], filterOptions: { metals: uniq('metal'), familias: uniq('familia'), categories: uniq('category'), suppliers: uniq('shopify_vendor') } }
   }
 
   const codes = products.map(p => p.codigo_modelo)
@@ -58,11 +58,11 @@ async function loadData(params: SearchParams) {
       .order('es_variante_lider', { ascending: false }),
     supabase
       .from('product_shopify_data')
-      .select('codigo_modelo, shopify_vendor, shopify_status')
+      .select('codigo_modelo, shopify_status')
       .in('codigo_modelo', codes),
     supabase
       .from('products')
-      .select('metal, familia, category, supplier_name'),
+      .select('metal, familia, category, shopify_vendor'),
   ])
 
   const imageMap = Object.fromEntries(
@@ -80,7 +80,7 @@ async function loadData(params: SearchParams) {
   )
 
   const allOpts = filterRes.data ?? []
-  const uniq = (key: 'metal' | 'familia' | 'category' | 'supplier_name') =>
+  const uniq = (key: 'metal' | 'familia' | 'category' | 'shopify_vendor') =>
     Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
 
   const enriched = products.map(p => {
@@ -98,7 +98,7 @@ async function loadData(params: SearchParams) {
       image_url:       imageMap[p.codigo_modelo] ?? null,
       precio_venta:    leader?.precio_venta      ?? null,
       slug_lider:      leader?.slug              ?? null,
-      marca:           shopify?.shopify_vendor   ?? null,
+      marca:           p.shopify_vendor           ?? null,
       activo:          shopify?.shopify_status === 'active',
       stock_total:     stockTotal,
       is_discontinued: allDiscontinued,
@@ -124,7 +124,7 @@ async function loadData(params: SearchParams) {
       metals:     uniq('metal'),
       familias:   uniq('familia'),
       categories: uniq('category'),
-      suppliers:  uniq('supplier_name'),
+      suppliers:  uniq('shopify_vendor'),
     },
   }
 }
