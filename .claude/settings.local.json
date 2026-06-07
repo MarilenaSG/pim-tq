@@ -23,7 +23,31 @@
       "mcp__Claude_Preview__preview_start",
       "mcp__Claude_in_Chrome__tabs_context_mcp",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\User\\\\Documents\\\\Claude Code\\\\PIM Te Quiero\\\\app\\\\api\\\\products\\\\[codigo_modelo]\\\\shopify\")",
+      "Bash(curl -s http://localhost:3000/settings/sync)",
+      "Bash(python -c \"import sys; d=sys.stdin.read\\(\\); print\\(d[d.find\\('__NEXT_DATA__'\\):d.find\\('__NEXT_DATA__'\\)+300] if '__NEXT_DATA__' in d else d[:500]\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/settings/sync)",
+      "Bash(python -c \"import sys; d=sys.stdin.read\\(\\); print\\('Shopify' in d, 'Sincronización' in d, 'Metabase CSV' in d\\)\")",
+      "Bash(curl -s http://localhost:3000/products)",
+      "Bash(python -c \"import sys; d=sys.stdin.read\\(\\); print\\('Shopify' in d\\)\")",
+      "Bash(python -c \"import sys; d=sys.stdin.read\\(\\); print\\('Shopify' in d, 'Metabase CSV' in d, 'Ventas mensuales' in d, 'Reservas' in d\\)\")",
+      "Bash(curl -s \"http://localhost:3000/products/002AA?tab=shopify\")",
+      "Bash(python -c \"import sys; d=sys.stdin.read\\(\\); print\\('Shopify' in d, 'Estado en Shopify' in d, 'Generaci' in d\\)\")",
+      "Bash(curl -s \"http://localhost:3000/products\")",
+      "Bash(python -c \"import sys,re; d=sys.stdin.read\\(\\); codes=re.findall\\(r'/products/\\([A-Z0-9]+\\)', d\\); print\\(codes[:5] if codes else 'no codes found'\\)\")",
+      "Bash(curl -s \"http://localhost:3000/products/002AE?tab=shopify\")",
+      "Bash(python -c \"import sys; d=sys.stdin.read\\(\\); print\\('Estado en Shopify' in d, 'Generaci' in d, 'NO SINCRONIZADO' in d, 'campos completados' in d\\)\")",
+      "Bash(python -c \"import sys; d=sys.stdin.read\\(\\); print\\('Sin sync' in d, 'Shopify' in d\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:3000/export\")",
+      "Bash(curl -s \"http://localhost:3000/export\")",
+      "Bash(python -c \"import sys; d=sys.stdin.read\\(\\); print\\('Shopify CSV' in d, 'Descargar CSV' in d\\)\")",
+      "Bash(curl -s http://localhost:3000/products/batch)",
+      "Bash(sed -i 's/query\\\\.eq\\('\\\\''supplier_name'\\\\'', supplier\\)/query.eq\\('\\\\''shopify_vendor'\\\\'', supplier\\)/g' \"app/\\(dashboard\\)/analytics/surtido/page.tsx\")",
+      "Bash(sed -i 's/query\\\\.eq\\('\\\\''supplier_name'\\\\'', supplier\\)/query.eq\\('\\\\''shopify_vendor'\\\\'', supplier\\)/g' \"app/\\(dashboard\\)/analytics/ciclo-vida/page.tsx\")",
+      "Bash(sed -i 's/prodQuery\\\\.eq\\('\\\\''supplier_name'\\\\'', supplier\\)/prodQuery.eq\\('\\\\''shopify_vendor'\\\\'', supplier\\)/g' \"app/\\(dashboard\\)/analytics/precio/page.tsx\")",
+      "Bash(sed -i 's/baseQuery\\\\.eq\\('\\\\''supplier_name'\\\\'', supplier\\)/baseQuery.eq\\('\\\\''shopify_vendor'\\\\'', supplier\\)/g' \"app/\\(dashboard\\)/analytics/price-ladder/page.tsx\")",
+      "Bash(sed -i 's/prodQuery\\\\.eq\\('\\\\''supplier_name'\\\\'', supplier\\)/prodQuery.eq\\('\\\\''shopify_vendor'\\\\'', supplier\\)/g' \"app/\\(dashboard\\)/analytics/stock/page.tsx\")"
     ]
   }
 }
