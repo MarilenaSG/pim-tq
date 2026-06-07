@@ -11,7 +11,9 @@ type SupplierRow = {
   pctIngresos: number
   pctIngresosMax: number
   margenMedio: number | null
+  precioMedio: number | null
   abcA: number; abcB: number; abcC: number
+  abcA_uni: number; abcB_uni: number; abcC_uni: number
   abcATotal: number; abcAConStock: number
   familias: string[]
   topProductos: { codigo_modelo: string; familia: string | null; abc_ventas: string | null; ingresos_12m: number | null }[]
@@ -20,6 +22,28 @@ type SupplierRow = {
 type SortKey = 'proveedor' | 'modelos' | 'ingresos' | 'margenMedio' | 'abcA'
 
 function fmtEuro(n: number) { return n.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €' }
+
+function AbcBars({ a, b, c, total, colorA = '#3A9E6A', colorB = '#0099f2', colorC = '#C8842A' }: {
+  a: number; b: number; c: number; total: number
+  colorA?: string; colorB?: string; colorC?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      {([['A', a, colorA], ['B', b, colorB], ['C', c, colorC]] as const).map(([label, count, color]) => (
+        <div key={label} className="flex items-center gap-2 text-xs">
+          <span className="w-4 font-bold shrink-0" style={{ color }}>{label}</span>
+          <div className="flex-1 h-2 rounded-full bg-[rgba(0,85,127,0.08)]">
+            <div className="h-2 rounded-full transition-all" style={{ width: `${total > 0 ? (count / total) * 100 : 0}%`, background: color }} />
+          </div>
+          <span className="w-6 text-right shrink-0" style={{ color: '#b2b2b2' }}>{count}</span>
+          <span className="w-8 text-right shrink-0 text-[10px]" style={{ color: '#b2b2b2' }}>
+            {total > 0 ? ((count / total) * 100).toFixed(0) + '%' : '—'}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export function SuppliersClient({
   suppliers, totalIngresos, totalProducts, defaultMarginTarget, highlight,
@@ -69,9 +93,15 @@ export function SuppliersClient({
 
   const Th = ({ k, children, right }: { k: SortKey; children: React.ReactNode; right?: boolean }) => (
     <th onClick={() => toggleSort(k)}
-      className={`px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase cursor-pointer select-none hover:opacity-70 ${right ? 'text-right' : ''}`}
+      className={`px-3 py-3 text-left text-[10px] font-bold tracking-widest uppercase cursor-pointer select-none hover:opacity-70 whitespace-nowrap ${right ? 'text-right' : ''}`}
       style={{ color: sortKey === k ? '#00557f' : '#b2b2b2' }}>
       {children}<SortIcon k={k} />
+    </th>
+  )
+
+  const ThPlain = ({ children, right }: { children: React.ReactNode; right?: boolean }) => (
+    <th className={`px-3 py-3 text-[10px] font-bold tracking-widest uppercase whitespace-nowrap ${right ? 'text-right' : 'text-left'}`} style={{ color: '#b2b2b2' }}>
+      {children}
     </th>
   )
 
@@ -93,13 +123,12 @@ export function SuppliersClient({
               <tr style={{ borderBottom: '1px solid rgba(0,85,127,0.08)' }}>
                 <Th k="proveedor">Proveedor</Th>
                 <Th k="modelos">Modelos</Th>
-                <th className="px-3 py-3 text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>% Catálogo</th>
+                <ThPlain>% Catálogo</ThPlain>
                 <Th k="ingresos" right>Ingresos 12m</Th>
-                <th className="px-3 py-3 text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>% Ingresos</th>
+                <ThPlain>% Ingresos</ThPlain>
                 <Th k="margenMedio" right>Margen medio</Th>
-                <Th k="abcA">ABC-A</Th>
-                <th className="px-3 py-3 text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>ABC-C</th>
-                <th className="px-3 py-3 text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Familias</th>
+                <Th k="abcA">ABC-A ingr.</Th>
+                <ThPlain>ABC-C ingr.</ThPlain>
               </tr>
             </thead>
             <tbody>
@@ -113,7 +142,7 @@ export function SuppliersClient({
                     onClick={() => setSelected(selected?.proveedor === s.proveedor ? null : s)}
                     style={{
                       borderBottom: i < sorted.length - 1 ? '1px solid rgba(0,85,127,0.05)' : 'none',
-                      background: isHighlight ? 'rgba(0,153,242,0.04)' : undefined,
+                      background: selected?.proveedor === s.proveedor ? 'rgba(0,85,127,0.04)' : isHighlight ? 'rgba(0,153,242,0.04)' : undefined,
                     }}
                   >
                     <td className="px-3 py-2.5">
@@ -137,7 +166,7 @@ export function SuppliersClient({
                         <span className="text-xs font-mono" style={{ color: '#b2b2b2' }}>{s.pctIngresos.toFixed(1)}%</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-right">
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
                       {s.margenMedio == null
                         ? <span style={{ color: '#b2b2b2' }}>—</span>
                         : <span style={{ color: s.margenMedio >= defaultMarginTarget ? '#3A9E6A' : s.margenMedio >= defaultMarginTarget * 0.8 ? '#C8842A' : '#C0392B', fontWeight: 600 }}>{s.margenMedio.toFixed(1)}%</span>
@@ -155,14 +184,6 @@ export function SuppliersClient({
                         color: s.modelos > 0 && s.abcC / s.modelos > 0.5 ? '#C0392B' : '#b2b2b2',
                       }}>{s.abcC}</span>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex gap-1 flex-wrap">
-                        {s.familias.slice(0, 3).map(f => (
-                          <span key={f} className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'rgba(0,85,127,0.06)', color: '#00557f' }}>{f}</span>
-                        ))}
-                        {s.familias.length > 3 && <span className="text-[9px]" style={{ color: '#b2b2b2' }}>+{s.familias.length - 3}</span>}
-                      </div>
-                    </td>
                   </tr>
                 )
               })}
@@ -173,65 +194,79 @@ export function SuppliersClient({
                 <td className="px-3 py-2.5 text-xs font-bold text-tq-snorkel">{totalProducts}</td>
                 <td className="px-3 py-2.5 text-xs font-bold text-tq-snorkel">100%</td>
                 <td className="px-3 py-2.5 text-xs font-bold font-mono text-right text-tq-snorkel">{fmtEuro(totalIngresos)}</td>
-                <td colSpan={5} />
+                <td colSpan={4} />
               </tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Sidebar */}
+      {/* Detail panel */}
       {selected && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setSelected(null)} />
           <aside className="fixed right-0 top-0 h-full w-96 bg-white z-30 flex flex-col overflow-y-auto"
             style={{ boxShadow: '-4px 0 24px rgba(0,32,60,0.12)', borderLeft: '1px solid rgba(0,85,127,0.1)' }}>
+
+            {/* Header */}
             <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: 'rgba(0,85,127,0.1)' }}>
               <div>
                 <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b2b2b2' }}>Proveedor</p>
                 <h2 className="text-base font-bold text-tq-snorkel">{selected.proveedor}</h2>
-                <p className="text-xs" style={{ color: '#b2b2b2' }}>{selected.modelos} modelos</p>
+                <p className="text-xs" style={{ color: '#b2b2b2' }}>{selected.modelos} modelos · {selected.familias.length} familias</p>
               </div>
               <button onClick={() => setSelected(null)} className="text-lg opacity-40 hover:opacity-70">✕</button>
             </div>
 
             <div className="p-5 space-y-5">
+
+              {/* KPIs */}
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Modelos', value: selected.modelos },
-                  { label: 'Ingresos 12m', value: fmtEuro(selected.ingresos) },
-                  { label: 'Margen medio', value: selected.margenMedio != null ? selected.margenMedio.toFixed(1) + '%' : '—' },
-                  { label: 'ABC-A', value: selected.abcA },
+                  { label: 'Modelos',       value: selected.modelos },
+                  { label: 'Ingresos 12m',  value: fmtEuro(selected.ingresos) },
+                  {
+                    label: 'Precio medio',
+                    value: selected.precioMedio != null ? fmtEuro(selected.precioMedio) : '—',
+                  },
+                  {
+                    label: 'Margen medio',
+                    value: selected.margenMedio != null ? selected.margenMedio.toFixed(1) + '%' : '—',
+                    color: selected.margenMedio == null ? undefined
+                      : selected.margenMedio >= defaultMarginTarget ? '#3A9E6A'
+                      : selected.margenMedio >= defaultMarginTarget * 0.8 ? '#C8842A'
+                      : '#C0392B',
+                  },
                 ].map(k => (
                   <div key={k.label} className="rounded-lg px-3 py-2.5" style={{ background: 'rgba(0,85,127,0.04)' }}>
                     <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#b2b2b2' }}>{k.label}</div>
-                    <div className="text-sm font-bold text-tq-snorkel">{k.value}</div>
+                    <div className="text-sm font-bold" style={{ color: 'color' in k && k.color ? k.color : '#00264d' }}>{k.value}</div>
                   </div>
                 ))}
               </div>
 
-              {/* Familias distribution */}
+              {/* ABC por ingresos */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>ABC por ingresos</p>
+                <AbcBars a={selected.abcA} b={selected.abcB} c={selected.abcC} total={selected.modelos} />
+              </div>
+
+              {/* ABC por rotación */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>ABC por rotación (uds.)</p>
+                <AbcBars
+                  a={selected.abcA_uni} b={selected.abcB_uni} c={selected.abcC_uni}
+                  total={selected.modelos}
+                  colorA="#C8842A" colorB="#8B5E1A" colorC="#e8d5b7"
+                />
+              </div>
+
+              {/* Familias */}
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>Familias</p>
                 <div className="flex flex-wrap gap-1.5">
                   {selected.familias.map(f => (
                     <span key={f} className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,85,127,0.06)', color: '#00557f' }}>{f}</span>
-                  ))}
-                </div>
-              </div>
-
-              {/* ABC */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#b2b2b2' }}>Distribución ABC</p>
-                <div className="space-y-1.5">
-                  {([['A', selected.abcA, '#3A9E6A'], ['B', selected.abcB, '#0099f2'], ['C', selected.abcC, '#C8842A']] as const).map(([label, count, color]) => (
-                    <div key={label} className="flex items-center gap-2 text-xs">
-                      <span className="w-4 font-bold" style={{ color }}>{label}</span>
-                      <div className="flex-1 h-2 rounded-full bg-[rgba(0,85,127,0.08)]">
-                        <div className="h-2 rounded-full" style={{ width: `${selected.modelos > 0 ? (count / selected.modelos) * 100 : 0}%`, background: color }} />
-                      </div>
-                      <span className="w-6 text-right" style={{ color: '#b2b2b2' }}>{count}</span>
-                    </div>
                   ))}
                 </div>
               </div>
@@ -255,9 +290,9 @@ export function SuppliersClient({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 pt-2">
-                <Link href={`/products?supplier=${encodeURIComponent(selected.proveedor)}`}
-                  className="text-sm font-semibold px-4 py-2.5 rounded-lg text-center text-white"
+              <div className="pt-2">
+                <Link href={`/products?proveedor=${encodeURIComponent(selected.proveedor)}`}
+                  className="block text-sm font-semibold px-4 py-2.5 rounded-lg text-center text-white"
                   style={{ background: '#00557f' }}>
                   Ver todos sus productos →
                 </Link>

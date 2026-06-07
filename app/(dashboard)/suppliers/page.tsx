@@ -11,8 +11,8 @@ export default async function SuppliersPage({
   const { data: rawProducts } = await supabase
     .from('products')
     .select(`
-      codigo_modelo, familia, supplier_name, abc_ventas, ingresos_12m, num_variantes, category,
-      product_variants(stock_variante, pct_margen_bruto, es_variante_lider)
+      codigo_modelo, familia, supplier_name, abc_ventas, abc_unidades, ingresos_12m, num_variantes, category,
+      product_variants(stock_variante, pct_margen_bruto, precio_venta, es_variante_lider)
     `)
 
   const { data: pricingRules } = await supabase
@@ -30,10 +30,11 @@ export default async function SuppliersPage({
     familia: string | null
     supplier_name: string | null
     abc_ventas: string | null
+    abc_unidades: string | null
     ingresos_12m: number | null
     num_variantes: number | null
     category: string | null
-    product_variants: { stock_variante: number | null; pct_margen_bruto: number | null; es_variante_lider: boolean }[]
+    product_variants: { stock_variante: number | null; pct_margen_bruto: number | null; precio_venta: number | null; es_variante_lider: boolean }[]
   }
 
   const products = (rawProducts ?? []) as unknown as RawProduct[]
@@ -46,7 +47,9 @@ export default async function SuppliersPage({
     modelos: number
     ingresos: number
     abcA: number; abcB: number; abcC: number
+    abcA_uni: number; abcB_uni: number; abcC_uni: number
     margenValues: number[]
+    precioValues: number[]
     familias: Set<string>
     topProductos: { codigo_modelo: string; familia: string | null; abc_ventas: string | null; ingresos_12m: number | null }[]
     abcATotal: number; abcAConStock: number
@@ -55,7 +58,7 @@ export default async function SuppliersPage({
   for (const p of products) {
     const key = p.supplier_name ?? 'Sin proveedor'
     if (!supplierMap.has(key)) {
-      supplierMap.set(key, { proveedor: key, modelos: 0, ingresos: 0, abcA: 0, abcB: 0, abcC: 0, margenValues: [], familias: new Set(), topProductos: [], abcATotal: 0, abcAConStock: 0 })
+      supplierMap.set(key, { proveedor: key, modelos: 0, ingresos: 0, abcA: 0, abcB: 0, abcC: 0, abcA_uni: 0, abcB_uni: 0, abcC_uni: 0, margenValues: [], precioValues: [], familias: new Set(), topProductos: [], abcATotal: 0, abcAConStock: 0 })
     }
     const s = supplierMap.get(key)!
     s.modelos++
@@ -63,9 +66,13 @@ export default async function SuppliersPage({
     if (p.abc_ventas === 'A') { s.abcA++; s.abcATotal++ }
     else if (p.abc_ventas === 'B') s.abcB++
     else if (p.abc_ventas === 'C') s.abcC++
+    if (p.abc_unidades === 'A') s.abcA_uni++
+    else if (p.abc_unidades === 'B') s.abcB_uni++
+    else if (p.abc_unidades === 'C') s.abcC_uni++
     if (p.familia) s.familias.add(p.familia)
     const leader = p.product_variants.find(v => v.es_variante_lider) ?? p.product_variants[0]
     if (leader?.pct_margen_bruto != null) s.margenValues.push(leader.pct_margen_bruto)
+    if (leader?.precio_venta != null)     s.precioValues.push(leader.precio_venta)
     const stockTotal = p.product_variants.reduce((sum, v) => sum + (v.stock_variante ?? 0), 0)
     if (p.abc_ventas === 'A' && stockTotal > 0) s.abcAConStock++
     s.topProductos.push({ codigo_modelo: p.codigo_modelo, familia: p.familia, abc_ventas: p.abc_ventas, ingresos_12m: p.ingresos_12m })
@@ -81,9 +88,13 @@ export default async function SuppliersPage({
     pctIngresos: totalIngresos > 0 ? (s.ingresos / totalIngresos) * 100 : 0,
     pctIngresosMax: maxIngresos > 0 ? (s.ingresos / maxIngresos) * 100 : 0,
     margenMedio: s.margenValues.length > 0 ? s.margenValues.reduce((a, b) => a + b, 0) / s.margenValues.length : null,
+    precioMedio: s.precioValues.length > 0 ? s.precioValues.reduce((a, b) => a + b, 0) / s.precioValues.length : null,
     abcA: s.abcA,
     abcB: s.abcB,
     abcC: s.abcC,
+    abcA_uni: s.abcA_uni,
+    abcB_uni: s.abcB_uni,
+    abcC_uni: s.abcC_uni,
     abcATotal: s.abcATotal,
     abcAConStock: s.abcAConStock,
     familias: Array.from(s.familias).sort(),
