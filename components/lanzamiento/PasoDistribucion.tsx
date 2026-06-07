@@ -6,23 +6,20 @@ import { WizardLayout, useAutoSave } from './WizardLayout'
 import { CoachingPanel } from './CoachingPanel'
 import { SugerenciaIA }  from './SugerenciaIA'
 import { CLUSTERS, nTiendasDesdeClusters, fmtEur } from '@/lib/lanzamiento'
-import type { Lanzamiento } from '@/types'
+import type { Lanzamiento, Tienda } from '@/types'
 
-// ── Tiendas por cluster (estáticas hasta que exista la tabla tiendas) ──
-
-function generarTiendas(selectedClusters: string[]) {
-  return CLUSTERS.flatMap(cl => {
-    if (!selectedClusters.includes(cl.id)) return []
-    return Array.from({ length: cl.nTiendas }, (_, i) => ({
-      id:        `${cl.id}-${i + 1}`,
-      label:     `Tienda ${cl.id}-${i + 1}`,
-      clusterId: cl.id,
-      color:     cl.color,
-    }))
-  })
+// ── Validación de dist. personalizada ────────────────────────
+// Si los borradores anteriores tienen claves fake (ej: "A-1"), se resetean.
+function validarCustomDist(
+  saved: Record<string, number> | null,
+  tiendaIds: Set<string>,
+): Record<string, number> {
+  if (!saved) return {}
+  const allValid = Object.keys(saved).every(k => tiendaIds.has(k))
+  return allValid ? saved : {}
 }
 
-// ── Chip de advertencia / info ──────────────────────────────────
+// ── Chip de advertencia / info ────────────────────────────────
 
 function AlertaVolumen({
   totalUds,
@@ -68,11 +65,20 @@ function AlertaVolumen({
 
 // ── Componente principal ──────────────────────────────────────
 
-export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) {
+export function PasoDistribucion({
+  lanzamiento,
+  tiendas,
+}: {
+  lanzamiento: Lanzamiento
+  tiendas:     Tienda[]
+}) {
   const router             = useRouter()
   const { save, flush, status } = useAutoSave(lanzamiento.id)
 
-  // Estado del paso
+  // Índice de IDs reales para validar distribuciones guardadas
+  const tiendaIds = new Set(tiendas.map(t => t.id))
+
+  // ── Estado ───────────────────────────────────────────────────
   const [selectedClusters,    setSelectedClusters]    = useState<string[]>(
     (lanzamiento.clusters_objetivo as string[] | null) ?? ['A', 'B', 'C'],
   )
@@ -83,13 +89,18 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
     !!lanzamiento.distribucion_personalizada,
   )
   const [customDist, setCustomDist] = useState<Record<string, number>>(
-    (lanzamiento.distribucion_personalizada as Record<string, number> | null) ?? {},
+    validarCustomDist(
+      lanzamiento.distribucion_personalizada as Record<string, number> | null,
+      tiendaIds,
+    ),
   )
-  const [mediaVentas,         setMediaVentas]         = useState<number | null>(null)
+  const [mediaVentas, setMediaVentas] = useState<number | null>(null)
 
-  // ── KPIs derivados ───────────────────────────────────────────
-  const tiendas     = generarTiendas(selectedClusters)
-  const totalTiendas = nTiendasDesdeClusters(selectedClusters)
+  // ── Tiendas activas filtradas por cluster ────────────────────
+  const tiendasVisibles = tiendas.filter(
+    t => t.cluster != null && selectedClusters.includes(t.cluster),
+  )
+  const totalTiendas    = nTiendasDesdeClusters(selectedClusters, tiendas)
 
   const totalUnidades = distribPersonalizada
     ? Object.values(customDist).reduce((s, v) => s + (v || 0), 0)
@@ -117,7 +128,7 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
       ? selectedClusters.filter(c => c !== id)
       : [...selectedClusters, id]
     setSelectedClusters(next)
-    const nTiendas = nTiendasDesdeClusters(next)
+    const nTiendas = nTiendasDesdeClusters(next, tiendas)
     save({ clusters_objetivo: next, n_tiendas: nTiendas })
   }
 
@@ -130,9 +141,8 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
   function handleTogglePersonalizada(on: boolean) {
     setDistribPersonalizada(on)
     if (on) {
-      // Pre-rellenar con el valor uniforme
       const initDist: Record<string, number> = {}
-      generarTiendas(selectedClusters).forEach(t => { initDist[t.id] = udsPerTienda })
+      tiendasVisibles.forEach(t => { initDist[t.id] = udsPerTienda })
       setCustomDist(initDist)
       save({ distribucion_personalizada: initDist })
     } else {
@@ -150,7 +160,7 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
 
   function distribuirIgual() {
     const dist: Record<string, number> = {}
-    tiendas.forEach(t => { dist[t.id] = udsPerTienda })
+    tiendasVisibles.forEach(t => { dist[t.id] = udsPerTienda })
     setCustomDist(dist)
     save({ distribucion_personalizada: dist })
   }
@@ -161,8 +171,8 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        paso_actual:              Math.max(lanzamiento.paso_actual, 4),
-        n_tiendas:                totalTiendas,
+        paso_actual:               Math.max(lanzamiento.paso_actual, 4),
+        n_tiendas:                 totalTiendas,
         output_presupuesto_compra: presupuestoCompra,
       }),
     })
@@ -179,8 +189,8 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-3"
-        concepto="Selecciona qué clusters van a recibir este lanzamiento. El Cluster A son las 5 flagship (mayor volumen y visibilidad), el B son las 8 estándar, y el C son las 4 pequeñas o turísticas con perfiles de rotación distintos. Empieza conservador: es más fácil ampliar una reposición que gestionar el exceso."
-        ejemplo="Un anillo de oro con PVP 150€ arrancó solo en clusters A y B. A las 4 semanas ampliamos a C cuando confirmamos que la curva era buena. Evitamos tener 80 unidades paradas en tiendas con menos tráfico."
+        concepto="Selecciona qué clusters van a recibir este lanzamiento. El Cluster A son las 8 flagship (mayor volumen y visibilidad), el B son las 8 estándar, y el C son las 3 pequeñas con perfiles de rotación distintos. Empieza conservador: es más fácil ampliar una reposición que gestionar el exceso."
+        ejemplo="Un anillo de oro con PVP 150€ arrancó solo en clusters A y B. A las 4 semanas ampliamos a C cuando confirmamos que la curva era buena. Evitamos tener stock parado en tiendas con menos tráfico."
         consecuencia="Si abres demasiados clusters de golpe y la demanda no se confirma, tendrás que hacer outlet o retirar antes de tiempo."
       />
 
@@ -191,7 +201,8 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
         </label>
         <div className="grid grid-cols-3 gap-3">
           {CLUSTERS.map(cl => {
-            const active = selectedClusters.includes(cl.id)
+            const active          = selectedClusters.includes(cl.id)
+            const nTiendasCluster = tiendas.filter(t => t.cluster === cl.id).length
             return (
               <button
                 key={cl.id}
@@ -204,21 +215,15 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
                 }}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span
-                    className="text-lg font-black"
-                    style={{ color: active ? cl.color : '#c0cfd8' }}
-                  >
+                  <span className="text-lg font-black" style={{ color: active ? cl.color : '#c0cfd8' }}>
                     {cl.id}
                   </span>
                   {active && (
                     <span className="text-[9px] font-bold" style={{ color: cl.color }}>✓</span>
                   )}
                 </div>
-                <p
-                  className="text-[13px] font-semibold leading-tight mb-0.5"
-                  style={{ color: active ? '#00264d' : '#8fa8b8' }}
-                >
-                  {cl.nTiendas} tiendas
+                <p className="text-[13px] font-semibold leading-tight mb-0.5" style={{ color: active ? '#00264d' : '#8fa8b8' }}>
+                  {nTiendasCluster} tiendas
                 </p>
                 <p className="text-[10px]" style={{ color: '#b2b2b2' }}>
                   {cl.descripcion}
@@ -240,7 +245,6 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
           Unidades por tienda (pedido inicial)
         </label>
         <div className="flex items-center gap-3">
-          {/* Stepper visual */}
           <div className="flex items-center gap-0 rounded-lg overflow-hidden" style={{ border: '1.5px solid rgba(0,85,127,0.15)' }}>
             <button
               onClick={() => handleUdsPerTienda(udsPerTienda - 1)}
@@ -320,14 +324,15 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
           <span className="text-[10px]" style={{ color: '#b2b2b2' }}>(opcional)</span>
         </label>
 
-        {distribPersonalizada && tiendas.length > 0 && (
+        {distribPersonalizada && tiendasVisibles.length > 0 && (
           <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,85,127,0.1)' }}>
+            {/* Header */}
             <div
               className="flex items-center justify-between px-4 py-2.5"
               style={{ background: 'rgba(0,85,127,0.04)', borderBottom: '1px solid rgba(0,85,127,0.08)' }}
             >
               <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>
-                {tiendas.length} tiendas seleccionadas
+                {tiendasVisibles.length} tiendas seleccionadas
               </span>
               <button
                 onClick={distribuirIgual}
@@ -338,9 +343,10 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
               </button>
             </div>
 
+            {/* Tiendas agrupadas por cluster */}
             <div className="divide-y divide-[rgba(0,85,127,0.06)]">
               {CLUSTERS.map(cl => {
-                const clTiendas = tiendas.filter(t => t.clusterId === cl.id)
+                const clTiendas = tiendasVisibles.filter(t => t.cluster === cl.id)
                 if (!clTiendas.length) return null
 
                 const subtotal = clTiendas.reduce((s, t) => s + (customDist[t.id] ?? 0), 0)
@@ -360,15 +366,24 @@ export function PasoDistribucion({ lanzamiento }: { lanzamiento: Lanzamiento }) 
                       </span>
                     </div>
 
-                    {/* Tiendas del cluster */}
+                    {/* Tiendas del cluster con nombres reales */}
                     {clTiendas.map(tienda => (
                       <div
                         key={tienda.id}
                         className="flex items-center justify-between px-4 py-2"
                         style={{ borderTop: '1px solid rgba(0,85,127,0.04)' }}
                       >
-                        <span className="text-[12px]" style={{ color: '#00264d' }}>{tienda.label}</span>
-                        <div className="flex items-center gap-0 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(0,85,127,0.12)' }}>
+                        <div className="min-w-0">
+                          <span className="text-[12px] font-medium" style={{ color: '#00264d' }}>
+                            {tienda.nombre_corto ?? tienda.nombre}
+                          </span>
+                          {tienda.zona && (
+                            <span className="ml-1.5 text-[10px]" style={{ color: '#b2b2b2' }}>
+                              {tienda.zona}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-0 rounded-lg overflow-hidden shrink-0" style={{ border: '1px solid rgba(0,85,127,0.12)' }}>
                           <button
                             onClick={() => handleCustomUds(tienda.id, (customDist[tienda.id] ?? 0) - 1)}
                             className="w-7 h-7 flex items-center justify-center text-[14px] transition-colors hover:bg-[rgba(0,85,127,0.05)]"

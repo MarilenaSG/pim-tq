@@ -389,3 +389,21 @@ export interface StockPorTienda {
   fecha_snapshot: string
   synced_at: string
 }
+
+// ── Tiendas ───────────────────────────────────────────────────
+
+export type TiendaCluster = 'A' | 'B' | 'C'
+export type TiendaZona    = 'Capital' | 'Periferia' | 'Turistica' | 'Ecommerce'
+export type TiendaTipo    = 'Flagship' | 'Estandar' | 'Pequeña' | 'Almacen'
+
+export interface Tienda {
+  id:           string           // slug (ej: 'la_laguna')
+  nombre:       string           // valor exacto en ventas_mensuales.tienda
+  nombre_corto: string | null    // para UI compacta
+  zona:         TiendaZona | null
+  tipo:         TiendaTipo | null
+  cluster:      TiendaCluster | null
+  activo:       boolean
+  es_almacen:   boolean
+  created_at:   string
+}

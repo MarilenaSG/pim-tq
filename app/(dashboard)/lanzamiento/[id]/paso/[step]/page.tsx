@@ -7,7 +7,7 @@ import { PasoReferencia }   from '@/components/lanzamiento/PasoReferencia'
 import { PasoCurva }        from '@/components/lanzamiento/PasoCurva'
 import { PasoCampana }      from '@/components/lanzamiento/PasoCampana'
 import { PasoSimulador }    from '@/components/lanzamiento/PasoSimulador'
-import type { Lanzamiento } from '@/types'
+import type { Lanzamiento, Tienda } from '@/types'
 
 export default async function WizardStepPage({
   params,
@@ -46,7 +46,16 @@ export default async function WizardStepPage({
   }
 
   if (step === 3) {
-    return <PasoDistribucion lanzamiento={lanzamiento} />
+    const { data: tiendasRaw } = await supabase
+      .from('tiendas')
+      .select('*')
+      .eq('activo', true)
+      .eq('es_almacen', false)
+      .order('cluster', { ascending: true })
+      .order('nombre', { ascending: true })
+
+    const tiendas = (tiendasRaw ?? []) as Tienda[]
+    return <PasoDistribucion lanzamiento={lanzamiento} tiendas={tiendas} />
   }
 
   if (step === 4) {

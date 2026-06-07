@@ -1,4 +1,4 @@
-import type { SemanaProyeccion, LanzamientoEscenario } from '@/types'
+import type { SemanaProyeccion, LanzamientoEscenario, Tienda } from '@/types'
 
 // ── Cálculo de curva de demanda ───────────────────────────────
 // Importable tanto en servidor como en cliente (paso 7).
@@ -119,19 +119,19 @@ export function crearEscenario(
   }
 }
 
-// ── Clusters estáticos (TODO: reemplazar con query tiendas) ──
+// ── Clusters — metadatos de display (counts vienen de la tabla tiendas) ──
 
 export const CLUSTERS = [
-  { id: 'A', label: 'Cluster A', descripcion: 'Flagship',          nTiendas: 5, color: '#3A9E6A' },
-  { id: 'B', label: 'Cluster B', descripcion: 'Estándar',          nTiendas: 8, color: '#0099f2' },
-  { id: 'C', label: 'Cluster C', descripcion: 'Pequeñas / Turísticas', nTiendas: 4, color: '#C8842A' },
+  { id: 'A', label: 'Cluster A', descripcion: 'Flagship', color: '#3A9E6A' },
+  { id: 'B', label: 'Cluster B', descripcion: 'Estándar', color: '#0099f2' },
+  { id: 'C', label: 'Cluster C', descripcion: 'Pequeña',  color: '#C8842A' },
 ] as const
 
-export function nTiendasDesdeClusters(clusters: string[]): number {
-  return clusters.reduce((sum, id) => {
-    const c = CLUSTERS.find(cl => cl.id === id)
-    return sum + (c ? c.nTiendas : 0)
-  }, 0)
+export type ClusterId = 'A' | 'B' | 'C'
+
+/** Cuenta tiendas activas en los clusters seleccionados usando datos reales de la tabla tiendas */
+export function nTiendasDesdeClusters(clusters: string[], tiendas: Tienda[]): number {
+  return tiendas.filter(t => t.cluster != null && clusters.includes(t.cluster)).length
 }
 
 // ── Formatters ────────────────────────────────────────────────
