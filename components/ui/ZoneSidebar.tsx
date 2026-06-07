@@ -20,6 +20,7 @@ const NAV = [
     label: 'Gestión',
     items: [
       { label: 'Campañas',          href: '/campaigns',           icon: '◈' },
+      { label: 'Lanzamientos',      href: '/lanzamiento',         icon: '◈' },
       { label: 'Alertas',           href: '/alerts',              icon: '⚑', badge: true },
     ],
   },
@@ -80,9 +81,8 @@ export function ZoneSidebar() {
 
   function isActive(href: string, exact?: boolean) {
     if (exact) return pathname === href
-    if (href === '/analytics/surtido') {
-      return pathname.startsWith('/analytics')
-    }
+    if (href === '/analytics/surtido') return pathname.startsWith('/analytics')
+    if (href === '/lanzamiento') return pathname.startsWith('/lanzamiento')
     return pathname === href || pathname.startsWith(href + '/')
   }
 

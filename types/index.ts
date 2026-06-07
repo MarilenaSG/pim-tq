@@ -290,6 +290,78 @@ export interface PriceSuggestionResult {
   alertas: string[]
 }
 
+// ── Lanzamientos ─────────────────────────────────────────────
+
+export type LanzamientoTipo   = 'sku' | 'marca' | 'drop'
+export type LanzamientoEstado = 'borrador' | 'confirmado'
+
+export interface Lanzamiento {
+  id:                         string
+  created_by:                 string | null
+  tipo:                       LanzamientoTipo | null
+  nombre:                     string | null
+  familia:                    string | null
+  metal:                      string | null
+  marca:                      string | null
+  precio_venta:               number | null
+  coste:                      number | null
+  margen_objetivo:            number | null
+  clusters_objetivo:          string[] | null
+  n_tiendas:                  number | null
+  unidades_por_tienda:        number | null
+  distribucion_personalizada: Record<string, number> | null
+  semanas_rampa:              number | null
+  crecimiento_semanal_pct:    number | null
+  factor_ajuste_pct:          number | null
+  referencia_analoga:         string | null
+  descuento_promo_pct:        number | null
+  semanas_promo:              number | null
+  tipo_campana:               string | null
+  notas_campana:              string | null
+  escenarios:                 LanzamientoEscenario[] | null
+  estado:                     LanzamientoEstado
+  paso_actual:                number
+  output_unidades_total:      number | null
+  output_presupuesto_compra:  number | null
+  output_margen_proyectado:   number | null
+  output_breakeven_semanas:   number | null
+  proveedor:                  string | null
+  fecha_lanzamiento:          string | null   // ISO date
+  lead_time_semanas:          number
+  created_at:                 string
+  updated_at:                 string
+}
+
+export interface LanzamientoEscenario {
+  id:          string
+  nombre:      string
+  params:      Record<string, number>
+  kpis: {
+    unidades_total:    number
+    ingresos:          number
+    margen_bruto:      number
+    margen_pct:        number
+    breakeven_semanas: number
+  }
+  confirmado: boolean
+}
+
+export interface SemanaProyeccion {
+  semana:              number
+  unidades:            number
+  ingresos:            number
+  margen:              number
+  margenAcumulado:     number
+  breakEvenAlcanzado:  boolean
+}
+
+export interface MbBenchmark {
+  mb_medio: number | null
+  mb_min:   number | null
+  mb_max:   number | null
+  n:        number
+}
+
 // ── Ventas por tienda ─────────────────────────────────────────
 
 export interface VentasPorTienda {
