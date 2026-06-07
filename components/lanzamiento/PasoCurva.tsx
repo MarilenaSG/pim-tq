@@ -43,7 +43,7 @@ function KpiBlock({
       <p className="text-[16px] font-black leading-tight" style={{ color }}>
         {value}
       </p>
-      {sub && <p className="text-[10px] mt-0.5" style={{ color: '#b2b2b2' }}>{sub}</p>}
+      {sub && <p className="text-[10px] mt-0.5" style={{ color: '#6b8a9a' }}>{sub}</p>}
     </div>
   )
 }
@@ -338,7 +338,7 @@ export function PasoCurva({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                 </div>
                 <span className="text-[12px]" style={{ color: '#8fa8b8' }}>% / semana</span>
                 {crecimientoSemanalPct === 0 && (
-                  <span className="text-[11px]" style={{ color: '#c0cfd8' }}>Sin crecimiento — meseta plana</span>
+                  <span className="text-[11px]" style={{ color: '#8fa8b8' }}>Sin crecimiento — meseta plana</span>
                 )}
                 {crecimientoSemanalPct > 15 && (
                   <span className="text-[11px]" style={{ color: '#C8842A' }}>Crecimiento muy optimista</span>
@@ -359,7 +359,7 @@ export function PasoCurva({ lanzamiento }: { lanzamiento: Lanzamiento }) {
               <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>
                 Curva proyectada — 16 semanas
               </span>
-              <span className="text-[10px]" style={{ color: '#b2b2b2' }}>
+              <span className="text-[10px]" style={{ color: '#6b8a9a' }}>
                 Sin promo — ver Paso 6 para impacto campaña
               </span>
             </div>

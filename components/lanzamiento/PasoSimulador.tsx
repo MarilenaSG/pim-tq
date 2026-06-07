@@ -67,7 +67,7 @@ function fmtPayback(m: number | null): string {
 }
 
 function paybackColor(m: number | null): string {
-  if (m == null)  return '#b2b2b2'
+  if (m == null)  return '#8fa8b8'
   if (m > 12)     return '#C0392B'
   if (m > 6)      return '#C8842A'
   return '#3A9E6A'
@@ -781,21 +781,21 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                 <p className="text-[16px] font-black" style={{ color: '#00264d' }}>
                   {opexPersonalPct + opexGastosPct}%
                 </p>
-                <p className="text-[9px]" style={{ color: '#b2b2b2' }}>personal + gastos</p>
+                <p className="text-[9px]" style={{ color: '#6b8a9a' }}>personal + gastos</p>
               </div>
               <div className="text-center rounded-lg py-2" style={{ background: 'white', border: '1px solid rgba(0,85,127,0.08)' }}>
                 <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>EBITDA Base</p>
                 <p className="text-[16px] font-black" style={{ color: ebitdaColor(paybacks[1]?.ebitdaPct ?? 0) }}>
                   {fmtPct(paybacks[1]?.ebitdaPct ?? 0, 0)}
                 </p>
-                <p className="text-[9px]" style={{ color: '#b2b2b2' }}>MB − OPEX</p>
+                <p className="text-[9px]" style={{ color: '#6b8a9a' }}>MB − OPEX</p>
               </div>
               <div className="text-center rounded-lg py-2" style={{ background: 'white', border: '1px solid rgba(0,85,127,0.08)' }}>
                 <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>Payback Base</p>
                 <p className="text-[16px] font-black" style={{ color: paybackColor(paybacks[1]?.paybackMeses ?? null) }}>
                   {paybacks[1]?.paybackMeses != null ? `${paybacks[1].paybackMeses} m.` : 'n/a'}
                 </p>
-                <p className="text-[9px]" style={{ color: '#b2b2b2' }}>
+                <p className="text-[9px]" style={{ color: '#6b8a9a' }}>
                   {paybacks[1]?.margenMensual != null
                     ? `${fmtEur(paybacks[1].margenMensual)}/mes MB`
                     : 'sobre margen bruto'}
@@ -948,7 +948,7 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                     )}
                   </button>
                 </div>
-                <p className="text-[11px]" style={{ color: '#b2b2b2' }}>
+                <p className="text-[11px]" style={{ color: '#6b8a9a' }}>
                   El botón «Confirmar lanzamiento ✓» en la barra inferior pedirá una confirmación final.
                 </p>
               </>

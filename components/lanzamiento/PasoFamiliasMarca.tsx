@@ -118,7 +118,7 @@ export function PasoFamiliasMarca({ lanzamiento }: { lanzamiento: Lanzamiento })
             })}
           </div>
         ) : (
-          <p className="text-[12px]" style={{ color: '#b2b2b2' }}>Cargando familias…</p>
+          <p className="text-[12px]" style={{ color: '#8fa8b8' }}>Cargando familias…</p>
         )}
       </div>
 
@@ -142,14 +142,14 @@ export function PasoFamiliasMarca({ lanzamiento }: { lanzamiento: Lanzamiento })
               </span>
             ))}
           </div>
-          <p className="mt-2 text-[11px]" style={{ color: '#b2b2b2' }}>
+          <p className="mt-2 text-[11px]" style={{ color: '#6b8a9a' }}>
             Siguiente: define la arquitectura de precios para cada familia
           </p>
         </div>
       )}
 
       {familiasSeleccionadas.length === 0 && (
-        <p className="text-center text-[12px] py-4" style={{ color: '#c0cfd8' }}>
+        <p className="text-center text-[12px] py-4" style={{ color: '#6b8a9a' }}>
           Selecciona al menos una familia para continuar
         </p>
       )}

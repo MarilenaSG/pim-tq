@@ -197,12 +197,12 @@ export function PasoDistribucion({
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        paso_actual:               Math.max(lanzamiento.paso_actual, 4),
+        paso_actual:               Math.max(lanzamiento.paso_actual, step + 1),
         n_tiendas:                 totalTiendas,
         output_presupuesto_compra: presupuestoCompra,
       }),
     })
-    router.push(`/lanzamiento/${lanzamiento.id}/paso/4`)
+    router.push(`/lanzamiento/${lanzamiento.id}/paso/${step + 1}`)
   }
 
   return (

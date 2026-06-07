@@ -21,7 +21,7 @@ function Stepper({
       <div className="flex items-end justify-between mb-1.5">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>{label}</p>
-          {sub && <p className="text-[10px]" style={{ color: '#b2b2b2' }}>{sub}</p>}
+          {sub && <p className="text-[10px]" style={{ color: '#6b8a9a' }}>{sub}</p>}
         </div>
         <span className="text-[15px] font-black" style={{ color: '#00264d' }}>
           {unit === '€' ? fmtEur(value) : `${value}${unit}`}
@@ -210,7 +210,7 @@ export function PasoPresupuesto({ lanzamiento, step = 6 }: { lanzamiento: Lanzam
         >
           <div>
             <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>Inversión total</p>
-            <p className="text-[10px]" style={{ color: '#b2b2b2' }}>
+            <p className="text-[10px]" style={{ color: '#5a7a8a' }}>
               {fmtEur(inversionCompra)} producto + {fmtEur(presupuestoMarketing)} marketing
             </p>
           </div>
@@ -266,7 +266,7 @@ export function PasoPresupuesto({ lanzamiento, step = 6 }: { lanzamiento: Lanzam
       </div>
 
       {/* ── Nota ─────────────────────────────────────── */}
-      <p className="text-[11px]" style={{ color: '#b2b2b2' }}>
+      <p className="text-[11px]" style={{ color: '#6b8a9a' }}>
         El EBITDA y el payback exactos se calculan en el simulador del paso siguiente, una vez fijados los escenarios de venta.
       </p>
     </WizardLayout>

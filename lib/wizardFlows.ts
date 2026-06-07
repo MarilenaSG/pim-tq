@@ -9,7 +9,8 @@ export type WizardStepKey =
   | 'referencia'          // SKU: análogo histórico
   | 'curva'               // SKU: parámetros de demanda
   | 'campana'             // SKU + Drop: campaña/promo
-  | 'simulador'           // shared: 3 escenarios
+  | 'simulador'           // SKU + Drop: 3 escenarios
+  | 'proyeccion'          // Marca: alias de simulador para el flujo marca
   | 'marca_drop'          // Drop: marca existente + fecha
   | 'familias_drop'       // Drop: familias + cantidades
   | 'identidad_marca'     // Marca: nombre + posicionamiento

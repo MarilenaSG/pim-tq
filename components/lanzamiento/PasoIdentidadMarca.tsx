@@ -82,7 +82,7 @@ export function PasoIdentidadMarca({ lanzamiento }: { lanzamiento: Lanzamiento }
           Nombre de la marca
         </label>
         <p className="text-[20px] font-black" style={{ color: '#00264d' }}>
-          {lanzamiento.nombre ?? <span className="text-[14px] font-normal" style={{ color: '#c0cfd8' }}>Sin nombre — vuelve al paso 1</span>}
+          {lanzamiento.nombre ?? <span className="text-[14px] font-normal" style={{ color: '#8fa8b8' }}>Sin nombre — vuelve al paso 1</span>}
         </p>
       </div>
 
@@ -108,10 +108,10 @@ export function PasoIdentidadMarca({ lanzamiento }: { lanzamiento: Lanzamiento }
                 <p className="text-[13px] font-black mb-0.5" style={{ color: active ? p.color : '#8fa8b8' }}>
                   {p.label}
                 </p>
-                <p className="text-[11px] font-bold mb-1.5" style={{ color: active ? '#00264d' : '#c0cfd8' }}>
+                <p className="text-[11px] font-bold mb-1.5" style={{ color: active ? '#00264d' : '#8fa8b8' }}>
                   {p.rango}
                 </p>
-                <p className="text-[10px] leading-snug" style={{ color: '#b2b2b2' }}>
+                <p className="text-[10px] leading-snug" style={{ color: active ? '#5a7a8a' : '#8fa8b8' }}>
                   {p.descripcion}
                 </p>
               </button>

@@ -287,7 +287,7 @@ export function PasoCampana({ lanzamiento, step = 6 }: { lanzamiento: Lanzamient
                   +
                 </button>
               </div>
-              <p className="text-[10px] mt-1" style={{ color: '#b2b2b2' }}>
+              <p className="text-[10px] mt-1" style={{ color: '#5a7a8a' }}>
                 PVP promo: {lanzamiento.precio_venta
                   ? fmtEur(lanzamiento.precio_venta * (1 - descuentoPromoPct / 100))
                   : '—'}
@@ -324,7 +324,7 @@ export function PasoCampana({ lanzamiento, step = 6 }: { lanzamiento: Lanzamient
                   +
                 </button>
               </div>
-              <p className="text-[10px] mt-1" style={{ color: '#b2b2b2' }}>
+              <p className="text-[10px] mt-1" style={{ color: '#6b8a9a' }}>
                 Semanas 1 a {semanasPromo} con precio reducido
               </p>
             </div>
@@ -459,7 +459,7 @@ export function PasoCampana({ lanzamiento, step = 6 }: { lanzamiento: Lanzamient
       {/* ── Presupuesto de marketing ─────────────────────────── */}
       <div className="mb-5">
         <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>
-          Inversión en marketing <span className="font-normal" style={{ color: '#c0cfd8' }}>(€ total de campaña)</span>
+          Inversión en marketing <span className="font-normal" style={{ color: '#8fa8b8' }}>(€ total de campaña)</span>
         </label>
         <div className="flex items-center gap-3">
           <div
@@ -487,7 +487,7 @@ export function PasoCampana({ lanzamiento, step = 6 }: { lanzamiento: Lanzamient
             </span>
           )}
         </div>
-        <p className="text-[10px] mt-1" style={{ color: '#c0cfd8' }}>
+        <p className="text-[10px] mt-1" style={{ color: '#6b8a9a' }}>
           Se usará en el Paso 7 para calcular el payback real de la inversión.
         </p>
       </div>
@@ -495,7 +495,7 @@ export function PasoCampana({ lanzamiento, step = 6 }: { lanzamiento: Lanzamient
       {/* ── Notas de campaña ────────────────────────────────── */}
       <div className="mb-2">
         <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>
-          Notas de campaña <span className="font-normal" style={{ color: '#c0cfd8' }}>(opcional)</span>
+          Notas de campaña <span className="font-normal" style={{ color: '#8fa8b8' }}>(opcional)</span>
         </label>
         <textarea
           value={notasCampana}
@@ -514,7 +514,7 @@ export function PasoCampana({ lanzamiento, step = 6 }: { lanzamiento: Lanzamient
       </div>
 
       {/* Hint para el último paso */}
-      <p className="text-[11px] mt-4" style={{ color: '#b2b2b2' }}>
+      <p className="text-[11px] mt-4" style={{ color: '#6b8a9a' }}>
         En el <strong style={{ color: '#00557f' }}>Paso 7</strong> verás el simulador completo con el análisis de payback real, podrás crear escenarios y descargar el briefing.
       </p>
     </WizardLayout>

@@ -61,7 +61,7 @@ export function PasoMarcaDrop({ lanzamiento }: { lanzamiento: Lanzamiento }) {
           Nombre del drop
         </label>
         <p className="text-[16px] font-bold" style={{ color: '#00264d' }}>
-          {lanzamiento.nombre ?? <span style={{ color: '#c0cfd8' }}>Sin nombre — vuelve al paso 1</span>}
+          {lanzamiento.nombre ?? <span style={{ color: '#8fa8b8' }}>Sin nombre — vuelve al paso 1</span>}
         </p>
       </div>
 
@@ -119,7 +119,7 @@ export function PasoMarcaDrop({ lanzamiento }: { lanzamiento: Lanzamiento }) {
             background: 'white',
           }}
         />
-        <p className="mt-1.5 text-[11px]" style={{ color: '#b2b2b2' }}>
+        <p className="mt-1.5 text-[11px]" style={{ color: '#6b8a9a' }}>
           Define cuándo arrancan las ventas en tienda. Necesaria para calcular el lead-time de compra.
         </p>
       </div>

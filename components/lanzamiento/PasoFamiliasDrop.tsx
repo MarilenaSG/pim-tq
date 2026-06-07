@@ -37,7 +37,7 @@ function FamiliaCard({
         <button
           onClick={onRemove}
           className="text-[11px] font-medium hover:opacity-70"
-          style={{ color: '#b2b2b2' }}
+          style={{ color: '#8fa8b8' }}
         >
           × quitar
         </button>
@@ -46,7 +46,7 @@ function FamiliaCard({
       {/* Inputs en grid */}
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#b2b2b2' }}>Uds.</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#8fa8b8' }}>Uds.</p>
           <input
             type="number"
             min={1}
@@ -57,7 +57,7 @@ function FamiliaCard({
           />
         </div>
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#b2b2b2' }}>PVP medio</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#8fa8b8' }}>PVP medio</p>
           <input
             type="number"
             min={0}
@@ -70,7 +70,7 @@ function FamiliaCard({
           />
         </div>
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#b2b2b2' }}>Coste medio</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#8fa8b8' }}>Coste medio</p>
           <input
             type="number"
             min={0}
@@ -86,7 +86,7 @@ function FamiliaCard({
 
       {/* Mini resumen */}
       <div className="flex items-center gap-4 mt-2.5 pt-2.5" style={{ borderTop: `1px solid ${color}20` }}>
-        <span className="text-[10px]" style={{ color: '#b2b2b2' }}>
+        <span className="text-[10px]" style={{ color: '#5a7a8a' }}>
           Coste total: <strong style={{ color: '#00264d' }}>
             {item.coste_medio ? fmtEur(item.uds * item.coste_medio) : '—'}
           </strong>
@@ -223,7 +223,7 @@ export function PasoFamiliasDrop({ lanzamiento }: { lanzamiento: Lanzamiento }) 
             ))}
           </div>
         ) : (
-          <p className="text-[12px]" style={{ color: '#b2b2b2' }}>
+          <p className="text-[12px]" style={{ color: '#6b8a9a' }}>
             Todas las familias disponibles ya están en el drop.
           </p>
         )}
@@ -250,7 +250,7 @@ export function PasoFamiliasDrop({ lanzamiento }: { lanzamiento: Lanzamiento }) 
       )}
 
       {familias.length === 0 && (
-        <p className="text-[12px] text-center py-6" style={{ color: '#c0cfd8' }}>
+        <p className="text-[12px] text-center py-6" style={{ color: '#6b8a9a' }}>
           Añade al menos una familia para continuar
         </p>
       )}

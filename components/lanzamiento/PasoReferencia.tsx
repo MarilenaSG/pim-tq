@@ -109,27 +109,27 @@ function ReferenciaCard({
       {/* Métricas en línea */}
       <div className="flex items-center gap-3 mb-3">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#c0cfd8' }}>PVP</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>PVP</span>
           <p className="text-[12px] font-semibold" style={{ color: '#00264d' }}>
             {fmtEur(r.precio_venta)}
           </p>
         </div>
         {r.mb_pct != null && (
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#c0cfd8' }}>MB</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>MB</span>
             <p className="text-[12px] font-semibold" style={{ color: mbColor(r.mb_pct) }}>
               {fmtPct(r.mb_pct, 0)}
             </p>
           </div>
         )}
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#c0cfd8' }}>Uds/mes</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Uds/mes</span>
           <p className="text-[12px] font-semibold" style={{ color: '#00264d' }}>
             {r.avg_uds_mes}
           </p>
         </div>
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#c0cfd8' }}>12m</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>12m</span>
           <p className="text-[12px] font-semibold" style={{ color: '#00264d' }}>
             {r.total_uds_12m.toLocaleString('es-ES')} uds
           </p>
@@ -140,7 +140,7 @@ function ReferenciaCard({
       <Sparkline data={r.serie} color={chartColor} />
 
       {/* Footer */}
-      <p className="text-[9px] mt-1 text-right" style={{ color: '#c0cfd8' }}>
+      <p className="text-[9px] mt-1 text-right" style={{ color: '#8fa8b8' }}>
         {r.meses_con_ventas} meses con ventas · últimos 12 meses
       </p>
     </div>
@@ -313,7 +313,7 @@ export function PasoReferencia({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                 <p className="text-[13px] font-medium mb-1" style={{ color: '#8fa8b8' }}>
                   No hay referencias análogas con suficiente histórico
                 </p>
-                <p className="text-[11px]" style={{ color: '#c0cfd8' }}>
+                <p className="text-[11px]" style={{ color: '#8fa8b8' }}>
                   Necesitamos al menos 6 meses de ventas en familia y rango de precio similar.
                 </p>
               </div>
@@ -333,7 +333,7 @@ export function PasoReferencia({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                 }}
               >
                 {sinReferencia ? '✓ ' : ''} Ninguna se parece — usaré una curva genérica
-                <span className="block text-[10px] font-normal mt-0.5" style={{ color: '#c0cfd8' }}>
+                <span className="block text-[10px] font-normal mt-0.5" style={{ color: '#8fa8b8' }}>
                   El paso 5 generará una curva conservadora sin ancla histórica.
                 </span>
               </button>

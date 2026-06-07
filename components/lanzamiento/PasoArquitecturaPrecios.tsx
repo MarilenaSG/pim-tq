@@ -45,7 +45,7 @@ function FilaFamilia({
           { key: 'max' as const,   label: 'Precio máximo', hint: 'ticket más alto' },
         ] as { key: keyof ArquitecturaPreciosFamilia; label: string; hint: string }[]).map(({ key, label, hint }) => (
           <div key={key}>
-            <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#b2b2b2' }}>{label}</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#8fa8b8' }}>{label}</p>
             <div className="relative">
               <input
                 type="number"
@@ -57,9 +57,9 @@ function FilaFamilia({
                 className="w-full rounded-lg pl-5 pr-2 py-1.5 text-[13px] font-bold focus:outline-none"
                 style={{ border: '1.5px solid rgba(0,85,127,0.15)', color: '#00264d' }}
               />
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: '#b2b2b2' }}>€</span>
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: '#8fa8b8' }}>€</span>
             </div>
-            <p className="text-[9px] mt-0.5" style={{ color: '#c0cfd8' }}>{hint}</p>
+            <p className="text-[9px] mt-0.5" style={{ color: '#8fa8b8' }}>{hint}</p>
           </div>
         ))}
       </div>
@@ -84,11 +84,11 @@ function FilaFamilia({
             )}
           </div>
           <div className="flex justify-between mt-1">
-            <span className="text-[9px]" style={{ color: '#c0cfd8' }}>{data.min}€</span>
+            <span className="text-[9px]" style={{ color: '#8fa8b8' }}>{data.min}€</span>
             {data.medio != null && (
               <span className="text-[9px] font-bold" style={{ color }}>med. {data.medio}€</span>
             )}
-            <span className="text-[9px]" style={{ color: '#c0cfd8' }}>{data.max}€</span>
+            <span className="text-[9px]" style={{ color: '#8fa8b8' }}>{data.max}€</span>
           </div>
         </div>
       )}
@@ -112,8 +112,9 @@ export function PasoArquitecturaPrecios({ lanzamiento }: { lanzamiento: Lanzamie
   function updateFamilia(fam: string, data: ArquitecturaPreciosFamilia) {
     const next = { ...arquitectura, [fam]: data }
     setArquitectura(next)
-    // También actualiza precio_venta (precio medio de la primera familia como referencia)
-    const pMedio = Object.values(next).find(v => v.medio != null)?.medio ?? null
+    // precio_venta = media de todos los precios medios definidos (determinista)
+    const medios = Object.values(next).map(v => v.medio).filter((v): v is number => v != null)
+    const pMedio = medios.length > 0 ? Math.round(medios.reduce((a, b) => a + b, 0) / medios.length) : null
     save({ arquitectura_precios: next, precio_venta: pMedio })
   }
 
@@ -146,7 +147,7 @@ export function PasoArquitecturaPrecios({ lanzamiento }: { lanzamiento: Lanzamie
 
       {familias.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-[13px]" style={{ color: '#b2b2b2' }}>
+          <p className="text-[13px]" style={{ color: '#6b8a9a' }}>
             No hay familias seleccionadas. Vuelve al paso anterior.
           </p>
         </div>
