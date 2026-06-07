@@ -79,6 +79,7 @@ export function PasoTipo({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   return (
     <WizardLayout
       step={1}
+      tipo={lanzamiento.tipo}
       lanzamientoId={lanzamiento.id}
       title="Tipo de lanzamiento"
       saveStatus={status}
@@ -86,9 +87,9 @@ export function PasoTipo({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-1"
-        concepto="¿Qué tipo de lanzamiento es este? El tipo define el alcance del planning. Un SKU nuevo tiene curva predecible porque hay histórico de esa marca. Una marca nueva no tiene histórico propio — el sistema buscará referencias análogas. Un drop tiene ventana corta: si te quedas sin stock en la semana 3, perdiste la ventana."
-        ejemplo="La incorporación de los anillos de Viceroy fue una marca nueva. Partimos de la curva de los anillos de Festina en el mismo rango de precio como base."
-        consecuencia="Si lo clasificas mal, el benchmark del paso 4 puede no ser relevante."
+        concepto="SKU nuevo = un producto concreto de una marca ya en catálogo (un anillo, unos pendientes). Drop = varias familias lanzadas juntas en una ventana temporal corta — Black Friday, San Valentín. Marca nueva = una identidad de producto que aún no existe en Te Quiero: requiere planning más largo porque no hay histórico propio de esa marca."
+        ejemplo="El primer lanzamiento de marca será TQ Jewels District — marca urbana que sale el mes que viene. Un drop sería el de San Valentín con pendientes + anillos de plata en ventana de 3 semanas. Un SKU sería añadir un anillo nuevo a la colección de Viceroy que ya está en tienda."
+        consecuencia="Si lo clasificas mal, el sistema no te pedirá los datos que necesita para proyectar bien: sin tipo correcto, el benchmark y la distribución no tendrán sentido."
       />
 
       {/* Selector tipo */}

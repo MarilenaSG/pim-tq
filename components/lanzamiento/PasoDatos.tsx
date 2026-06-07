@@ -115,6 +115,7 @@ export function PasoDatos({ lanzamiento, familias }: PasoDatosProps) {
   return (
     <WizardLayout
       step={2}
+      tipo={lanzamiento.tipo}
       lanzamientoId={lanzamiento.id}
       title="Datos del producto"
       saveStatus={status}
@@ -122,9 +123,9 @@ export function PasoDatos({ lanzamiento, familias }: PasoDatosProps) {
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-2"
-        concepto="El precio comunica antes que la pieza. MB = (PVP − Coste) / PVP × 100. Un MB bajo implica menos margen para promoción sin entrar en pérdidas."
-        ejemplo="Colgantes de plata 40–60€ tienen MB medio del 58%. Por debajo del 50%, el producto compite con marcas que tienen más presupuesto de marketing."
-        consecuencia="Fijar el precio sin revisar el MB de referencias similares es el error más frecuente al lanzar."
+        concepto="MB = (PVP − Coste) / PVP × 100. En Te Quiero el MB habitual está entre el 45% y el 65% según familia y metal. La plata tiene mayor rotación y puede moverse con MB algo más ajustado. El oro se compra en ocasiones especiales: el cliente tarda más en decidirse, así que el margen tiene que sostenerse sin necesidad de promo."
+        ejemplo="Los productos de plata (Crystal Dreams y otros) que subieron de precio en diciembre–enero generaron una rotura de expectativa: el cliente los conocía a otro precio y el ajuste fue doloroso. Mejor fijar el PVP mirando primero el MB objetivo y luego comparar con la competencia — no al revés."
+        consecuencia="Fijar precio sin revisar el MB de referencias similares es el error más frecuente al lanzar. Por debajo del 45% reduces el margen de maniobra en campañas y llegas antes al outlet."
       />
 
       <div className="space-y-5">

@@ -230,6 +230,7 @@ export function PasoReferencia({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   return (
     <WizardLayout
       step={4}
+      tipo={lanzamiento.tipo}
       lanzamientoId={lanzamiento.id}
       title="Referencia análoga"
       saveStatus={status}
@@ -237,9 +238,9 @@ export function PasoReferencia({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-4"
-        concepto="Una referencia análoga es un producto del catálogo histórico con características similares (familia, metal, rango de precio) que usaremos para anclar la proyección de demanda. Su curva real de ventas es el punto de partida más honesto que tenemos."
-        ejemplo="Para el lanzamiento del anillo de zafiro de oro a 195€, tomamos como referencia un modelo de turmalina a 175€ que vendió 6 uds/mes de media en los clusters A+B. Ajustamos un factor +20% por el mayor precio de la piedra."
-        consecuencia="Si no hay ninguna referencia válida, el paso 5 usará una curva genérica conservadora. Es menos preciso, pero sigue siendo útil."
+        concepto="Una buena referencia análoga comparte tres cosas con el nuevo producto: el mismo metal, un rango de precio cercano (±30%) y el mismo estilo de producto. El estilo importa tanto como el precio: el cliente que compra medallas religiosas es distinto al que busca joyería urbana, aunque ambas piezas sean plata a 45€ y sean colgantes."
+        ejemplo="Una medalla de plata de 45€ no es análoga a un colgante de diseño de 45€ aunque sean la misma familia y el mismo metal. Para TQ Jewels District — estilo urbano — la referencia válida sería un colgante contemporáneo de plata a precio similar, no una medalla de comunión."
+        consecuencia="Si no hay ninguna referencia válida, el paso siguiente usará una curva genérica conservadora. Es menos preciso pero sigue siendo útil para el planning inicial."
       />
 
       {/* ── Aviso si no hay familia/pvp ────────────────────────── */}

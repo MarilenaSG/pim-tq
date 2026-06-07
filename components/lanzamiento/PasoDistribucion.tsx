@@ -5,11 +5,14 @@ import { useRouter } from 'next/navigation'
 import { WizardLayout, useAutoSave } from './WizardLayout'
 import { CoachingPanel } from './CoachingPanel'
 import { SugerenciaIA }  from './SugerenciaIA'
-import { CLUSTERS, nTiendasDesdeClusters, fmtEur } from '@/lib/lanzamiento'
+import {
+  CLUSTERS, CLUSTER_WEIGHTS,
+  calcularDistribucionPorCluster,
+  nTiendasDesdeClusters, fmtEur,
+} from '@/lib/lanzamiento'
 import type { Lanzamiento, Tienda } from '@/types'
 
 // ── Validación de dist. personalizada ────────────────────────
-// Si los borradores anteriores tienen claves fake (ej: "A-1"), se resetean.
 function validarCustomDist(
   saved: Record<string, number> | null,
   tiendaIds: Set<string>,
@@ -21,15 +24,8 @@ function validarCustomDist(
 
 // ── Chip de advertencia / info ────────────────────────────────
 
-function AlertaVolumen({
-  totalUds,
-  media,
-}: {
-  totalUds: number
-  media: number | null
-}) {
+function AlertaVolumen({ totalUds, media }: { totalUds: number; media: number | null }) {
   if (media == null || totalUds === 0) return null
-
   if (totalUds > media * 3) {
     return (
       <div
@@ -44,7 +40,6 @@ function AlertaVolumen({
       </div>
     )
   }
-
   if (totalUds < media * 0.5) {
     return (
       <div
@@ -59,7 +54,6 @@ function AlertaVolumen({
       </div>
     )
   }
-
   return null
 }
 
@@ -68,23 +62,29 @@ function AlertaVolumen({
 export function PasoDistribucion({
   lanzamiento,
   tiendas,
+  step = 3,
 }: {
   lanzamiento: Lanzamiento
   tiendas:     Tienda[]
+  step?:       number
 }) {
   const router             = useRouter()
   const { save, flush, status } = useAutoSave(lanzamiento.id)
 
-  // Índice de IDs reales para validar distribuciones guardadas
   const tiendaIds = new Set(tiendas.map(t => t.id))
 
   // ── Estado ───────────────────────────────────────────────────
-  const [selectedClusters,    setSelectedClusters]    = useState<string[]>(
+  const [selectedClusters, setSelectedClusters] = useState<string[]>(
     (lanzamiento.clusters_objetivo as string[] | null) ?? ['A', 'B', 'C'],
   )
-  const [udsPerTienda,        setUdsPerTienda]        = useState<number>(
-    lanzamiento.unidades_por_tienda ?? 2,
-  )
+
+  // Total de unidades a comprar al proveedor
+  const initUds = lanzamiento.unidades_compra_total
+    ?? ((lanzamiento.unidades_por_tienda ?? 2) * (lanzamiento.n_tiendas ?? 19))
+  const [unidadesCompraTotal, setUnidadesCompraTotal] = useState<number>(initUds)
+  // valor crudo del input — permite borrar y reescribir sin que salte a 1
+  const [inputUds, setInputUds] = useState<string>(String(initUds))
+
   const [distribPersonalizada, setDistribPersonalizada] = useState(
     !!lanzamiento.distribucion_personalizada,
   )
@@ -96,19 +96,28 @@ export function PasoDistribucion({
   )
   const [mediaVentas, setMediaVentas] = useState<number | null>(null)
 
-  // ── Tiendas activas filtradas por cluster ────────────────────
-  const tiendasVisibles = tiendas.filter(
-    t => t.cluster != null && selectedClusters.includes(t.cluster),
-  )
-  const totalTiendas    = nTiendasDesdeClusters(selectedClusters, tiendas)
+  // ── Métricas derivadas ───────────────────────────────────────
+  const totalTiendas = nTiendasDesdeClusters(selectedClusters, tiendas)
 
   const totalUnidades = distribPersonalizada
     ? Object.values(customDist).reduce((s, v) => s + (v || 0), 0)
-    : totalTiendas * udsPerTienda
+    : unidadesCompraTotal
 
   const presupuestoCompra = lanzamiento.coste
     ? Math.round(totalUnidades * lanzamiento.coste)
     : null
+
+  // Distribución automática por cluster (solo cuando no es personalizada)
+  const distribucionAuto = calcularDistribucionPorCluster(
+    unidadesCompraTotal,
+    tiendas,
+    selectedClusters,
+  )
+
+  // Tiendas visibles para la distribución personalizada
+  const tiendasVisibles = tiendas.filter(
+    t => t.cluster != null && selectedClusters.includes(t.cluster),
+  )
 
   // ── Fetch velocidad de ventas de referencia ──────────────────
   useEffect(() => {
@@ -132,17 +141,41 @@ export function PasoDistribucion({
     save({ clusters_objetivo: next, n_tiendas: nTiendas })
   }
 
-  function handleUdsPerTienda(v: number) {
+  function handleUnidadesCompraTotal(v: number) {
     const safe = Math.max(1, Math.round(v))
-    setUdsPerTienda(safe)
-    save({ unidades_por_tienda: safe })
+    setUnidadesCompraTotal(safe)
+    setInputUds(String(safe))
+    save({ unidades_compra_total: safe })
+  }
+
+  function handleInputUdsChange(raw: string) {
+    setInputUds(raw)
+    const parsed = parseInt(raw, 10)
+    if (!isNaN(parsed) && parsed >= 1) {
+      setUnidadesCompraTotal(parsed)
+      save({ unidades_compra_total: parsed })
+    }
+  }
+
+  function handleInputUdsBlur() {
+    const parsed = parseInt(inputUds, 10)
+    const safe   = isNaN(parsed) || parsed < 1 ? 1 : Math.round(parsed)
+    setUnidadesCompraTotal(safe)
+    setInputUds(String(safe))
+    save({ unidades_compra_total: safe })
   }
 
   function handleTogglePersonalizada(on: boolean) {
     setDistribPersonalizada(on)
     if (on) {
+      // Inicializar con la distribución automática por cluster
       const initDist: Record<string, number> = {}
-      tiendasVisibles.forEach(t => { initDist[t.id] = udsPerTienda })
+      const dist = calcularDistribucionPorCluster(unidadesCompraTotal, tiendas, selectedClusters)
+      const distByCluster: Record<string, number> = {}
+      dist.forEach(d => { distByCluster[d.clusterId] = Math.round(d.udsPorTienda) })
+      tiendasVisibles.forEach(t => {
+        initDist[t.id] = distByCluster[t.cluster!] ?? 1
+      })
       setCustomDist(initDist)
       save({ distribucion_personalizada: initDist })
     } else {
@@ -156,13 +189,6 @@ export function PasoDistribucion({
     const next = { ...customDist, [tiendaId]: safe }
     setCustomDist(next)
     save({ distribucion_personalizada: next })
-  }
-
-  function distribuirIgual() {
-    const dist: Record<string, number> = {}
-    tiendasVisibles.forEach(t => { dist[t.id] = udsPerTienda })
-    setCustomDist(dist)
-    save({ distribucion_personalizada: dist })
   }
 
   async function handleNext() {
@@ -181,7 +207,8 @@ export function PasoDistribucion({
 
   return (
     <WizardLayout
-      step={3}
+      step={step}
+      tipo={lanzamiento.tipo}
       lanzamientoId={lanzamiento.id}
       title="Distribución por tiendas"
       saveStatus={status}
@@ -189,13 +216,66 @@ export function PasoDistribucion({
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-3"
-        concepto="Selecciona qué clusters van a recibir este lanzamiento. El Cluster A son las 8 flagship (mayor volumen y visibilidad), el B son las 8 estándar, y el C son las 3 pequeñas con perfiles de rotación distintos. Empieza conservador: es más fácil ampliar una reposición que gestionar el exceso."
-        ejemplo="Un anillo de oro con PVP 150€ arrancó solo en clusters A y B. A las 4 semanas ampliamos a C cuando confirmamos que la curva era buena. Evitamos tener stock parado en tiendas con menos tráfico."
-        consecuencia="Si abres demasiados clusters de golpe y la demanda no se confirma, tendrás que hacer outlet o retirar antes de tiempo."
+        concepto="Indica cuántas unidades totales vas a pedir al proveedor. El sistema las distribuye por cluster ponderando automáticamente: Flagship ×1,5, Estándar ×1,0, Pequeña ×0,5. Una Flagship puede vender hasta el triple que una tienda Pequeña para el mismo producto. Puedes ajustar tienda a tienda si lo necesitas."
+        ejemplo="Cuando abrió Galeón, la demanda dio un subidón que no habíamos previsto — sin stock extra, muchas referencias rotaron más rápido de lo proyectado. En Villalba, la Navidad disparó la demanda y provocó roturas en las semanas clave. Ambos casos pedían más stock del que se había planificado para esas tiendas."
+        consecuencia="Abrir demasiados clusters de golpe sin stock suficiente genera roturas y frustra al equipo de tienda. Mejor empezar en Flagship+Estándar y ampliar cuando confirmes la demanda real."
       />
 
-      {/* ── Selector de clusters ─────────────────────────── */}
+      {/* ── 1. Total de unidades a comprar ───────────────── */}
       <div className="mb-6">
+        <label className="block text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: '#8fa8b8' }}>
+          Unidades totales a comprar (pedido al proveedor)
+        </label>
+
+        <div className="flex items-center gap-4">
+          {/* Stepper grande */}
+          <div
+            className="flex items-center gap-0 rounded-xl overflow-hidden"
+            style={{ border: '2px solid rgba(0,85,127,0.18)' }}
+          >
+            {([-10, -1] as number[]).map(delta => (
+              <button
+                key={delta}
+                onClick={() => handleUnidadesCompraTotal(unidadesCompraTotal + delta)}
+                className="h-12 px-3 flex items-center justify-center transition-colors hover:bg-[rgba(0,85,127,0.06)] text-[13px] font-bold"
+                style={{ color: '#00557f', minWidth: 36 }}
+              >
+                {delta}
+              </button>
+            ))}
+            <input
+              type="number"
+              min={1}
+              value={inputUds}
+              onChange={e => handleInputUdsChange(e.target.value)}
+              onBlur={handleInputUdsBlur}
+              className="w-20 h-12 text-center text-[22px] font-black border-x border-[rgba(0,85,127,0.14)] bg-white focus:outline-none"
+              style={{ color: '#00264d' }}
+            />
+            {[+1, +10].map(delta => (
+              <button
+                key={delta}
+                onClick={() => handleUnidadesCompraTotal(unidadesCompraTotal + delta)}
+                className="h-12 px-3 flex items-center justify-center transition-colors hover:bg-[rgba(0,85,127,0.06)] text-[13px] font-bold"
+                style={{ color: '#00557f', minWidth: 36 }}
+              >
+                +{delta}
+              </button>
+            ))}
+          </div>
+          <div>
+            <p className="text-[12px] font-semibold" style={{ color: '#00264d' }}>uds. totales</p>
+            {presupuestoCompra && (
+              <p className="text-[11px]" style={{ color: '#8fa8b8' }}>
+                coste pedido: <span className="font-bold" style={{ color: '#00557f' }}>{fmtEur(presupuestoCompra)}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 2. Selector de clusters ──────────────────────── */}
+      <div className="mb-5">
         <label className="block text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: '#8fa8b8' }}>
           Clusters de distribución
         </label>
@@ -203,6 +283,7 @@ export function PasoDistribucion({
           {CLUSTERS.map(cl => {
             const active          = selectedClusters.includes(cl.id)
             const nTiendasCluster = tiendas.filter(t => t.cluster === cl.id).length
+            const weight          = CLUSTER_WEIGHTS[cl.id] ?? 1
             return (
               <button
                 key={cl.id}
@@ -219,7 +300,9 @@ export function PasoDistribucion({
                     {cl.id}
                   </span>
                   {active && (
-                    <span className="text-[9px] font-bold" style={{ color: cl.color }}>✓</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${cl.color}18`, color: cl.color }}>
+                      ×{weight}
+                    </span>
                   )}
                 </div>
                 <p className="text-[13px] font-semibold leading-tight mb-0.5" style={{ color: active ? '#00264d' : '#8fa8b8' }}>
@@ -239,73 +322,92 @@ export function PasoDistribucion({
         )}
       </div>
 
-      {/* ── Unidades por tienda ──────────────────────────── */}
-      <div className="mb-5">
-        <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>
-          Unidades por tienda (pedido inicial)
-        </label>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-0 rounded-lg overflow-hidden" style={{ border: '1.5px solid rgba(0,85,127,0.15)' }}>
-            <button
-              onClick={() => handleUdsPerTienda(udsPerTienda - 1)}
-              className="w-9 h-9 flex items-center justify-center text-[18px] transition-colors hover:bg-[rgba(0,85,127,0.05)]"
-              style={{ color: '#00557f' }}
-            >
-              −
-            </button>
-            <input
-              type="number"
-              min={1}
-              value={udsPerTienda}
-              onChange={e => handleUdsPerTienda(parseInt(e.target.value) || 1)}
-              className="w-14 h-9 text-center text-[15px] font-bold border-x border-[rgba(0,85,127,0.12)] bg-white focus:outline-none"
-              style={{ color: '#00264d' }}
-            />
-            <button
-              onClick={() => handleUdsPerTienda(udsPerTienda + 1)}
-              className="w-9 h-9 flex items-center justify-center text-[18px] transition-colors hover:bg-[rgba(0,85,127,0.05)]"
-              style={{ color: '#00557f' }}
-            >
-              +
-            </button>
-          </div>
-          <span className="text-[12px]" style={{ color: '#8fa8b8' }}>uds/tienda</span>
-        </div>
-      </div>
-
-      {/* ── Resumen de totales ───────────────────────────── */}
-      {selectedClusters.length > 0 && (
+      {/* ── 3. Distribución automática por cluster ───────── */}
+      {selectedClusters.length > 0 && !distribPersonalizada && (
         <div
-          className="grid grid-cols-3 gap-3 rounded-xl p-4 mb-5"
-          style={{ background: 'rgba(0,85,127,0.04)', border: '1px solid rgba(0,85,127,0.08)' }}
+          className="rounded-xl overflow-hidden mb-5"
+          style={{ border: '1px solid rgba(0,85,127,0.1)' }}
         >
-          <div className="text-center">
-            <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>Tiendas</p>
-            <p className="text-[22px] font-black" style={{ color: '#00557f' }}>{totalTiendas}</p>
+          <div
+            className="px-4 py-2.5 flex items-center justify-between"
+            style={{ background: 'rgba(0,85,127,0.04)', borderBottom: '1px solid rgba(0,85,127,0.08)' }}
+          >
+            <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>
+              Distribución por cluster
+            </span>
+            <span className="text-[10px]" style={{ color: '#b2b2b2' }}>calculado automáticamente</span>
           </div>
-          <div className="text-center" style={{ borderLeft: '1px solid rgba(0,85,127,0.08)', borderRight: '1px solid rgba(0,85,127,0.08)' }}>
-            <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>Uds. totales</p>
-            <p className="text-[22px] font-black" style={{ color: '#00264d' }}>{totalUnidades.toLocaleString('es-ES')}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>Presupuesto</p>
-            <p className="text-[22px] font-black" style={{ color: presupuestoCompra ? '#00264d' : '#c0cfd8' }}>
-              {presupuestoCompra ? fmtEur(presupuestoCompra) : '—'}
-            </p>
+
+          {distribucionAuto.map(row => {
+            const cl = CLUSTERS.find(c => c.id === row.clusterId)
+            if (!cl) return null
+            const udsPorTiendaRounded = Math.round(row.udsPorTienda * 10) / 10
+            return (
+              <div
+                key={row.clusterId}
+                className="flex items-center justify-between px-4 py-3"
+                style={{ borderBottom: '1px solid rgba(0,85,127,0.06)' }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center"
+                    style={{ background: `${cl.color}18`, color: cl.color }}
+                  >
+                    {cl.id}
+                  </span>
+                  <div>
+                    <p className="text-[12px] font-semibold" style={{ color: '#00264d' }}>
+                      {cl.descripcion} <span style={{ color: '#b2b2b2' }}>({row.nTiendas} tiendas)</span>
+                    </p>
+                    <p className="text-[10px]" style={{ color: '#b2b2b2' }}>
+                      factor ×{CLUSTER_WEIGHTS[cl.id]}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[15px] font-black" style={{ color: cl.color }}>
+                    {row.udsCluster} uds
+                  </p>
+                  <p className="text-[10px]" style={{ color: '#b2b2b2' }}>
+                    ~{udsPorTiendaRounded} uds/tienda
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Totales */}
+          <div
+            className="flex items-center justify-between px-4 py-3"
+            style={{ background: 'rgba(0,85,127,0.03)', borderTop: '1.5px solid rgba(0,85,127,0.1)' }}
+          >
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>Total pedido</p>
+              <p className="text-[10px]" style={{ color: '#b2b2b2' }}>{totalTiendas} tiendas</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[17px] font-black" style={{ color: '#00264d' }}>
+                {unidadesCompraTotal.toLocaleString('es-ES')} uds
+              </p>
+              {presupuestoCompra && (
+                <p className="text-[11px] font-semibold" style={{ color: '#00557f' }}>
+                  {fmtEur(presupuestoCompra)}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* ── Validación vs media histórica ───────────────── */}
       <AlertaVolumen totalUds={totalUnidades} media={mediaVentas} />
-
       {mediaVentas != null && (
         <p className="mt-2 mb-4 text-[11px]" style={{ color: '#b2b2b2' }}>
-          Referencia: {mediaVentas} uds/mes de media en productos similares · {totalTiendas} tiendas · {lanzamiento.familia}
+          Referencia: {mediaVentas} uds/mes de media en {lanzamiento.familia} · {totalTiendas} tiendas
         </p>
       )}
 
-      {/* ── Distribución personalizada ───────────────────── */}
+      {/* ── 4. Distribución personalizada ───────────────── */}
       <div className="mb-5">
         <label className="flex items-center gap-2.5 cursor-pointer mb-4">
           <div
@@ -319,7 +421,7 @@ export function PasoDistribucion({
             />
           </div>
           <span className="text-[12px] font-medium" style={{ color: '#00264d' }}>
-            Distribución personalizada por tienda
+            Ajustar distribución por tienda
           </span>
           <span className="text-[10px]" style={{ color: '#b2b2b2' }}>(opcional)</span>
         </label>
@@ -332,14 +434,22 @@ export function PasoDistribucion({
               style={{ background: 'rgba(0,85,127,0.04)', borderBottom: '1px solid rgba(0,85,127,0.08)' }}
             >
               <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>
-                {tiendasVisibles.length} tiendas seleccionadas
+                {tiendasVisibles.length} tiendas
               </span>
               <button
-                onClick={distribuirIgual}
+                onClick={() => {
+                  const dist = calcularDistribucionPorCluster(unidadesCompraTotal, tiendas, selectedClusters)
+                  const distByCluster: Record<string, number> = {}
+                  dist.forEach(d => { distByCluster[d.clusterId] = Math.round(d.udsPorTienda) })
+                  const next: Record<string, number> = {}
+                  tiendasVisibles.forEach(t => { next[t.id] = distByCluster[t.cluster!] ?? 1 })
+                  setCustomDist(next)
+                  save({ distribucion_personalizada: next })
+                }}
                 className="text-[11px] font-semibold hover:underline"
                 style={{ color: '#0099f2' }}
               >
-                Distribuir igual ({udsPerTienda} uds)
+                Resetear a distribución automática
               </button>
             </div>
 
@@ -348,12 +458,9 @@ export function PasoDistribucion({
               {CLUSTERS.map(cl => {
                 const clTiendas = tiendasVisibles.filter(t => t.cluster === cl.id)
                 if (!clTiendas.length) return null
-
                 const subtotal = clTiendas.reduce((s, t) => s + (customDist[t.id] ?? 0), 0)
-
                 return (
                   <div key={cl.id}>
-                    {/* Cluster header */}
                     <div
                       className="flex items-center justify-between px-4 py-1.5"
                       style={{ background: `${cl.color}08` }}
@@ -365,8 +472,6 @@ export function PasoDistribucion({
                         {subtotal} uds
                       </span>
                     </div>
-
-                    {/* Tiendas del cluster con nombres reales */}
                     {clTiendas.map(tienda => (
                       <div
                         key={tienda.id}
@@ -412,8 +517,6 @@ export function PasoDistribucion({
                   </div>
                 )
               })}
-
-              {/* Total footer */}
               <div
                 className="flex items-center justify-between px-4 py-2.5"
                 style={{ background: 'rgba(0,85,127,0.03)', borderTop: '1.5px solid rgba(0,85,127,0.1)' }}
@@ -439,7 +542,7 @@ export function PasoDistribucion({
         }}
         label="¿Es razonable este pedido?"
         disabled={selectedClusters.length === 0 || totalUnidades === 0}
-        disabledReason="Selecciona al menos un cluster y establece las unidades por tienda"
+        disabledReason="Selecciona al menos un cluster y establece las unidades"
       />
     </WizardLayout>
   )

@@ -107,13 +107,14 @@ export function PasoCurva({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   const canCompute = !!(
     lanzamiento.precio_venta &&
     lanzamiento.coste &&
-    lanzamiento.n_tiendas &&
-    lanzamiento.unidades_por_tienda
+    (lanzamiento.unidades_compra_total != null || lanzamiento.unidades_por_tienda != null)
   )
 
+  const unidadesTotalCompra = lanzamiento.unidades_compra_total
+    ?? ((lanzamiento.unidades_por_tienda ?? 2) * (lanzamiento.n_tiendas ?? 19))
+
   const curvaParams: CalcularCurvaParams | null = canCompute ? {
-    unidadesPorTienda:     lanzamiento.unidades_por_tienda!,
-    nTiendas:              lanzamiento.n_tiendas!,
+    unidadesTotalCompra,
     semanasRampa,
     crecimientoSemanalPct,
     factorAjustePct,
@@ -128,7 +129,7 @@ export function PasoCurva({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     return calcularCurva(curvaParams)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    lanzamiento.unidades_por_tienda, lanzamiento.n_tiendas,
+    unidadesTotalCompra,
     lanzamiento.precio_venta, lanzamiento.coste,
     semanasRampa, crecimientoSemanalPct, factorAjustePct,
   ])
@@ -186,6 +187,7 @@ export function PasoCurva({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   return (
     <WizardLayout
       step={5}
+      tipo={lanzamiento.tipo}
       lanzamientoId={lanzamiento.id}
       title="Curva de demanda proyectada"
       saveStatus={status}
@@ -193,9 +195,9 @@ export function PasoCurva({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-5"
-        concepto="La curva de demanda proyecta cómo se venderá el producto semana a semana durante las primeras 16 semanas. La rampa modela el tiempo que tarda en despegar (el equipo de ventas lo conoce, el cliente tiene que descubrirlo). El crecimiento post-rampa es el ritmo de aceleración una vez el producto está visible."
-        ejemplo="Un anillo de oro lanzado en el Cluster A tardó 3 semanas en despegar — las tiendas lo estaban aprendiendo. A partir de la semana 4 creció un 8% semanal. El factor 90% lo ajustamos porque el PVP era un 10% superior a la referencia análoga."
-        consecuencia="Una rampa demasiado corta genera expectativas irreales. Una rampa demasiado larga puede hacer que el producto muera antes de que el equipo lo haya dado a conocer."
+        concepto="En joyería el consumo es más pausado que en retail de alimentación o moda rápida. Un producto nuevo tarda entre 3 y 4 semanas en despegar — el equipo de tienda necesita aprender el producto y el cliente necesita descubrirlo. La plata rota mucho más rápido que el oro: el oro se compra para ocasiones especiales y el cliente tarda más en decidirse."
+        ejemplo="Lo que más acelera o ralentiza el despegue no es el producto en sí, sino el escaparate y las RRSS. Un producto en escaparate desde la semana 1 puede reducir la rampa a 2 semanas. Si entra al expositor sin comunicación, la rampa puede alargarse a 5-6 semanas sin que sea problema del producto."
+        consecuencia="Una rampa demasiado corta genera expectativas irreales y la proyección se aleja de la realidad. Una rampa demasiado larga puede hacer que el producto muera antes de que el equipo lo haya dado a conocer."
       />
 
       {!canCompute && (

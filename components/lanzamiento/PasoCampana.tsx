@@ -68,7 +68,7 @@ function ImpactoChip({ sinPromo, conPromo }: { sinPromo: number; conPromo: numbe
 
 // ── Componente principal ──────────────────────────────────────────
 
-export function PasoCampana({ lanzamiento }: { lanzamiento: Lanzamiento }) {
+export function PasoCampana({ lanzamiento, step = 6 }: { lanzamiento: Lanzamiento; step?: number }) {
   const router             = useRouter()
   const { save, flush, status } = useAutoSave(lanzamiento.id)
 
@@ -87,13 +87,14 @@ export function PasoCampana({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   const canCompute = !!(
     lanzamiento.precio_venta &&
     lanzamiento.coste &&
-    lanzamiento.n_tiendas &&
-    lanzamiento.unidades_por_tienda
+    (lanzamiento.unidades_compra_total != null || lanzamiento.unidades_por_tienda != null)
   )
 
+  const unidadesTotalCompra = lanzamiento.unidades_compra_total
+    ?? ((lanzamiento.unidades_por_tienda ?? 2) * (lanzamiento.n_tiendas ?? 19))
+
   const baseParams = canCompute ? {
-    unidadesPorTienda:     lanzamiento.unidades_por_tienda!,
-    nTiendas:              lanzamiento.n_tiendas!,
+    unidadesTotalCompra,
     semanasRampa:          lanzamiento.semanas_rampa ?? 3,
     crecimientoSemanalPct: lanzamiento.crecimiento_semanal_pct ?? 5,
     factorAjustePct:       lanzamiento.factor_ajuste_pct ?? 100,
@@ -178,7 +179,8 @@ export function PasoCampana({ lanzamiento }: { lanzamiento: Lanzamiento }) {
 
   return (
     <WizardLayout
-      step={6}
+      step={step}
+      tipo={lanzamiento.tipo}
       lanzamientoId={lanzamiento.id}
       title="Esfuerzo de campaña"
       saveStatus={status}
@@ -186,9 +188,9 @@ export function PasoCampana({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-6"
-        concepto="Una campaña de lanzamiento puede acelerar la curva de demanda en las primeras semanas, pero viene con un coste: si el descuento es demasiado agresivo, el margen de las primeras ventas sufre. El objetivo es conseguir visibilidad sin sacrificar la percepción de valor del producto."
-        ejemplo="El lanzamiento de los pendientes de turmalina tuvo un descuento de lanzamiento del 15% durante las primeras 2 semanas con campaña de RRSS. Vendimos un 30% más de lo previsto en la rampa y el margen se recuperó a partir de la semana 3."
-        consecuencia="Si activas promo, asegúrate de que el margen bruto resultante en esas semanas sigue siendo positivo. Si no, estás pagando para que el cliente te compre."
+        concepto="En lanzamiento, la estrategia de Te Quiero es visibilidad sin descuento: regalo con compra, packaging especial y comunicación en escaparate y RRSS. El descuento directo se reserva para campañas de salida de stock o Black Friday — usarlo en lanzamiento puede dañar la percepción de valor del producto desde el primer día."
+        ejemplo="Black Friday funciona muy bien precisamente porque el cliente espera y acepta el descuento en ese contexto. En un lanzamiento, un packaging especial o un regalo con compra comunica valor sin reducir el margen. El objetivo es generar descubrimiento y deseo, no urgencia por precio."
+        consecuencia="Si activas descuento en lanzamiento, asegúrate de que el MB resultante en esas semanas sigue siendo positivo. Si no, estás pagando para que el cliente te compre — y esa expectativa de precio se quedará."
       />
 
       {/* ── Toggle campaña sí/no ────────────────────────────── */}
