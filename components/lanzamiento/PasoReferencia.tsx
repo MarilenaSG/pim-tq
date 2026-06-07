@@ -63,11 +63,11 @@ function Sparkline({ data, color }: { data: Array<{ label: string; uds: number }
 // ── Card de referencia ────────────────────────────────────────────
 
 function ReferenciaCard({
-  ref: r,
+  referencia: r,
   isSelected,
   onSelect,
 }: {
-  ref:        ReferenciaAnaloga
+  referencia: ReferenciaAnaloga
   isSelected: boolean
   onSelect:   () => void
 }) {
@@ -294,7 +294,7 @@ export function PasoReferencia({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                 {referencias.map(r => (
                   <ReferenciaCard
                     key={r.codigo_modelo}
-                    ref={r}
+                    referencia={r}
                     isSelected={seleccionada === r.codigo_modelo}
                     onSelect={() => handleSeleccionar(r.codigo_modelo)}
                   />
