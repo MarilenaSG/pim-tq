@@ -26,11 +26,12 @@ type ProductRow = {
 }
 
 type FilterOption = {
-  metal:         string | null
-  category:      string | null
-  familia:       string | null
-  karat:         string | null
+  metal:          string | null
+  category:       string | null
+  familia:        string | null
+  karat:          string | null
   shopify_vendor: string | null
+  supplier_name:  string | null
 }
 
 // ── Page ──────────────────────────────────────────────────────────
@@ -49,6 +50,7 @@ export default async function ProductsPage({
   const abc         = str('abc')
   const completitud = str('completitud')
   const supplier    = str('supplier')
+  const proveedor   = str('proveedor')
   const estado      = str('estado')
   const campaign    = str('campaign')
   const stockMin    = Math.max(0, Number(searchParams.stock_min ?? 0))
@@ -70,7 +72,8 @@ export default async function ProductsPage({
   if (familia)  productsQuery = productsQuery.eq('familia', familia)
   if (karat)    productsQuery = productsQuery.eq('karat', karat)
   if (abc)      productsQuery = productsQuery.eq('abc_ventas', abc)
-  if (supplier) productsQuery = productsQuery.eq('shopify_vendor', supplier)
+  if (supplier)  productsQuery = productsQuery.eq('shopify_vendor',  supplier)
+  if (proveedor) productsQuery = productsQuery.eq('supplier_name',   proveedor)
   if (estado === 'catalogo')      productsQuery = productsQuery.eq('is_discontinued', false)
   if (estado === 'descatalogado') productsQuery = productsQuery.eq('is_discontinued', true)
 
@@ -148,7 +151,7 @@ export default async function ProductsPage({
     const arr = Array.from(allowedCodes)
     if (arr.length === 0) {
       const [optRes, camRes] = await Promise.all([
-        supabase.from('products').select('metal, category, familia, karat, shopify_vendor'),
+        supabase.from('products').select('metal, category, familia, karat, shopify_vendor, supplier_name'),
         supabase.from('campaigns').select('id, nombre').eq('estado', 'activa').order('nombre'),
       ])
       const allOpts    = (optRes.data ?? []) as FilterOption[]
@@ -161,7 +164,7 @@ export default async function ProductsPage({
           <Suspense>
             <ProductFilters
               metals={uniq('metal')} categories={uniq('category')} familias={uniq('familia')}
-              karats={uniq('karat')} suppliers={uniq('shopify_vendor')} campaigns={campaigns}
+              karats={uniq('karat')} suppliers={uniq('shopify_vendor')} proveedores={uniq('supplier_name')} campaigns={campaigns}
             />
           </Suspense>
           <EmptyState icon="◻" message="Sin resultados" description="Ningún modelo coincide con los filtros activos." />
@@ -175,7 +178,7 @@ export default async function ProductsPage({
 
   const [productsResult, optionsResult, campaignsResult] = await Promise.all([
     paginatedQuery,
-    supabase.from('products').select('metal, category, familia, karat, shopify_vendor'),
+    supabase.from('products').select('metal, category, familia, karat, shopify_vendor, supplier_name'),
     supabase.from('campaigns').select('id, nombre').eq('estado', 'activa').order('nombre'),
   ])
 
@@ -257,7 +260,7 @@ export default async function ProductsPage({
     Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
   const campaignOpts = (campaignsResult.data ?? []) as { id: string; nombre: string }[]
 
-  const hasFilters = search || metal || category || familia || karat || abc || completitud || supplier || estado || campaign || stockMin > 0
+  const hasFilters = search || metal || category || familia || karat || abc || completitud || supplier || proveedor || estado || campaign || stockMin > 0
 
   return (
     <div className="p-6 max-w-[1400px] space-y-5">
@@ -283,6 +286,7 @@ export default async function ProductsPage({
           familias={uniq('familia')}
           karats={uniq('karat')}
           suppliers={uniq('shopify_vendor')}
+          proveedores={uniq('supplier_name')}
           campaigns={campaignOpts}
         />
       </Suspense>

@@ -5,15 +5,16 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { FilterSelect } from '@/components/ui'
 
 interface Props {
-  metals:     string[]
-  categories: string[]
-  familias:   string[]
-  karats:     string[]
-  suppliers:  string[]
-  campaigns:  { id: string; nombre: string }[]
+  metals:      string[]
+  categories:  string[]
+  familias:    string[]
+  karats:      string[]
+  suppliers:   string[]
+  proveedores: string[]
+  campaigns:   { id: string; nombre: string }[]
 }
 
-export function ProductFilters({ metals, categories, familias, karats, suppliers, campaigns }: Props) {
+export function ProductFilters({ metals, categories, familias, karats, suppliers, proveedores, campaigns }: Props) {
   const router   = useRouter()
   const pathname = usePathname()
   const sp       = useSearchParams()
@@ -52,13 +53,14 @@ export function ProductFilters({ metals, categories, familias, karats, suppliers
   const karat      = sp.get('karat')      ?? ''
   const abc        = sp.get('abc')        ?? ''
   const supplier   = sp.get('supplier')   ?? ''
+  const proveedor  = sp.get('proveedor')  ?? ''
   const estado     = sp.get('estado')     ?? ''
   const campaign   = sp.get('campaign')   ?? ''
   const completitud = sp.get('completitud') ?? ''
   const stockMin   = Number(sp.get('stock_min') ?? 0)
 
   const hasFilters = searchValue || metal || category || familia || karat || abc ||
-                     supplier || estado || campaign || completitud || stockMin > 0
+                     supplier || proveedor || estado || campaign || completitud || stockMin > 0
 
   return (
     <div
@@ -83,6 +85,7 @@ export function ProductFilters({ metals, categories, familias, karats, suppliers
         />
 
         <FilterSelect value={supplier}   onChange={v => setParam('supplier', v)}    placeholder="Marca"       options={suppliers}   maxWidth={150} />
+        <FilterSelect value={proveedor}  onChange={v => setParam('proveedor', v)}  placeholder="Proveedor"   options={proveedores} maxWidth={160} />
         <FilterSelect value={metal}      onChange={v => setParam('metal', v)}       placeholder="Metal"       options={metals}      />
         <FilterSelect value={familia}    onChange={v => setParam('familia', v)}     placeholder="Familia"     options={familias}    />
         <FilterSelect value={category}   onChange={v => setParam('category', v)}    placeholder="Categoría"   options={categories}  />
