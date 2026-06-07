@@ -296,7 +296,7 @@ export function PasoDistribucion({
                 }}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-lg font-black" style={{ color: active ? cl.color : '#c0cfd8' }}>
+                  <span className="text-lg font-black" style={{ color: active ? cl.color : '#8fa8b8' }}>
                     {cl.id}
                   </span>
                   {active && (
@@ -305,11 +305,18 @@ export function PasoDistribucion({
                     </span>
                   )}
                 </div>
-                <p className="text-[13px] font-semibold leading-tight mb-0.5" style={{ color: active ? '#00264d' : '#8fa8b8' }}>
+                <p className="text-[13px] font-semibold leading-tight mb-0.5" style={{ color: active ? '#00264d' : '#5a7a8a' }}>
                   {nTiendasCluster} tiendas
                 </p>
-                <p className="text-[10px]" style={{ color: '#b2b2b2' }}>
+                <p className="text-[10px] mb-2" style={{ color: active ? '#5a7a8a' : '#8fa8b8' }}>
                   {cl.descripcion}
+                </p>
+                {/* Nombres de tiendas del cluster */}
+                <p className="text-[9px] leading-relaxed" style={{ color: active ? '#5a7a8a' : '#8fa8b8' }}>
+                  {tiendas
+                    .filter(t => t.cluster === cl.id)
+                    .map(t => t.nombre_corto ?? t.nombre)
+                    .join(' · ')}
                 </p>
               </button>
             )
@@ -335,7 +342,7 @@ export function PasoDistribucion({
             <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>
               Distribución por cluster
             </span>
-            <span className="text-[10px]" style={{ color: '#b2b2b2' }}>calculado automáticamente</span>
+            <span className="text-[10px]" style={{ color: '#6b8a9a' }}>calculado automáticamente</span>
           </div>
 
           {distribucionAuto.map(row => {
@@ -357,9 +364,9 @@ export function PasoDistribucion({
                   </span>
                   <div>
                     <p className="text-[12px] font-semibold" style={{ color: '#00264d' }}>
-                      {cl.descripcion} <span style={{ color: '#b2b2b2' }}>({row.nTiendas} tiendas)</span>
+                      {cl.descripcion} <span style={{ color: '#5a7a8a' }}>({row.nTiendas} tiendas)</span>
                     </p>
-                    <p className="text-[10px]" style={{ color: '#b2b2b2' }}>
+                    <p className="text-[10px]" style={{ color: '#5a7a8a' }}>
                       factor ×{CLUSTER_WEIGHTS[cl.id]}
                     </p>
                   </div>
@@ -368,7 +375,7 @@ export function PasoDistribucion({
                   <p className="text-[15px] font-black" style={{ color: cl.color }}>
                     {row.udsCluster} uds
                   </p>
-                  <p className="text-[10px]" style={{ color: '#b2b2b2' }}>
+                  <p className="text-[10px]" style={{ color: '#5a7a8a' }}>
                     ~{udsPorTiendaRounded} uds/tienda
                   </p>
                 </div>
@@ -383,7 +390,7 @@ export function PasoDistribucion({
           >
             <div>
               <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>Total pedido</p>
-              <p className="text-[10px]" style={{ color: '#b2b2b2' }}>{totalTiendas} tiendas</p>
+              <p className="text-[10px]" style={{ color: '#5a7a8a' }}>{totalTiendas} tiendas</p>
             </div>
             <div className="text-right">
               <p className="text-[17px] font-black" style={{ color: '#00264d' }}>
@@ -402,7 +409,7 @@ export function PasoDistribucion({
       {/* ── Validación vs media histórica ───────────────── */}
       <AlertaVolumen totalUds={totalUnidades} media={mediaVentas} />
       {mediaVentas != null && (
-        <p className="mt-2 mb-4 text-[11px]" style={{ color: '#b2b2b2' }}>
+        <p className="mt-2 mb-4 text-[11px]" style={{ color: '#6b8a9a' }}>
           Referencia: {mediaVentas} uds/mes de media en {lanzamiento.familia} · {totalTiendas} tiendas
         </p>
       )}
@@ -423,7 +430,7 @@ export function PasoDistribucion({
           <span className="text-[12px] font-medium" style={{ color: '#00264d' }}>
             Ajustar distribución por tienda
           </span>
-          <span className="text-[10px]" style={{ color: '#b2b2b2' }}>(opcional)</span>
+          <span className="text-[10px]" style={{ color: '#6b8a9a' }}>(opcional)</span>
         </label>
 
         {distribPersonalizada && tiendasVisibles.length > 0 && (
@@ -483,7 +490,7 @@ export function PasoDistribucion({
                             {tienda.nombre_corto ?? tienda.nombre}
                           </span>
                           {tienda.zona && (
-                            <span className="ml-1.5 text-[10px]" style={{ color: '#b2b2b2' }}>
+                            <span className="ml-1.5 text-[10px]" style={{ color: '#6b8a9a' }}>
                               {tienda.zona}
                             </span>
                           )}
