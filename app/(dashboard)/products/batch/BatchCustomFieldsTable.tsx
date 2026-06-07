@@ -215,127 +215,122 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
   // ── Render ─────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 px-6 pb-6 gap-3">
+    <div className="flex flex-col flex-1 min-h-0 px-6 pb-4 gap-2">
 
-      {/* ── Filter bar ── */}
+      {/* ── Single compact bar: nav + filters + actions ── */}
       <div
-        className="rounded-xl px-4 py-3 flex flex-wrap items-end gap-3"
-        style={{ background: 'white', boxShadow: '0 1px 4px rgba(0,32,60,0.07)' }}
+        className="flex items-center gap-2 px-3 py-2 rounded-xl flex-wrap"
+        style={{ background: 'white', boxShadow: '0 1px 4px rgba(0,32,60,0.07)', minHeight: 44 }}
       >
-        {/* Búsqueda */}
-        <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
-          <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>
-            Buscar modelo / descripción
-          </label>
-          <input
-            type="text"
-            value={filters.search}
-            onChange={e => setFilter('search', e.target.value)}
-            placeholder="Ej. 002AA o anillo oro…"
-            className="px-2.5 py-1.5 rounded-lg text-sm border focus:outline-none focus:ring-1 focus:ring-tq-sky"
-            style={{ borderColor: 'rgba(0,85,127,0.18)', color: '#00557f' }}
-          />
-        </div>
+        {/* Back link */}
+        <Link href="/products" className="text-xs shrink-0 mr-1" style={{ color: '#8fa8b8' }}>
+          ← Productos
+        </Link>
 
-        {/* Marca */}
-        <FilterSelect
-          label="Marca"
+        <div className="w-px h-4 shrink-0" style={{ background: 'rgba(0,85,127,0.12)' }} />
+
+        {/* Search */}
+        <input
+          type="search"
+          value={filters.search}
+          onChange={e => setFilter('search', e.target.value)}
+          placeholder="Buscar modelo o descripción…"
+          className="h-7 px-2.5 rounded-md text-xs border focus:outline-none focus:ring-1 focus:ring-tq-sky"
+          style={{
+            borderColor: filters.search ? '#00557f' : 'rgba(0,85,127,0.16)',
+            color: '#00557f',
+            minWidth: 200,
+            flex: '1 1 160px',
+          }}
+        />
+
+        {/* Selects — compact, label is the first option */}
+        <CompactSelect
+          placeholder="Marca"
           value={filters.supplier}
           options={filterOptions.suppliers}
           onChange={v => setFilter('supplier', v)}
         />
-
-        {/* Metal */}
-        <FilterSelect
-          label="Metal"
+        <CompactSelect
+          placeholder="Metal"
           value={filters.metal}
           options={filterOptions.metals}
           onChange={v => setFilter('metal', v)}
         />
-
-        {/* Familia */}
-        <FilterSelect
-          label="Familia"
+        <CompactSelect
+          placeholder="Familia"
           value={filters.familia}
           options={filterOptions.familias}
           onChange={v => setFilter('familia', v)}
         />
-
-        {/* Categoría */}
-        <FilterSelect
-          label="Categoría"
+        <CompactSelect
+          placeholder="Categoría"
           value={filters.category}
           options={filterOptions.categories}
           onChange={v => setFilter('category', v)}
         />
 
-        {/* En catálogo */}
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>
-            En catálogo
-          </label>
-          <button
-            onClick={() => setFilter('enCatalogo', !filters.enCatalogo)}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors"
-            style={
-              filters.enCatalogo
-                ? { background: '#00557f', color: 'white', borderColor: '#00557f' }
-                : { background: 'white', color: '#00557f', borderColor: 'rgba(0,85,127,0.2)' }
-            }
-          >
-            {filters.enCatalogo ? 'Solo activos' : 'Todos'}
-          </button>
-        </div>
+        {/* En catálogo toggle */}
+        <button
+          onClick={() => setFilter('enCatalogo', !filters.enCatalogo)}
+          title={filters.enCatalogo ? 'Mostrando solo activos — pulsa para ver todos' : 'Mostrando todos — pulsa para ver solo activos'}
+          className="h-7 px-2.5 rounded-md text-xs font-medium border transition-colors shrink-0"
+          style={
+            filters.enCatalogo
+              ? { background: '#00557f', color: 'white', borderColor: '#00557f' }
+              : { background: 'white', color: '#6b8a9a', borderColor: 'rgba(0,85,127,0.16)' }
+          }
+        >
+          En catálogo
+        </button>
 
-        {/* Limpiar */}
+        {/* Clear filters */}
         {hasFilters && (
           <button
             onClick={clearFilters}
-            className="self-end px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            className="h-7 px-2 rounded-md text-xs font-medium shrink-0 transition-colors"
             style={{ color: '#C8842A', background: '#FDF3E4' }}
           >
-            Limpiar filtros
+            ✕ Limpiar
           </button>
         )}
 
-        {/* Spacer + contador */}
-        <div className="flex-1" />
-        <p className="self-end text-xs pb-0.5" style={{ color: '#b2b2b2' }}>
-          {visibleRows.length} de {rows.length} modelos
-        </p>
-      </div>
+        {/* Counter */}
+        <span className="text-xs shrink-0 tabular-nums" style={{ color: '#b2b2b2' }}>
+          {visibleRows.length}/{rows.length}
+        </span>
 
-      {/* ── Toolbar ── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Link href="/products" className="text-sm flex items-center gap-1" style={{ color: '#6b8a9a' }}>
-          ← Volver a productos
-        </Link>
         <div className="flex-1" />
+        <div className="w-px h-4 shrink-0" style={{ background: 'rgba(0,85,127,0.12)' }} />
 
+        {/* Dirty indicator */}
         {dirtyCount > 0 && (
-          <span className="text-xs font-medium px-2.5 py-1 rounded-full"
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0"
                 style={{ background: '#FDF3E4', color: '#C8842A' }}>
-            {dirtyCount} {dirtyCount === 1 ? 'celda modificada' : 'celdas modificadas'}
+            {dirtyCount} pendiente{dirtyCount !== 1 ? 's' : ''}
           </span>
         )}
 
+        {/* Export */}
         <button
           onClick={handleExport}
-          className="text-sm px-3 py-1.5 rounded-lg border font-medium transition-colors hover:bg-slate-50"
-          style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+          title="Exportar Excel con valores actuales"
+          className="h-7 px-2.5 rounded-md text-xs border font-medium transition-colors hover:bg-slate-50 shrink-0"
+          style={{ borderColor: 'rgba(0,85,127,0.18)', color: '#00557f' }}
         >
-          ↓ Exportar Excel
+          ↓ Excel
         </button>
 
+        {/* Import */}
         <label
-          className="text-sm px-3 py-1.5 rounded-lg border font-medium transition-colors cursor-pointer"
+          title="Importar Excel — los cambios se previsualizarán en la tabla"
+          className="h-7 px-2.5 rounded-md text-xs border font-medium transition-colors cursor-pointer shrink-0 flex items-center"
           style={{
-            borderColor: 'rgba(0,85,127,0.2)',
-            color:       isImporting ? '#b2b2b2' : '#00557f',
-            background:  isImporting ? '#f9f9f9'  : undefined,
+            borderColor: 'rgba(0,85,127,0.18)',
+            color:      isImporting ? '#b2b2b2' : '#00557f',
           }}
         >
-          {isImporting ? 'Importando…' : '↑ Importar Excel'}
+          {isImporting ? '…' : '↑ Excel'}
           <input
             ref={fileInputRef}
             type="file"
@@ -346,20 +341,21 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
           />
         </label>
 
+        {/* Save */}
         <button
           onClick={handleSave}
           disabled={dirtyCount === 0 || isSaving}
-          className="text-sm px-4 py-1.5 rounded-lg font-semibold text-white transition-all"
+          className="h-7 px-3 rounded-md text-xs font-semibold text-white transition-all shrink-0"
           style={{
             background: dirtyCount > 0 && !isSaving ? '#C8842A' : '#d4cfc9',
             cursor:     dirtyCount > 0 && !isSaving ? 'pointer' : 'not-allowed',
           }}
         >
-          {isSaving ? 'Guardando…' : dirtyCount > 0 ? `Guardar cambios (${dirtyCount})` : 'Guardar cambios'}
+          {isSaving ? 'Guardando…' : `Guardar${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
         </button>
       </div>
 
-      {/* ── Table ── */}
+      {/* ── Table — takes all remaining height ── */}
       <div
         className="flex-1 overflow-auto rounded-xl border"
         style={{ borderColor: 'rgba(0,85,127,0.12)', minHeight: 0 }}
@@ -462,43 +458,37 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
         )}
       </div>
 
-      <p className="text-xs" style={{ color: '#b2b2b2' }}>
-        Edita directamente en la tabla o importa un Excel. Los cambios (marcados en naranja) se aplican al hacer clic en &quot;Guardar cambios&quot;.
-      </p>
     </div>
   )
 }
 
-// ── Filter select helper ──────────────────────────────────────────
+// ── Compact inline select (no external label) ─────────────────────
 
-function FilterSelect({
-  label, value, options, onChange,
+function CompactSelect({
+  placeholder, value, options, onChange,
 }: {
-  label:    string
-  value:    string
-  options:  string[]
-  onChange: (v: string) => void
+  placeholder: string
+  value:       string
+  options:     string[]
+  onChange:    (v: string) => void
 }) {
+  const active = !!value
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>
-        {label}
-      </label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="px-2.5 py-1.5 rounded-lg text-sm border focus:outline-none focus:ring-1 focus:ring-tq-sky"
-        style={{
-          borderColor: value ? '#00557f' : 'rgba(0,85,127,0.18)',
-          color: value ? '#00557f' : '#6b8a9a',
-          background: value ? 'rgba(0,85,127,0.04)' : 'white',
-          minWidth: 130,
-        }}
-      >
-        <option value="">Todas</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="h-7 px-2 rounded-md text-xs border focus:outline-none focus:ring-1 focus:ring-tq-sky shrink-0"
+      style={{
+        borderColor: active ? '#00557f' : 'rgba(0,85,127,0.16)',
+        color:       active ? '#00557f' : '#8fa8b8',
+        background:  active ? 'rgba(0,85,127,0.05)' : 'white',
+        fontWeight:  active ? 500 : 400,
+        maxWidth:    140,
+      }}
+    >
+      <option value="">{placeholder}</option>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
   )
 }
 
