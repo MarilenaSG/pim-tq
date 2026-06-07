@@ -10,7 +10,7 @@ const CATS: { key: BoletinCategoria; label: string; color: string; bg: string; i
   { key: 'campaña', label: 'Campaña',   color: '#00557f', bg: '#e8f4fb', icon: '◈', desc: 'Productos incluidos en campañas activas' },
   { key: 'nuevo',   label: 'Nuevo',     color: '#3A9E6A', bg: '#e8f5f0', icon: '★', desc: 'Incorporados al catálogo en los últimos 2 meses' },
   { key: 'outlet',  label: 'Outlet',    color: '#C8842A', bg: '#fdf3e4', icon: '▼', desc: 'Con descuento aplicado ≥ 15%' },
-  { key: 'retirar', label: 'A retirar', color: '#C0392B', bg: '#fdf0f0', icon: '⊗', desc: 'Descatalogados o sin ventas en +6 meses' },
+  { key: 'retirar', label: 'A retirar', color: '#C0392B', bg: '#fdf0f0', icon: '⊗', desc: 'Descatalogados con menos de 20 uds. en stock' },
 ]
 
 function fmtEur(n: number | null) {
@@ -208,6 +208,26 @@ export default function BoletinPage() {
   const [editing, setEditing]   = useState<BoletinItem | null>(null)
   const [filter, setFilter]     = useState<BoletinCategoria | 'all'>('all')
   const [search, setSearch]     = useState('')
+  const [exporting, setExporting] = useState(false)
+
+  async function exportExcel() {
+    setExporting(true)
+    try {
+      const res = await fetch('/api/boletin/excel')
+      if (!res.ok) throw new Error('Error al generar el Excel')
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `boletin-tiendas-tq-${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('No se pudo generar el Excel. Inténtalo de nuevo.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -249,12 +269,29 @@ export default function BoletinPage() {
         title="Boletín"
         subtitle="Novedades de campaña, nuevos, outlet y productos a retirar"
         actions={
-          <button
-            onClick={load}
-            className="px-4 py-2 rounded-lg text-sm font-medium border border-[#e8e3df] hover:bg-white transition-colors"
-          >
-            ↻ Actualizar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportExcel}
+              disabled={exporting || loading}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+              style={{ background: '#3A9E6A', opacity: exporting ? 0.7 : 1 }}
+            >
+              {exporting ? (
+                <>
+                  <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Generando…
+                </>
+              ) : (
+                <>⬇ Exportar Excel</>
+              )}
+            </button>
+            <button
+              onClick={load}
+              className="px-4 py-2 rounded-lg text-sm font-medium border border-[#e8e3df] hover:bg-white transition-colors"
+            >
+              ↻ Actualizar
+            </button>
+          </div>
         }
       />
 

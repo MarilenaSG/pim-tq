@@ -27,13 +27,12 @@ function autoCategorize(p: {
   dias_en_catalogo: number
   descuento_aplicado: number | null
   is_discontinued: boolean
-  sin_ventas_dias: number | null
+  stock_total: number
 }): BoletinCategoria | null {
   if (p.en_campaña_activa) return 'campaña'
-  if (p.dias_en_catalogo <= 60) return 'nuevo'          // ≤ 2 meses
+  if (p.dias_en_catalogo <= 60) return 'nuevo'           // ≤ 2 meses
   if ((p.descuento_aplicado ?? 0) >= 15) return 'outlet' // descuento ≥ 15%
-  if (p.is_discontinued) return 'retirar'
-  if ((p.sin_ventas_dias ?? 0) > 180) return 'retirar'   // sin ventas > 6m
+  if (p.is_discontinued && p.stock_total < 20) return 'retirar' // descatalogado con < 20 uds
   return null  // not noteworthy
 }
 
@@ -112,11 +111,11 @@ export async function GET() {
 
     // Auto-categorize
     const autoCategoria = autoCategorize({
-      en_campaña_activa: productosEnCampaña.has(codigo),
-      dias_en_catalogo:  diasEnCatalogo,
+      en_campaña_activa:  productosEnCampaña.has(codigo),
+      dias_en_catalogo:   diasEnCatalogo,
       descuento_aplicado: leader ? (leader.descuento_aplicado as number | null) : null,
-      is_discontinued:   p.is_discontinued as boolean,
-      sin_ventas_dias:   null, // TODO: derive from ventas_mensuales once available
+      is_discontinued:    p.is_discontinued as boolean,
+      stock_total:        stockTotal,
     })
 
     // Apply override if present, else use auto
