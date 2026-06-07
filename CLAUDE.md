@@ -47,6 +47,23 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 
 ---
 
+## Concepto crítico: Marca ≠ Proveedor
+
+> **Esta distinción es fundamental. No confundir nunca.**
+
+| Campo | Columna DB | Origen | Significado |
+|---|---|---|---|
+| **Proveedor** | `products.supplier_name` | Metabase (CSV) | Fabricante/manufacturer del producto |
+| **Marca** | `products.shopify_vendor` | Shopify Admin API | Marca que Te Quiero asigna en Shopify |
+
+- Un proveedor puede fabricar productos de varias marcas TQ.
+- `supplier_name` viene del sync de Metabase y nunca se edita manualmente.
+- `shopify_vendor` viene del sync de Shopify y se propaga a `products` via migración 019.
+- En los filtros de la app: "Proveedor" filtra por `supplier_name`, "Marca" filtra por `shopify_vendor`.
+- Ambos filtros coexisten en `/products`. En `/analytics` solo existe el filtro Marca (`shopify_vendor`).
+
+---
+
 ## Estructura de carpetas real
 
 ```
@@ -57,6 +74,8 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 │   │   ├── layout.tsx                      ← ZoneSidebar + ToastProvider
 │   │   ├── products/
 │   │   │   ├── page.tsx                    ← Lista de productos (global)
+│   │   │   ├── ProductsTable.tsx           ← Tabla con .tq-table + checkbox + sort
+│   │   │   ├── ProductFilters.tsx          ← Filtros: Marca (shopify_vendor) + Proveedor (supplier_name)
 │   │   │   └── [codigo_modelo]/
 │   │   │       └── page.tsx                ← Ficha de producto
 │   │   ├── campaigns/
@@ -64,7 +83,8 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 │   │   ├── alerts/
 │   │   │   └── page.tsx                    ← Centro de alertas
 │   │   ├── suppliers/
-│   │   │   └── page.tsx                    ← Proveedores
+│   │   │   ├── page.tsx                    ← Proveedores (Server Component, agrega datos)
+│   │   │   └── SuppliersClient.tsx         ← Tabla + panel lateral + ABC ingresos/rotación
 │   │   ├── category/
 │   │   │   └── page.tsx                    ← Category manager
 │   │   ├── compare/
@@ -75,10 +95,10 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 │   │   ├── stock/
 │   │   │   └── page.tsx                    ← Dashboard Stock
 │   │   ├── tiendas/
-│   │   │   ├── boletin/page.tsx            ← Boletín para tiendas
+│   │   │   ├── boletin/page.tsx            ← Boletín para tiendas (client, con export Excel)
 │   │   │   └── catalogo/page.tsx           ← Catálogo para tiendas
 │   │   ├── analytics/
-│   │   │   ├── layout.tsx                  ← Layout analítica con tabs
+│   │   │   ├── layout.tsx                  ← Layout analítica con tabs + filtro Marca
 │   │   │   ├── surtido/page.tsx
 │   │   │   ├── precio/page.tsx
 │   │   │   ├── price-ladder/page.tsx       ← Escalera de precios
@@ -126,7 +146,9 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 │       ├── ai/
 │       │   ├── price-suggestion/route.ts
 │       │   └── ladder-insights/route.ts
-│       ├── boletin/route.ts
+│       ├── boletin/
+│       │   ├── route.ts                    ← GET boletín items + POST/DELETE overrides
+│       │   └── excel/route.ts              ← Export Excel del boletín para tiendas
 │       ├── batch/update/route.ts
 │       └── products/
 │           ├── filter/route.ts
@@ -148,6 +170,7 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 │       ├── EmptyState.tsx
 │       ├── Toast.tsx
 │       ├── AnalyticsFilters.tsx
+│       ├── FilterSelect.tsx            ← Select reutilizable con estado activo (azul)
 │       ├── ZoneSidebar.tsx             ← Barra lateral multi-zona
 │       ├── ZoneCardsSection.tsx        ← Cards de acceso rápido por zona
 │       ├── ZoneSummaryWidget.tsx       ← Widget de resumen por zona en home
@@ -160,6 +183,7 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 │   ├── metabase.ts                    ← Sync productos desde CSV
 │   ├── ventas.ts                      ← Sync ventas_mensuales desde CSV
 │   ├── reservas.ts                    ← Sync reservas desde CSV
+│   ├── shopify.ts                     ← Sync Shopify API → product_shopify_data + products.shopify_vendor
 │   ├── alerts.ts                      ← Lógica de alertas (stock crítico, etc.)
 │   ├── completitud.ts                 ← Score de completitud de ficha
 │   ├── zones.ts                       ← Configuración de zonas (ZONES[])
@@ -169,7 +193,7 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 ├── types/
 │   └── index.ts                       ← Todos los tipos TypeScript
 ├── supabase/
-│   └── migrations/                    ← 18 migraciones (001–018)
+│   └── migrations/                    ← 19 migraciones (001–019)
 ├── public/
 │   └── brand/
 │       ├── icon_cream.png             ← Logo para fondos oscuros (PDF, etc.)
@@ -220,10 +244,11 @@ APP_URL=                      # Para callbacks internos
 
 **`products`** — clave primaria: `codigo_modelo` (TEXT, ej: "002AA")
 - `description`, `category`, `familia`, `metal`, `karat`, `supplier_name`
+- `shopify_vendor` — Marca Shopify asignada por TQ (añadida en migración 019, backfill desde `product_shopify_data`)
 - `primera_entrada`, `num_variantes`, `lista_variantes`, `variante_lider`
 - Agregados: `ingresos_12m`, `unidades_12m`, `abc_ventas`, `abc_unidades`
 - Estado: `is_discontinued` (AND de todas sus variantes), `lifecycle_status`
-- Control: `metabase_synced_at`, `created_at`, `updated_at`
+- Control: `metabase_synced_at`, `shopify_synced_at`, `created_at`, `updated_at`
 
 **`product_variants`** — clave primaria: `codigo_interno` (TEXT, ej: "002AA08")
 - `slug` (= `codigo_interno`), `codigo_modelo` FK, `variante`, `description` ← por variante
@@ -236,6 +261,11 @@ APP_URL=                      # Para callbacks internos
 - Control: `metabase_synced_at`, `updated_at`
 
 > `description` en `product_variants` es la descripción específica de cada SKU (migración 018). Distinto del `description` de `products` que es el del modelo líder.
+
+**`product_shopify_data`** — FK: `codigo_modelo`
+- `shopify_product_id`, `shopify_vendor`, `shopify_status` (active|draft|archived)
+- `shopify_tags`, `shopify_synced_at`
+- Fuente de verdad Shopify por modelo. El campo `shopify_vendor` se copia a `products.shopify_vendor` en cada sync.
 
 **`ventas_mensuales`** — ventas históricas por SKU, tienda y mes
 - `slug` (= `codigo_interno`), `codigo_modelo`, `tienda`, `anyo`, `mes`
@@ -254,12 +284,26 @@ APP_URL=                      # Para callbacks internos
 **`pricing_rules`** — reglas de pricing por category management
 - `familia`, `metal`, `karat`, `margen_objetivo_pct`, `redondeo` (text|99|00), `descuento_minimo_pct`
 
+**`boletin_overrides`** — overrides manuales de categoría del boletín
+- `codigo_modelo`, `categoria` (campaña|nuevo|outlet|retirar), `nota_interna`, `activo`, `expira_en`, `creado_por`
+
 **`sync_log`**
 - `source` (metabase|ventas|reservas), `status` (success|error|running), `records_updated`, `error_message`, `triggered_by`, `started_at`, `finished_at`
 
 ### Vistas y RPCs
 - `product_stock_summary` — vista: stock total por modelo
 - RPCs de ventas: `ventas_por_modelo_v2`, otras funciones de agregación
+
+### Migraciones aplicadas
+- 001–018: schema base, variantes, imágenes, campañas, alertas, boletin_overrides, variant description
+- **019** `019_products_shopify_vendor.sql`: añade `shopify_vendor` a `products` y backfill desde `product_shopify_data`
+  - ⚠️ **Pendiente de aplicar en Supabase producción** (SQL Editor). Hasta que se aplique, cualquier query que seleccione `products.shopify_vendor` fallará.
+  ```sql
+  alter table products add column if not exists shopify_vendor text;
+  update products p set shopify_vendor = sd.shopify_vendor
+  from product_shopify_data sd
+  where sd.codigo_modelo = p.codigo_modelo and sd.shopify_vendor is not null;
+  ```
 
 ### Umbrales de stock (19 tiendas)
 | ABC | Mínimo | Normal | Sobrante |
@@ -288,9 +332,15 @@ APP_URL=                      # Para callbacks internos
 ### Metabase CSV — Reservas (`METABASE_RESERVAS_CSV_URL`)
 - Reservas activas de productos; sync en tabla `reservas`
 
+### Shopify Admin API (`lib/shopify.ts`)
+- Sync hacia `product_shopify_data` (shopify_product_id, shopify_vendor, shopify_status, shopify_tags)
+- Paso 7 del sync propaga `shopify_vendor` agrupado a `products.shopify_vendor` (en batches de 250)
+- Tras el sync de Shopify, los filtros de Marca en la app se rellenan automáticamente
+
 ### Exports (sin dependencias externas)
 - **PDF catálogo tiendas:** `@react-pdf/renderer`, logo `icon_cream.png` (28px, fondos oscuros), cabecera en todas las páginas, numeración, disclaimer de precios
 - **Excel plantilla pedido:** `ExcelJS`, columnas Metal / Familia / Descripción (por variante) / Uds. a pedir
+- **Excel boletín tiendas:** `ExcelJS`, secciones por categoría con colores TQ, stock resaltado en rojo para "a retirar"
 - **Export CM:** PDF y Excel del módulo de campañas y catálogo general
 
 ### Cron job (Vercel)
@@ -318,22 +368,76 @@ Ejecuta a las 05:00 UTC. El endpoint `run` lanza sync de productos + ventas en s
 
 ---
 
+## Boletín de Tiendas — lógica de categorización
+
+El boletín (`/tiendas/boletin`) auto-categoriza productos. Orden de prioridad (un producto solo entra en una categoría):
+
+| Categoría | Condición | Color |
+|---|---|---|
+| **Campaña** | En campaña activa en este momento | Azul `#00557F` |
+| **Nuevo** | `primera_entrada` ≤ 60 días | Verde `#3A9E6A` |
+| **Outlet** | `descuento_aplicado` ≥ 15% | Ámbar `#C8842A` |
+| **A retirar** | `is_discontinued = true` **AND** `stock_total < 20` uds. | Rojo `#C0392B` |
+
+> **Regla "A retirar" (junio 2026):** Un descatalogado solo aparece en el boletín como "a retirar" si además tiene menos de 20 unidades en stock. Con stock alto no urge retirarlo.
+
+Los overrides manuales (tabla `boletin_overrides`) sobreescriben la categoría auto-asignada. Tienen fecha de expiración opcional.
+
+**Export Excel del boletín** (`/api/boletin/excel`): genera un `.xlsx` con secciones por categoría, colores corporativos TQ, stock resaltado en rojo para productos a retirar, y URL de imagen para referencia.
+
+---
+
+## Sistema de UI de tablas
+
+Todas las tablas del proyecto usan las clases definidas en `app/globals.css`:
+
+```
+.tq-table-wrap   → contenedor blanco, rounded-xl, shadow-xs, border sutil
+.tq-table        → la <table> en sí, font-size 13px
+```
+
+**Headers `<th>`:** 10px · font-weight 600 · uppercase · letter-spacing 0.11em · color `#8fa8b8`
+- `.right` → text-align right
+- `.sortable` → cursor pointer, hover a `var(--tq-snorkel)`
+- `.sort-active` → color activo `var(--tq-snorkel)`
+
+**Filas:** padding `9px 14px` · border `rgba(0,85,127,0.05)` · hover `rgba(0,85,127,0.022)`
+- `.row-selected` → `rgba(0,153,242,0.045)` (checkboxes)
+- `.row-active` → `rgba(0,85,127,0.045)` (panel abierto)
+
+**Tfoot:** fondo `rgba(0,85,127,0.03)` · border-top 1.5px · font 11px bold · color snorkel
+
+**Colores de texto en celdas:**
+- Primario: `#00264d`
+- Secundario/muted: `#8fa8b8` (NO usar `#b2b2b2`)
+- Links/códigos: `#0099f2` (tq-sky)
+- Nombres de proveedor: `font-medium` 13px color `#00557f`
+
+**Badges:** `text-[11px] font-semibold px-2 py-0.5 rounded-full`
+- ABC-A: bg `rgba(58,158,106,0.12)` color `#2d7a54`
+- ABC-B: bg `rgba(0,153,242,0.12)` color `#006da3`
+- ABC-C: bg `rgba(200,132,42,0.12)` color `#a06818`
+
+Archivos de referencia: `app/(dashboard)/suppliers/SuppliersClient.tsx` · `app/(dashboard)/products/ProductsTable.tsx`
+
+---
+
 ## Rutas y acceso
 
 | Ruta | Zona | Descripción |
 |---|---|---|
 | `/` | CM | Dashboard Category Management |
-| `/products` | Global | Lista de productos con filtros |
+| `/products` | Global | Lista de productos con filtros Marca + Proveedor |
 | `/products/[codigo_modelo]` | Global | Ficha de producto |
 | `/campaigns` | CM/Ventas | Gestión de campañas |
 | `/alerts` | CM/Stock | Centro de alertas |
-| `/suppliers` | Stock | Proveedores |
+| `/suppliers` | Stock | Análisis de proveedores (eficiencia, surtido, ABC, margen) |
 | `/category` | CM | Category manager |
 | `/compare` | CM | Comparador de productos |
 | `/ventas` | Ventas | Dashboard sell-out |
 | `/ventas/sell-out` | Ventas | Sell-out por tienda |
 | `/stock` | Stock | Dashboard stock operativo |
-| `/tiendas/boletin` | Tiendas | Boletín de novedades |
+| `/tiendas/boletin` | Tiendas | Boletín de novedades (con export Excel) |
 | `/tiendas/catalogo` | Tiendas | Catálogo para equipos de tienda |
 | `/analytics/surtido` | CM | Amplitud, profundidad, Pareto |
 | `/analytics/precio` | CM | Mapas de precio, márgenes, descuentos |
@@ -348,6 +452,7 @@ Ejecuta a las 05:00 UTC. El endpoint `run` lanza sync de productos + ventas en s
 | `/help` | Global | Manual de usuario |
 | `/api/sync/run` | 🔑 CRON_SECRET | Cron de Vercel |
 | `/api/sync/*` | 🔑 CRON_SECRET | Sync manual por fuente |
+| `/api/boletin/excel` | Tiendas | Export Excel del boletín |
 
 Sin auth de usuario. Solo los endpoints de sync están protegidos (header `x-api-key: CRON_SECRET`).
 
@@ -363,7 +468,8 @@ Sin auth de usuario. Solo los endpoints de sync están protegidos (header `x-api
 | `PageHeader` | `title`, `subtitle`, `eyebrow?`, `actions?: ReactNode` |
 | `EmptyState` | `icon`, `message`, `cta?: { label, href }` |
 | `Toast` | Global via contexto. Variantes: success\|error\|info |
-| `ZoneSidebar` | Lee zona de `localStorage`, renderiza nav contextual |
+| `FilterSelect` | `placeholder`, `value`, `options: string[]`, `onChange`, `maxWidth?` — select con estado activo en azul |
+| `ZoneSidebar` | Navegación lateral. Proveedores está bajo la sección Stock |
 | `ZoneCardsSection` | Cards de acceso rápido en home de cada zona |
 | `ZoneSummaryWidget` | Widget de KPIs de zona en el dashboard CM |
 | `SidebarAlertBadge` | Badge numérico de alertas activas |
@@ -373,14 +479,17 @@ Sin auth de usuario. Solo los endpoints de sync están protegidos (header `x-api
 ## Paleta de colores
 
 ```css
---color-accent:       #C8842A   /* Dorado — acento corporativo */
---color-accent-light: #FDF3E4   /* Fondo suave dorado */
---color-accent-text:  #8B5E1A   /* Texto sobre fondo dorado */
---status-ok:          #3A9E6A
---status-warn:        #C8842A
---status-error:       #C0392B
---status-info:        #2A5F9E
---tq-bg:              fondo general de la app
+--tq-snorkel:      #00557f   /* Azul principal */
+--tq-sky:          #0099f2   /* Azul acento / links */
+--tq-gold:         #c8a164   /* Dorado */
+--color-accent:    #C8842A   /* Dorado — acento corporativo */
+--status-ok:       #3A9E6A
+--status-warn:     #C8842A
+--status-error:    #C0392B
+--status-info:     #2A5F9E
+--tq-bg:           #e8e3df   /* Fondo general (alyssum) */
+--tq-shadow-xs:    0 1px 2px rgba(0,32,60,0.06)
+--tq-shadow-sm:    0 2px 6px rgba(0,32,60,0.08)
 ```
 
 ---
@@ -402,6 +511,8 @@ Sin auth de usuario. Solo los endpoints de sync están protegidos (header `x-api
 13. **`bestAbc()`** — siempre usar el más estricto entre `abc_ventas` y `abc_unidades` para umbrales de stock.
 14. **`createServerClient()`** para lecturas (anon key) · **`createServiceClient()`** para escrituras (service role key). Nunca usar `createAuthServerClient()` — la app no tiene auth de usuario.
 15. **Supabase límite 1000 filas** — cuando se fetchen variantes de múltiples modelos, siempre acotar con `.in('codigo_modelo', codes)` para evitar cortes silenciosos.
+16. **Marca ≠ Proveedor** — `shopify_vendor` es la Marca TQ; `supplier_name` es el fabricante de Metabase. Nunca mezclarlos. Filtro "Marca" → `shopify_vendor`; filtro "Proveedor" → `supplier_name`.
+17. **Tablas: usar siempre `.tq-table-wrap` + `.tq-table`** — nunca inline styles para bordes/hover/sombras de tabla. Ver sección "Sistema de UI de tablas".
 
 ---
 
@@ -410,20 +521,28 @@ Sin auth de usuario. Solo los endpoints de sync están protegidos (header `x-api
 ### Completado y funcionando
 - ✅ Sync Metabase productos (CSV → `products` + `product_variants` + `product_images`)
 - ✅ Sync Metabase ventas (CSV → `ventas_mensuales`)
-- ✅ Lista de productos con filtros
+- ✅ Lista de productos con filtros Marca (`shopify_vendor`) y Proveedor (`supplier_name`) separados
 - ✅ Ficha de producto (datos Metabase + campos custom + precios + IA)
 - ✅ Arquitectura multi-zona con `ZoneSidebar`
 - ✅ Zona CM: dashboard + analítica completa (surtido, precio, ciclo vida, rentabilidad, stock, ventas)
 - ✅ Zona Ventas: dashboard + sell-out por tienda
 - ✅ Zona Stock: dashboard con alertas ABC, donut nivel stock, inventario expandible
-- ✅ Zona Tiendas: catálogo (con exports PDF y Excel) + boletín
+- ✅ Zona Tiendas: catálogo (con exports PDF y Excel) + boletín (con export Excel)
 - ✅ Campañas: CRUD + export PDF/Excel
 - ✅ Alertas: stock crítico, sin ventas, precio anomalía
 - ✅ Sugerencia de precio IA + price ladder insights
 - ✅ Reglas de pricing por familia/metal/karat
 - ✅ Settings de sync con panel de estado
+- ✅ Página Proveedores: análisis de eficiencia, ABC por ingresos y por rotación, precio medio, margen
+- ✅ Sistema de tabla unificado (`.tq-table` / `.tq-table-wrap`) aplicado en toda la app
+- ✅ Boletín: regla "A retirar" = descatalogado AND stock < 20 uds.
+- ✅ Boletín: export Excel con secciones por categoría y colores TQ
 
-### Pendiente
+### Pendiente — acción requerida antes de que funcione Marca
+- ⚠️ **Aplicar migración 019 en Supabase SQL Editor** — sin esto, cualquier página que lea `products.shopify_vendor` falla. SQL en `supabase/migrations/019_products_shopify_vendor.sql`
+- ⚠️ **Ejecutar sync de Shopify** tras aplicar la migración — para poblar `shopify_vendor` en `products` y que el filtro Marca muestre opciones
+
+### Pendiente — trabajo futuro
 - ⏳ `product_variants.description` poblada por variante (migración 018 aplicada; **sync de Metabase pendiente** para rellenar los datos)
 - ⏳ Sync de reservas (`METABASE_RESERVAS_CSV_URL` configurada, verificar en producción)
 - ⏳ Manual de usuario `/help` — contenido real
@@ -440,6 +559,8 @@ Lee el CLAUDE.md antes de empezar.
 Rama activa: architecture/multi-zone-redesign (no mergeada a main aún)
 
 Lo que ya funciona: zonas CM/Ventas/Stock/Tiendas · sync Metabase · exports PDF/Excel · IA precio
+⚠️ Pendiente crítico: aplicar migración 019 en Supabase para que funcione el filtro Marca
+
 Objetivo hoy: [descripción]
 Primer paso: [acción concreta]
 ```
@@ -451,4 +572,4 @@ Primer paso: [acción concreta]
 
 ---
 
-*Actualizado junio 2026. v2.1: arquitectura multi-zona · Shopify reintegrado (lib/shopify.ts · product_shopify_data · ShopifyTab · export CSV) · Google Sheets eliminado · 3 CSVs de Metabase · exports PDF/ExcelJS · 19 tiendas · umbrales ABC×19 · migración 018 variant description.*
+*Actualizado junio 2026. v2.2: Marca vs Proveedor (shopify_vendor ≠ supplier_name) · migración 019 products.shopify_vendor · sistema de tabla .tq-table unificado · FilterSelect component · Proveedores en sidebar Stock · regla boletín "a retirar" (descatalogado + stock < 20) · export Excel boletín tiendas.*
