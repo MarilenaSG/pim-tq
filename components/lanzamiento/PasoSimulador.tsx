@@ -242,174 +242,236 @@ function Stepper({
   )
 }
 
-// ── Card de escenario ─────────────────────────────────────────────
+// ── Tooltip informativo ───────────────────────────────────────────
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <div className="relative inline-flex items-center group flex-shrink-0">
+      <div
+        className="w-[15px] h-[15px] rounded-full flex items-center justify-center cursor-default"
+        style={{ background: 'rgba(0,85,127,0.1)', color: '#8fa8b8' }}
+      >
+        <span className="text-[9px] font-bold leading-none select-none">?</span>
+      </div>
+      {/* Bubble */}
+      <div
+        className="absolute bottom-full left-0 mb-2 w-56 p-3 rounded-xl text-[11px] leading-snug
+                   opacity-0 group-hover:opacity-100 transition-opacity duration-150
+                   pointer-events-none z-30 shadow-lg"
+        style={{ background: '#00264d', color: 'rgba(255,255,255,0.88)' }}
+      >
+        {text}
+        {/* Arrow */}
+        <span
+          className="absolute top-full left-3"
+          style={{
+            display: 'block', width: 0, height: 0,
+            borderLeft:  '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderTop:   '5px solid #00264d',
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ── Fila de slider con tooltip ────────────────────────────────────
+
+function SliderRow({
+  label, value, unit, min, max, step = 1,
+  marks, tooltip, color, onChange,
+}: {
+  label:   string
+  value:   number
+  unit:    string
+  min:     number
+  max:     number
+  step?:   number
+  marks:   string[]
+  tooltip: string
+  color:   string
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      {/* Label + tooltip */}
+      <div className="flex items-center gap-1.5 flex-shrink-0" style={{ width: 148 }}>
+        <span className="text-[11px]" style={{ color: '#8fa8b8' }}>{label}</span>
+        <InfoTooltip text={tooltip} />
+      </div>
+      {/* Slider */}
+      <div className="flex-1">
+        <input
+          type="range"
+          min={min} max={max} step={step} value={value}
+          onChange={e => onChange(parseInt(e.target.value))}
+          className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+          style={{ accentColor: color }}
+        />
+        <div className="flex justify-between text-[9px] mt-0.5" style={{ color: '#c0cfd8' }}>
+          {marks.map(m => <span key={m}>{m}</span>)}
+        </div>
+      </div>
+      {/* Valor */}
+      <span
+        className="text-[13px] font-bold flex-shrink-0 text-right"
+        style={{ color, width: 48 }}
+      >
+        {value}{unit}
+      </span>
+    </div>
+  )
+}
+
+// ── Card de escenario (ancho completo, controles siempre visibles) ─
 
 function EscenarioCard({
-  esc, cfg, expanded, onToggle, onUpdate,
+  esc, cfg, onUpdate,
   ebitdaPct, margenMensual, paybackMeses,
 }: {
   esc:           LanzamientoEscenario
   cfg:           typeof ESC_CFG[number]
-  expanded:      boolean
-  onToggle:      () => void
   onUpdate:      (field: keyof CalcularCurvaParams, value: number) => void
   ebitdaPct:     number
   margenMensual: number | null
   paybackMeses:  number | null
 }) {
-  const p = paramsOf(esc)
-  const k = esc.kpis
+  const p    = paramsOf(esc)
+  const k    = esc.kpis
   const beOk = k.breakeven_semanas <= 8
 
   return (
     <div
-      className="rounded-xl overflow-hidden flex-1 flex flex-col"
+      className="rounded-xl overflow-hidden"
       style={{
-        border:     `2px solid ${expanded ? cfg.color : cfg.border}`,
+        border:     `1.5px solid ${cfg.border}`,
         background: 'white',
-        boxShadow:  expanded ? `0 0 0 3px ${cfg.color}18` : 'var(--tq-shadow-xs)',
+        boxShadow:  'var(--tq-shadow-xs)',
       }}
     >
-      {/* ── Header clickable ─────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────── */}
       <div
-        className="px-4 py-2.5 flex items-center justify-between cursor-pointer"
-        onClick={onToggle}
-        style={{ background: `${cfg.color}0e`, borderBottom: `1px solid ${cfg.border}` }}
+        className="px-5 py-3 flex items-center gap-3"
+        style={{ background: `${cfg.color}0d`, borderBottom: `1px solid ${cfg.border}` }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: cfg.color }}>
-            {cfg.label}
-          </span>
-          <span
-            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-            style={{ background: `${cfg.color}20`, color: cfg.color }}
-          >
-            ST {p.factorAjustePct ?? 100}%
-          </span>
-        </div>
-        <span className="text-[10px] font-semibold" style={{ color: cfg.color }}>
-          {expanded ? '▲ Cerrar' : '▼ Editar'}
+        <span
+          className="text-[11px] font-bold uppercase tracking-widest"
+          style={{ color: cfg.color }}
+        >
+          {cfg.label}
+        </span>
+        <span
+          className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+          style={{ background: `${cfg.color}18`, color: cfg.color }}
+        >
+          ST {p.factorAjustePct ?? 100}%
         </span>
       </div>
 
-      {/* ── Héroe: Unidades + Ingresos ───────────────────── */}
-      <div className="px-4 pt-4 pb-3 flex items-end justify-between gap-2" style={{ borderBottom: `1px solid ${cfg.border}` }}>
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: cfg.color + 'aa' }}>
-            Uds. 16 sem.
+      {/* ── KPIs: fila de 6 métricas ─────────────────── */}
+      <div
+        className="px-5 py-4 grid"
+        style={{
+          gridTemplateColumns: 'repeat(6, 1fr)',
+          gap: 0,
+          borderBottom: `1px solid ${cfg.border}`,
+        }}
+      >
+        {/* Uds vendidas */}
+        <div className="pr-4">
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>
+            Uds vendidas
           </p>
-          <p className="text-[26px] font-black leading-none" style={{ color: cfg.color }}>
+          <p className="text-[24px] font-bold leading-none" style={{ color: cfg.color }}>
             {k.unidades_total.toLocaleString('es-ES')}
           </p>
+          <p className="text-[9px] mt-1" style={{ color: '#c0cfd8' }}>en 16 semanas</p>
         </div>
-        <div className="text-right">
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>
-            Ingresos
-          </p>
-          <p className="text-[15px] font-black leading-none" style={{ color: '#00264d' }}>
+
+        {/* Ingresos */}
+        <div className="px-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>Ingresos</p>
+          <p className="text-[18px] font-bold leading-none" style={{ color: '#00264d' }}>
             {fmtEur(k.ingresos)}
           </p>
         </div>
-      </div>
 
-      {/* ── Márgenes: MB% + Break-even ───────────────────── */}
-      <div className="px-4 py-3 grid grid-cols-2 gap-3" style={{ borderBottom: `1px solid ${cfg.border}` }}>
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>MB %</p>
-          <p className="text-[17px] font-black leading-tight" style={{ color: mbColor(k.margen_pct) }}>
+        {/* MB */}
+        <div className="px-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>Margen bruto</p>
+          <p className="text-[18px] font-bold leading-none" style={{ color: mbColor(k.margen_pct) }}>
             {fmtPct(k.margen_pct, 0)}
           </p>
         </div>
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>Break-even</p>
-          <p className="text-[17px] font-black leading-tight" style={{ color: beOk ? '#3A9E6A' : '#C8842A' }}>
+
+        {/* Break-even */}
+        <div className="px-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>Break-even</p>
+          <p className="text-[18px] font-bold leading-none" style={{ color: beOk ? '#3A9E6A' : '#C8842A' }}>
             {k.breakeven_semanas < 99 ? `Sem. ${k.breakeven_semanas}` : 'No alc.'}
           </p>
         </div>
-      </div>
 
-      {/* ── Operativo: EBITDA + Payback ──────────────────── */}
-      <div className="px-4 py-3 grid grid-cols-2 gap-3" style={{ background: 'rgba(0,85,127,0.025)' }}>
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>EBITDA %</p>
-          <p className="text-[15px] font-black leading-tight" style={{ color: ebitdaColor(ebitdaPct) }}>
+        {/* EBITDA */}
+        <div className="px-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>EBITDA</p>
+          <p className="text-[18px] font-bold leading-none" style={{ color: ebitdaColor(ebitdaPct) }}>
             {fmtPct(ebitdaPct, 0)}
           </p>
-          <p className="text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>MB − OPEX</p>
+          <p className="text-[9px] mt-1" style={{ color: '#c0cfd8' }}>MB − OPEX</p>
         </div>
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>Payback</p>
-          <p className="text-[15px] font-black leading-tight" style={{ color: paybackColor(paybackMeses) }}>
+
+        {/* Payback */}
+        <div className="pl-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>Payback</p>
+          <p className="text-[18px] font-bold leading-none" style={{ color: paybackColor(paybackMeses) }}>
             {fmtPayback(paybackMeses)}
           </p>
-          <p className="text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>
-            {margenMensual != null
-              ? `${fmtEur(margenMensual)}/mes de MB`
-              : 'añade inversión'}
-          </p>
+          {margenMensual != null && (
+            <p className="text-[9px] mt-1" style={{ color: '#c0cfd8' }}>
+              {fmtEur(margenMensual)}/mes MB
+            </p>
+          )}
         </div>
       </div>
 
-      {/* ── Params badge strip ───────────────────────────── */}
-      <div className="px-4 py-2.5 flex flex-wrap gap-1.5">
-        {[
-          `ST ${p.factorAjustePct ?? 100}%`,
-          `Rampa ${p.semanasRampa ?? 3} sem.`,
-          `+${p.crecimientoSemanalPct ?? 5}%/sem.`,
-        ].map(label => (
-          <span key={label} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${cfg.color}14`, color: cfg.color }}>
-            {label}
-          </span>
-        ))}
+      {/* ── Sliders siempre visibles ──────────────────── */}
+      <div
+        className="px-5 py-4 space-y-4"
+        style={{ background: 'rgba(0,85,127,0.012)' }}
+      >
+        <SliderRow
+          label="Sell-through"
+          value={p.factorAjustePct ?? 100}
+          unit="%"
+          min={20} max={110} step={5}
+          marks={['20%', '50%', '75%', '100%']}
+          tooltip="Porcentaje del stock comprado que se venderá en la ventana de 16 semanas. ST 75% = de 100 uds compradas se venden 75. El resto queda como stock remanente al final de la ventana."
+          color={cfg.color}
+          onChange={v => onUpdate('factorAjustePct', v)}
+        />
+        <SliderRow
+          label="Rampa de despegue"
+          value={p.semanasRampa ?? 3}
+          unit=" sem."
+          min={1} max={12} step={1}
+          marks={['1 (rápida)', '4 sem.', '8 sem.', '12 (lenta)']}
+          tooltip="Semanas que tarda el producto en alcanzar su velocidad normal de ventas. En joyería suele ser 3-4 semanas: el equipo aprende el producto y el cliente lo descubre. Escaparate y RRSS desde el día 1 pueden acortarla a 1-2 semanas."
+          color={cfg.color}
+          onChange={v => onUpdate('semanasRampa', v)}
+        />
+        <SliderRow
+          label="Crec. post-rampa"
+          value={p.crecimientoSemanalPct ?? 5}
+          unit="%"
+          min={0} max={30} step={1}
+          marks={['0% (plano)', '10%', '20%', '30%']}
+          tooltip="Ritmo de aceleración de ventas tras la rampa. Un 5%/sem significa que cada semana se vende un 5% más que la anterior. La plata puede crecer más rápido que el oro. Combinado con ST 100% produce una curva muy agresiva que vende todo antes de la semana 15."
+          color={cfg.color}
+          onChange={v => onUpdate('crecimientoSemanalPct', v)}
+        />
       </div>
-
-      {/* ── Panel de edición expandible ─────────────────── */}
-      {expanded && (
-        <div className="px-4 pb-4 space-y-4" style={{ borderTop: `1px solid ${cfg.border}`, paddingTop: 16 }}>
-          {/* Sell-through */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Sell-through</span>
-                <span className="ml-1.5 text-[9px]" style={{ color: '#c0cfd8' }}>% del stock vendido</span>
-              </div>
-              <span className="text-[12px] font-black" style={{ color: cfg.color }}>{p.factorAjustePct ?? 100}%</span>
-            </div>
-            <input type="range" min={20} max={110} step={5} value={p.factorAjustePct ?? 100}
-              onChange={e => onUpdate('factorAjustePct', parseInt(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ accentColor: cfg.color }} />
-            <div className="flex justify-between text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>
-              <span>20%</span><span>50%</span><span>75%</span><span>100%+</span>
-            </div>
-          </div>
-          {/* Rampa */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Rampa</span>
-              <span className="text-[12px] font-black" style={{ color: cfg.color }}>{p.semanasRampa ?? 3} sem.</span>
-            </div>
-            <input type="range" min={1} max={12} step={1} value={p.semanasRampa ?? 3}
-              onChange={e => onUpdate('semanasRampa', parseInt(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ accentColor: cfg.color }} />
-            <div className="flex justify-between text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>
-              <span>1 sem.</span><span>6 sem.</span><span>12 sem.</span>
-            </div>
-          </div>
-          {/* Crecimiento */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Crecimiento/semana</span>
-              <span className="text-[12px] font-black" style={{ color: cfg.color }}>{p.crecimientoSemanalPct ?? 5}%</span>
-            </div>
-            <input type="range" min={0} max={30} step={1} value={p.crecimientoSemanalPct ?? 5}
-              onChange={e => onUpdate('crecimientoSemanalPct', parseInt(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ accentColor: cfg.color }} />
-            <div className="flex justify-between text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>
-              <span>0%</span><span>15%</span><span>30%</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -437,7 +499,6 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     }
     return esc
   })
-  const [expandedIdx,  setExpandedIdx]  = useState<number | null>(null)
   const [exporting,    setExporting]    = useState(false)
   const [confirming,   setConfirming]   = useState(false)
 
@@ -673,24 +734,17 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
             </div>
           </div>
 
-          {/* ── Escenarios en columnas ──────────────────────── */}
+          {/* ── Escenarios apilados, ancho completo ────────── */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>
-                Tres escenarios — ajusta los parámetros de cada uno
-              </label>
-              <span className="text-[10px]" style={{ color: '#c0cfd8' }}>
-                Haz clic para editar parámetros
-              </span>
-            </div>
-            <div className="flex gap-3">
+            <label className="block text-[11px] font-semibold uppercase tracking-widest mb-4" style={{ color: '#8fa8b8' }}>
+              Tres escenarios — ajusta sell-through, rampa y crecimiento
+            </label>
+            <div className="space-y-4">
               {ESC_CFG.map((cfg, i) => (
                 <EscenarioCard
                   key={cfg.key}
                   esc={escenarios[i]}
                   cfg={cfg}
-                  expanded={expandedIdx === i}
-                  onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)}
                   onUpdate={(field, value) => handleUpdateEscenario(i, field, value)}
                   ebitdaPct={paybacks[i]?.ebitdaPct ?? 0}
                   margenMensual={paybacks[i]?.margenMensual ?? null}
