@@ -328,6 +328,12 @@ export interface Lanzamiento {
   proveedor:                  string | null
   fecha_lanzamiento:          string | null   // ISO date
   lead_time_semanas:          number
+  // Inversión y OPEX (añadidos en migración 022)
+  presupuesto_marketing:      number | null
+  opex_personal_pct:          number | null   // % ventas netas → personal, default 20
+  opex_gastos_pct:            number | null   // % ventas netas → gastos op., default 12
+  output_ebitda_pct:          number | null   // EBITDA % del escenario Base al confirmar
+  output_payback_meses:       number | null   // meses de payback del escenario Base al confirmar
   created_at:                 string
   updated_at:                 string
 }

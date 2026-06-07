@@ -72,13 +72,16 @@ export function PasoCampana({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   const router             = useRouter()
   const { save, flush, status } = useAutoSave(lanzamiento.id)
 
-  const [hayCampana,        setHayCampana]        = useState(
+  const [hayCampana,          setHayCampana]          = useState(
     (lanzamiento.semanas_promo ?? 0) > 0,
   )
-  const [tipoCampana,       setTipoCampana]       = useState(lanzamiento.tipo_campana ?? '')
-  const [descuentoPromoPct, setDescuentoPromoPct] = useState(lanzamiento.descuento_promo_pct ?? 15)
-  const [semanasPromo,      setSemanasPromo]      = useState(lanzamiento.semanas_promo ?? 2)
-  const [notasCampana,      setNotasCampana]      = useState(lanzamiento.notas_campana ?? '')
+  const [tipoCampana,         setTipoCampana]         = useState(lanzamiento.tipo_campana ?? '')
+  const [descuentoPromoPct,   setDescuentoPromoPct]   = useState(lanzamiento.descuento_promo_pct ?? 15)
+  const [semanasPromo,        setSemanasPromo]        = useState(lanzamiento.semanas_promo ?? 2)
+  const [notasCampana,        setNotasCampana]        = useState(lanzamiento.notas_campana ?? '')
+  const [presupuestoMarketing, setPresupuestoMarketing] = useState<number>(
+    lanzamiento.presupuesto_marketing ?? 0,
+  )
 
   // ── Curvas ─────────────────────────────────────────────────────
   const canCompute = !!(
@@ -155,6 +158,12 @@ export function PasoCampana({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   function handleNotas(v: string) {
     setNotasCampana(v)
     save({ notas_campana: v || null })
+  }
+
+  function handlePresupuestoMarketing(v: number) {
+    const safe = Math.max(0, Math.round(v))
+    setPresupuestoMarketing(safe)
+    save({ presupuesto_marketing: safe || null })
   }
 
   async function handleNext() {
@@ -445,6 +454,42 @@ export function PasoCampana({ lanzamiento }: { lanzamiento: Lanzamiento }) {
         </>
       )}
 
+      {/* ── Presupuesto de marketing ─────────────────────────── */}
+      <div className="mb-5">
+        <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>
+          Inversión en marketing <span className="font-normal" style={{ color: '#c0cfd8' }}>(€ total de campaña)</span>
+        </label>
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-2 rounded-lg px-3 h-9"
+            style={{ border: '1.5px solid rgba(0,85,127,0.15)', background: 'white' }}
+          >
+            <span className="text-[12px] font-semibold" style={{ color: '#8fa8b8' }}>€</span>
+            <input
+              type="number"
+              min={0}
+              step={100}
+              value={presupuestoMarketing}
+              onChange={e => handlePresupuestoMarketing(parseFloat(e.target.value) || 0)}
+              className="w-28 h-full text-[14px] font-bold bg-transparent focus:outline-none"
+              style={{ color: '#00264d' }}
+              placeholder="0"
+            />
+          </div>
+          {presupuestoMarketing > 0 && lanzamiento.output_presupuesto_compra && (
+            <span className="text-[11px]" style={{ color: '#8fa8b8' }}>
+              Inversión total: <strong style={{ color: '#00557f' }}>
+                {fmtEur((lanzamiento.output_presupuesto_compra ?? 0) + presupuestoMarketing)}
+              </strong>
+              {' '}(compra + marketing)
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] mt-1" style={{ color: '#c0cfd8' }}>
+          Se usará en el Paso 7 para calcular el payback real de la inversión.
+        </p>
+      </div>
+
       {/* ── Notas de campaña ────────────────────────────────── */}
       <div className="mb-2">
         <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>
@@ -468,7 +513,7 @@ export function PasoCampana({ lanzamiento }: { lanzamiento: Lanzamiento }) {
 
       {/* Hint para el último paso */}
       <p className="text-[11px] mt-4" style={{ color: '#b2b2b2' }}>
-        En el <strong style={{ color: '#00557f' }}>Paso 7</strong> verás el simulador completo, podrás crear escenarios y descargar el briefing.
+        En el <strong style={{ color: '#00557f' }}>Paso 7</strong> verás el simulador completo con el análisis de payback real, podrás crear escenarios y descargar el briefing.
       </p>
     </WizardLayout>
   )

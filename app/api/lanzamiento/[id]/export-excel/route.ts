@@ -67,8 +67,10 @@ export async function POST(
 
   if (!lanz) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-  // Escenarios del body (estado actual del simulador, puede no estar en DB aún)
+  // Escenarios y OPEX del body (estado actual del simulador, puede no estar en DB aún)
   const escenarios: LanzamientoEscenario[] = body.escenarios ?? lanz.escenarios ?? []
+  const opexPersonalPct: number = body.opexPersonalPct ?? lanz.opex_personal_pct ?? 20
+  const opexGastosPct:   number = body.opexGastosPct   ?? lanz.opex_gastos_pct   ?? 12
 
   // Escenario Base (índice 1)
   const escBase = escenarios[1] ?? escenarios[0] ?? null
@@ -235,6 +237,47 @@ export async function POST(
       ws1.getRow(r).height = 22
       r++
     }
+
+    // ── Sección: Rentabilidad operativa ──────────────────────────
+    r++
+    ws1.mergeCells(r, 1, r, 6)
+    styleHeader(ws1.getRow(r).getCell(1), '  RENTABILIDAD OPERATIVA (METODOLOGÍA RETAIL)')
+    ws1.getRow(r).height = 22
+    r++
+
+    const presupuestoCompra    = (lanz.output_presupuesto_compra ?? 0) as number
+    const presupuestoMarketing = (lanz.presupuesto_marketing     ?? 0) as number
+    const inversionTotal       = presupuestoCompra + presupuestoMarketing
+    const ebitdaPct            = kpisBase.margen_pct - opexPersonalPct - opexGastosPct
+    const ingresosMensuales    = kpisBase.ingresos / 4
+    const ebitdaMensual        = ingresosMensuales * (ebitdaPct / 100)
+    const paybackMeses         = ebitdaMensual > 0 && inversionTotal > 0
+      ? Math.round((inversionTotal / ebitdaMensual) * 10) / 10
+      : null
+
+    const opexFields: [string, string, string][] = [
+      ['% Personal (s/ ventas)',        `${opexPersonalPct}%`,                               NAVY],
+      ['% Gastos operativos (s/ ventas)', `${opexGastosPct}%`,                              NAVY],
+      ['OPEX total',                    `${opexPersonalPct + opexGastosPct}%`,               NAVY],
+      ['EBITDA % (MB − OPEX)',          `${ebitdaPct.toFixed(1)}%`,
+        ebitdaPct >= 15 ? OK : ebitdaPct >= 5 ? WARN : ERR],
+      ['Inversión total',               inversionTotal > 0 ? fmtEur(inversionTotal) : '—',  NAVY],
+      ['  → Presupuesto compra',        presupuestoCompra > 0 ? fmtEur(presupuestoCompra) : '—', '8FA8B8'],
+      ['  → Presupuesto marketing',     presupuestoMarketing > 0 ? fmtEur(presupuestoMarketing) : '—', '8FA8B8'],
+      ['Payback estimado (Esc. Base)',   paybackMeses != null ? `${paybackMeses} meses` : 'Inversión no recuperable',
+        paybackMeses != null ? (paybackMeses <= 6 ? OK : paybackMeses <= 12 ? WARN : ERR) : ERR],
+    ]
+
+    for (const [label, value, color] of opexFields) {
+      ws1.mergeCells(r, 1, r, 2)
+      styleLabel(ws1.getRow(r).getCell(1), label)
+      ws1.mergeCells(r, 3, r, 6)
+      const vc = ws1.getRow(r).getCell(3)
+      styleValue(vc, value)
+      vc.font = { ...vc.font, color: { argb: color }, size: 11, bold: true } as ExcelJS.Font
+      ws1.getRow(r).height = 18
+      r++
+    }
   }
 
   // ── Hoja 2: Escenarios ────────────────────────────────────────
@@ -263,6 +306,10 @@ export async function POST(
     })
     ws2.getRow(2).height = 24
 
+    const presupuestoCompraEsc = (lanz.output_presupuesto_compra ?? 0) as number
+    const presupuestoMktEsc    = (lanz.presupuesto_marketing     ?? 0) as number
+    const inversionTotalEsc    = presupuestoCompraEsc + presupuestoMktEsc
+
     const escRows: [string, (p: CalcularCurvaParams, k: typeof escenarios[0]['kpis']) => string][] = [
       ['Factor de ajuste',          (p)    => `${p.factorAjustePct ?? 100}%`],
       ['Semanas de rampa',          (p)    => `${p.semanasRampa ?? 3} sem.`],
@@ -275,6 +322,18 @@ export async function POST(
       ['Margen bruto',              (_, k) => fmtEur(k.margen_bruto)],
       ['MB %',                      (_, k) => `${k.margen_pct.toFixed(1)}%`],
       ['Break-even (semana)',        (_, k) => k.breakeven_semanas < 99 ? `Sem. ${k.breakeven_semanas}` : 'No alc.'],
+      ['─────────────────',         ()     => ''],
+      ['EBITDA % (MB − OPEX)',      (_, k) => {
+        const ebitda = k.margen_pct - opexPersonalPct - opexGastosPct
+        return `${ebitda.toFixed(1)}%`
+      }],
+      ['Payback inversión',         (_, k) => {
+        const ebitda = k.margen_pct - opexPersonalPct - opexGastosPct
+        if (ebitda <= 0 || inversionTotalEsc <= 0 || k.ingresos <= 0) return 'n/a'
+        const mensual  = (k.ingresos / 4) * (ebitda / 100)
+        const payback  = Math.round((inversionTotalEsc / mensual) * 10) / 10
+        return `${payback} meses`
+      }],
     ]
 
     let er = 3

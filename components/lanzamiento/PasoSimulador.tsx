@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
-  CartesianGrid, Legend, ResponsiveContainer,
+  CartesianGrid, ResponsiveContainer,
 } from 'recharts'
 import { WizardLayout, useAutoSave } from './WizardLayout'
 import { CoachingPanel } from './CoachingPanel'
@@ -23,7 +23,47 @@ const ESC_CFG = [
   { idx: 2, key: 'optimista', label: 'Optimista', color: '#3A9E6A', bg: 'rgba(58,158,106,0.05)', border: 'rgba(58,158,106,0.25)' },
 ] as const
 
-// ── Inicializar escenarios desde lanzamiento ──────────────────────
+// ── Payback ───────────────────────────────────────────────────────
+
+interface PaybackResult {
+  ebitdaPct:    number
+  paybackMeses: number | null
+}
+
+function calcPayback(
+  kpis:            LanzamientoEscenario['kpis'],
+  opexPersonalPct: number,
+  opexGastosPct:   number,
+  inversionTotal:  number,
+): PaybackResult {
+  const ebitdaPct = kpis.margen_pct - opexPersonalPct - opexGastosPct
+  if (ebitdaPct <= 0 || inversionTotal <= 0 || kpis.ingresos <= 0) {
+    return { ebitdaPct, paybackMeses: null }
+  }
+  // 16 semanas ≈ 4 meses
+  const ingresosMensuales = kpis.ingresos / 4
+  const ebitdaMensual     = ingresosMensuales * (ebitdaPct / 100)
+  if (ebitdaMensual <= 0) return { ebitdaPct, paybackMeses: null }
+  return {
+    ebitdaPct,
+    paybackMeses: Math.round((inversionTotal / ebitdaMensual) * 10) / 10,
+  }
+}
+
+function paybackColor(m: number | null): string {
+  if (m == null || m > 18) return '#C0392B'
+  if (m > 12) return '#C8842A'
+  if (m > 6)  return '#C8842A'
+  return '#3A9E6A'
+}
+
+function ebitdaColor(pct: number): string {
+  if (pct >= 15) return '#3A9E6A'
+  if (pct >= 5)  return '#C8842A'
+  return '#C0392B'
+}
+
+// ── Inicializar escenarios ────────────────────────────────────────
 
 function initEscenarios(lanz: Lanzamiento): LanzamientoEscenario[] {
   if (Array.isArray(lanz.escenarios) && lanz.escenarios.length === 3) {
@@ -32,7 +72,7 @@ function initEscenarios(lanz: Lanzamiento): LanzamientoEscenario[] {
 
   const base: CalcularCurvaParams = {
     unidadesPorTienda:     lanz.unidades_por_tienda ?? 2,
-    nTiendas:              lanz.n_tiendas ?? 17,
+    nTiendas:              lanz.n_tiendas ?? 19,
     semanasRampa:          lanz.semanas_rampa ?? 3,
     crecimientoSemanalPct: lanz.crecimiento_semanal_pct ?? 5,
     factorAjustePct:       lanz.factor_ajuste_pct ?? 100,
@@ -59,8 +99,6 @@ function initEscenarios(lanz: Lanzamiento): LanzamientoEscenario[] {
   ]
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
-
 function paramsOf(e: LanzamientoEscenario): CalcularCurvaParams {
   return e.params as unknown as CalcularCurvaParams
 }
@@ -76,16 +114,54 @@ function KpiMini({ label, value, color }: { label: string; value: string; color?
   )
 }
 
+// ── Stepper compacto ──────────────────────────────────────────────
+
+function Stepper({
+  label, value, unit, min, max, step = 1, onChange,
+}: {
+  label: string; value: number; unit: string
+  min: number; max: number; step?: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#8fa8b8' }}>{label}</p>
+      <div className="flex items-center gap-0 rounded-lg overflow-hidden" style={{ border: '1.5px solid rgba(0,85,127,0.15)' }}>
+        <button
+          onClick={() => onChange(Math.max(min, value - step))}
+          className="w-8 h-8 flex items-center justify-center text-[16px] hover:bg-[rgba(0,85,127,0.05)]"
+          style={{ color: '#00557f' }}
+        >
+          −
+        </button>
+        <div className="px-2 h-8 flex items-center justify-center min-w-[52px] bg-white border-x border-[rgba(0,85,127,0.12)]">
+          <span className="text-[13px] font-black" style={{ color: '#00264d' }}>{value}{unit}</span>
+        </div>
+        <button
+          onClick={() => onChange(Math.min(max, value + step))}
+          className="w-8 h-8 flex items-center justify-center text-[16px] hover:bg-[rgba(0,85,127,0.05)]"
+          style={{ color: '#00557f' }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Card de escenario ─────────────────────────────────────────────
 
 function EscenarioCard({
   esc, cfg, expanded, onToggle, onUpdate,
+  ebitdaPct, paybackMeses,
 }: {
-  esc:      LanzamientoEscenario
-  cfg:      typeof ESC_CFG[number]
-  expanded: boolean
-  onToggle: () => void
-  onUpdate: (field: keyof CalcularCurvaParams, value: number) => void
+  esc:          LanzamientoEscenario
+  cfg:          typeof ESC_CFG[number]
+  expanded:     boolean
+  onToggle:     () => void
+  onUpdate:     (field: keyof CalcularCurvaParams, value: number) => void
+  ebitdaPct:    number
+  paybackMeses: number | null
 }) {
   const p = paramsOf(esc)
   const k = esc.kpis
@@ -95,42 +171,31 @@ function EscenarioCard({
       className="rounded-xl overflow-hidden flex-1"
       style={{ border: `2px solid ${expanded ? cfg.color : cfg.border}`, background: cfg.bg, boxShadow: expanded ? `0 0 0 3px ${cfg.color}18` : 'var(--tq-shadow-xs)' }}
     >
-      {/* Header card */}
+      {/* Header */}
       <div
         className="px-4 py-3 flex items-center justify-between cursor-pointer"
         onClick={onToggle}
         style={{ borderBottom: `1px solid ${cfg.border}`, background: expanded ? `${cfg.color}10` : 'transparent' }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: cfg.color }}>
-            {cfg.label}
-          </span>
-        </div>
+        <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: cfg.color }}>
+          {cfg.label}
+        </span>
         <span className="text-[10px] font-medium" style={{ color: cfg.color }}>
           {expanded ? '▲ Cerrar' : '▼ Editar'}
         </span>
       </div>
 
-      {/* KPIs principales */}
+      {/* KPIs: 3×2 grid */}
       <div className="px-4 pt-3 pb-2 grid grid-cols-2 gap-3">
+        <KpiMini label="Uds. 16 sem." value={k.unidades_total.toLocaleString('es-ES')} color={cfg.color} />
+        <KpiMini label="Ingresos"     value={fmtEur(k.ingresos)} />
+        <KpiMini label="MB %"         value={fmtPct(k.margen_pct, 0)} color={mbColor(k.margen_pct)} />
+        <KpiMini label="Break-even"   value={k.breakeven_semanas < 99 ? `Sem. ${k.breakeven_semanas}` : 'No alc.'} color={k.breakeven_semanas <= 8 ? '#3A9E6A' : '#C8842A'} />
+        <KpiMini label="EBITDA %"     value={fmtPct(ebitdaPct, 0)} color={ebitdaColor(ebitdaPct)} />
         <KpiMini
-          label="Uds. 16 sem."
-          value={k.unidades_total.toLocaleString('es-ES')}
-          color={cfg.color}
-        />
-        <KpiMini
-          label="Ingresos"
-          value={fmtEur(k.ingresos)}
-        />
-        <KpiMini
-          label="MB %"
-          value={fmtPct(k.margen_pct, 0)}
-          color={mbColor(k.margen_pct)}
-        />
-        <KpiMini
-          label="Break-even"
-          value={k.breakeven_semanas < 99 ? `Sem. ${k.breakeven_semanas}` : 'No alc.'}
-          color={k.breakeven_semanas <= 8 ? '#3A9E6A' : '#C8842A'}
+          label="Payback"
+          value={paybackMeses != null ? `${paybackMeses} m.` : 'n/a'}
+          color={paybackColor(paybackMeses)}
         />
       </div>
 
@@ -141,11 +206,7 @@ function EscenarioCard({
           { label: `Rampa ${p.semanasRampa ?? 3} sem.` },
           { label: `+${p.crecimientoSemanalPct ?? 5}%/sem.` },
         ].map(b => (
-          <span
-            key={b.label}
-            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-            style={{ background: `${cfg.color}18`, color: cfg.color }}
-          >
+          <span key={b.label} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${cfg.color}18`, color: cfg.color }}>
             {b.label}
           </span>
         ))}
@@ -153,59 +214,42 @@ function EscenarioCard({
 
       {/* Panel de edición expandible */}
       {expanded && (
-        <div
-          className="px-4 pb-4 space-y-4"
-          style={{ borderTop: `1px solid ${cfg.border}`, paddingTop: 16 }}
-        >
+        <div className="px-4 pb-4 space-y-4" style={{ borderTop: `1px solid ${cfg.border}`, paddingTop: 16 }}>
           {/* Factor */}
           <div>
             <div className="flex justify-between mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Factor</span>
               <span className="text-[12px] font-black" style={{ color: cfg.color }}>{p.factorAjustePct ?? 100}%</span>
             </div>
-            <input
-              type="range" min={50} max={150} step={5}
-              value={p.factorAjustePct ?? 100}
+            <input type="range" min={50} max={150} step={5} value={p.factorAjustePct ?? 100}
               onChange={e => onUpdate('factorAjustePct', parseInt(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-              style={{ accentColor: cfg.color }}
-            />
+              className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ accentColor: cfg.color }} />
             <div className="flex justify-between text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>
               <span>50%</span><span>100%</span><span>150%</span>
             </div>
           </div>
-
           {/* Rampa */}
           <div>
             <div className="flex justify-between mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Rampa</span>
               <span className="text-[12px] font-black" style={{ color: cfg.color }}>{p.semanasRampa ?? 3} sem.</span>
             </div>
-            <input
-              type="range" min={1} max={12} step={1}
-              value={p.semanasRampa ?? 3}
+            <input type="range" min={1} max={12} step={1} value={p.semanasRampa ?? 3}
               onChange={e => onUpdate('semanasRampa', parseInt(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-              style={{ accentColor: cfg.color }}
-            />
+              className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ accentColor: cfg.color }} />
             <div className="flex justify-between text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>
               <span>1 sem.</span><span>6 sem.</span><span>12 sem.</span>
             </div>
           </div>
-
           {/* Crecimiento */}
           <div>
             <div className="flex justify-between mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Crecimiento/semana</span>
               <span className="text-[12px] font-black" style={{ color: cfg.color }}>{p.crecimientoSemanalPct ?? 5}%</span>
             </div>
-            <input
-              type="range" min={0} max={30} step={1}
-              value={p.crecimientoSemanalPct ?? 5}
+            <input type="range" min={0} max={30} step={1} value={p.crecimientoSemanalPct ?? 5}
               onChange={e => onUpdate('crecimientoSemanalPct', parseInt(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-              style={{ accentColor: cfg.color }}
-            />
+              className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ accentColor: cfg.color }} />
             <div className="flex justify-between text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>
               <span>0%</span><span>15%</span><span>30%</span>
             </div>
@@ -222,12 +266,40 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   const router             = useRouter()
   const { save, flush, status } = useAutoSave(lanzamiento.id)
 
-  const [escenarios, setEscenarios] = useState<LanzamientoEscenario[]>(
-    () => initEscenarios(lanzamiento),
+  const [escenarios,   setEscenarios]   = useState<LanzamientoEscenario[]>(() => initEscenarios(lanzamiento))
+  const [expandedIdx,  setExpandedIdx]  = useState<number | null>(null)
+  const [exporting,    setExporting]    = useState(false)
+  const [confirming,   setConfirming]   = useState(false)
+
+  // ── OPEX ───────────────────────────────────────────────────────
+  const [opexPersonalPct, setOpexPersonalPct] = useState(lanzamiento.opex_personal_pct ?? 20)
+  const [opexGastosPct,   setOpexGastosPct]   = useState(lanzamiento.opex_gastos_pct   ?? 12)
+
+  function handleOpexPersonal(v: number) {
+    const safe = Math.max(0, Math.min(40, v))
+    setOpexPersonalPct(safe)
+    save({ opex_personal_pct: safe })
+  }
+  function handleOpexGastos(v: number) {
+    const safe = Math.max(0, Math.min(30, v))
+    setOpexGastosPct(safe)
+    save({ opex_gastos_pct: safe })
+  }
+
+  // ── Inversión total ────────────────────────────────────────────
+  const presupuestoCompra = lanzamiento.output_presupuesto_compra
+    ?? (lanzamiento.coste && lanzamiento.n_tiendas && lanzamiento.unidades_por_tienda
+        ? Math.round(lanzamiento.coste * lanzamiento.n_tiendas * lanzamiento.unidades_por_tienda)
+        : 0)
+  const presupuestoMarketing = lanzamiento.presupuesto_marketing ?? 0
+  const inversionTotal       = presupuestoCompra + presupuestoMarketing
+
+  // ── Payback por escenario ──────────────────────────────────────
+  const paybacks = useMemo(
+    () => escenarios.map(e => calcPayback(e.kpis, opexPersonalPct, opexGastosPct, inversionTotal)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(escenarios), opexPersonalPct, opexGastosPct, inversionTotal],
   )
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
-  const [exporting,   setExporting]   = useState(false)
-  const [confirming,  setConfirming]  = useState(false)
 
   const canCompute = !!(
     lanzamiento.precio_venta &&
@@ -243,8 +315,8 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     [JSON.stringify(escenarios), canCompute],
   )
 
-  const chartData = useMemo(() =>
-    Array.from({ length: 16 }, (_, i) => ({
+  const chartData = useMemo(
+    () => Array.from({ length: 16 }, (_, i) => ({
       semana:    i + 1,
       pesimista: curves[0]?.[i]?.unidades ?? 0,
       base:      curves[1]?.[i]?.unidades ?? 0,
@@ -255,11 +327,7 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
 
   // ── Handlers ───────────────────────────────────────────────────
 
-  function handleUpdateEscenario(
-    idx: number,
-    field: keyof CalcularCurvaParams,
-    value: number,
-  ) {
+  function handleUpdateEscenario(idx: number, field: keyof CalcularCurvaParams, value: number) {
     const updated = escenarios.map((e, i) => {
       if (i !== idx) return e
       const params = { ...paramsOf(e), [field]: value }
@@ -287,14 +355,13 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
       const res  = await fetch(`/api/lanzamiento/${lanzamiento.id}/export-excel`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ escenarios }),
+        body:    JSON.stringify({ escenarios, opexPersonalPct, opexGastosPct }),
       })
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      const nombre  = (lanzamiento.nombre ?? lanzamiento.id).slice(0, 40)
-      a.download = `briefing-${nombre}-${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.download = `briefing-${(lanzamiento.nombre ?? lanzamiento.id).slice(0, 40)}-${new Date().toISOString().slice(0, 10)}.xlsx`
       a.click()
       URL.revokeObjectURL(url)
     } finally {
@@ -303,23 +370,21 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   }
 
   async function handleNext() {
-    if (!confirming) {
-      setConfirming(true)
-      return
-    }
+    if (!confirming) { setConfirming(true); return }
     await flush()
-    const escBase = escenarios[1]
+    const escBase      = escenarios[1]
+    const paybackBase  = paybacks[1]
     await fetch(`/api/lanzamiento/${lanzamiento.id}/confirmar`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
         escenarios,
-        output_unidades_total:     escBase?.kpis.unidades_total ?? null,
-        output_margen_proyectado:  escBase?.kpis.margen_pct ?? null,
+        output_unidades_total:     escBase?.kpis.unidades_total    ?? null,
+        output_margen_proyectado:  escBase?.kpis.margen_pct        ?? null,
         output_breakeven_semanas:  escBase?.kpis.breakeven_semanas ?? null,
-        output_presupuesto_compra: (lanzamiento.coste && escBase)
-          ? Math.round(escBase.kpis.unidades_total * lanzamiento.coste)
-          : null,
+        output_presupuesto_compra: presupuestoCompra || null,
+        output_ebitda_pct:         paybackBase?.ebitdaPct          ?? null,
+        output_payback_meses:      paybackBase?.paybackMeses        ?? null,
       }),
     })
     router.push('/lanzamiento')
@@ -335,16 +400,13 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-7"
-        concepto="El simulador te permite comparar tres escenarios (pesimista, base, optimista) con parámetros independientes. El escenario Base usa los valores que definiste en pasos anteriores. Al confirmar, los KPIs del escenario Base se guardan como outputs del lanzamiento y aparecen en el listado de confirmados."
-        ejemplo="En el lanzamiento de la colección de turmalinas, el pesimista proyectaba 280 uds y el optimista 650. El equipo se comprometió con el escenario Base (420 uds), que se alcanzó en la semana 14. El optimista habría requerido un stock adicional que no teníamos."
-        consecuencia="Confirmar es irreversible en cuanto al estado — el lanzamiento pasa al historial. Puedes seguir leyendo su ficha, pero no editarlo como borrador."
+        concepto="El simulador compara tres escenarios (pesimista, base, optimista) y calcula el payback real de la inversión teniendo en cuenta los costes operativos. El payback indica en cuántos meses recuperas lo invertido en stock y marketing. Al confirmar, los KPIs del escenario Base quedan como outputs del lanzamiento."
+        ejemplo="En el lanzamiento de turmalinas, el Base proyectaba un EBITDA del 28% y un payback de 5 meses. Con OPEX del 32% (personal + gastos), el pesimista tardaba 11 meses en recuperar la inversión — lo que determinó reducir el pedido inicial."
+        consecuencia="Confirmar es irreversible — el lanzamiento pasa al historial. Descarga el briefing antes si lo necesitas."
       />
 
       {!canCompute && (
-        <div
-          className="rounded-xl p-6 text-center mb-6"
-          style={{ background: 'rgba(200,132,42,0.05)', border: '1px solid rgba(200,132,42,0.15)' }}
-        >
+        <div className="rounded-xl p-6 text-center mb-6" style={{ background: 'rgba(200,132,42,0.05)', border: '1px solid rgba(200,132,42,0.15)' }}>
           <p className="text-[13px] font-medium" style={{ color: '#a06818' }}>
             Necesitas completar PVP, coste y distribución (Pasos 2 y 3) para ver el simulador.
           </p>
@@ -353,6 +415,73 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
 
       {canCompute && (
         <>
+          {/* ── Rentabilidad operativa ──────────────────────── */}
+          <div
+            className="rounded-xl p-4 mb-6"
+            style={{ background: 'rgba(0,85,127,0.03)', border: '1px solid rgba(0,85,127,0.1)' }}
+          >
+            <p className="text-[11px] font-bold uppercase tracking-widest mb-4" style={{ color: '#8fa8b8' }}>
+              Estructura de costes operativos
+            </p>
+
+            {/* Steppers OPEX */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <Stepper label="% Personal" value={opexPersonalPct} unit="%" min={0} max={40} onChange={handleOpexPersonal} />
+              <Stepper label="% Gastos operativos" value={opexGastosPct} unit="%" min={0} max={30} onChange={handleOpexGastos} />
+            </div>
+
+            {/* Resumen de inversión */}
+            <div
+              className="rounded-lg px-3 py-2 mb-3 text-[11px]"
+              style={{ background: 'rgba(0,85,127,0.05)', border: '1px solid rgba(0,85,127,0.08)' }}
+            >
+              <div className="flex items-center gap-4 flex-wrap">
+                <span style={{ color: '#8fa8b8' }}>
+                  Compra stock: <strong style={{ color: '#00264d' }}>{fmtEur(presupuestoCompra)}</strong>
+                </span>
+                <span style={{ color: '#c0cfd8' }}>+</span>
+                <span style={{ color: '#8fa8b8' }}>
+                  Marketing: <strong style={{ color: '#00264d' }}>{fmtEur(presupuestoMarketing)}</strong>
+                  {presupuestoMarketing === 0 && (
+                    <span className="ml-1 text-[9px]" style={{ color: '#c0cfd8' }}>
+                      (añade en Paso 6)
+                    </span>
+                  )}
+                </span>
+                <span style={{ color: '#c0cfd8' }}>→</span>
+                <span>
+                  <span style={{ color: '#8fa8b8' }}>Inversión total: </span>
+                  <strong style={{ color: '#00557f', fontSize: 13 }}>{fmtEur(inversionTotal)}</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* KPIs del escenario Base */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center rounded-lg py-2" style={{ background: 'white', border: '1px solid rgba(0,85,127,0.08)' }}>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>OPEX Total</p>
+                <p className="text-[16px] font-black" style={{ color: '#00264d' }}>
+                  {opexPersonalPct + opexGastosPct}%
+                </p>
+                <p className="text-[9px]" style={{ color: '#b2b2b2' }}>personal + gastos</p>
+              </div>
+              <div className="text-center rounded-lg py-2" style={{ background: 'white', border: '1px solid rgba(0,85,127,0.08)' }}>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>EBITDA Base</p>
+                <p className="text-[16px] font-black" style={{ color: ebitdaColor(paybacks[1]?.ebitdaPct ?? 0) }}>
+                  {fmtPct(paybacks[1]?.ebitdaPct ?? 0, 0)}
+                </p>
+                <p className="text-[9px]" style={{ color: '#b2b2b2' }}>MB − OPEX</p>
+              </div>
+              <div className="text-center rounded-lg py-2" style={{ background: 'white', border: '1px solid rgba(0,85,127,0.08)' }}>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>Payback Base</p>
+                <p className="text-[16px] font-black" style={{ color: paybackColor(paybacks[1]?.paybackMeses ?? null) }}>
+                  {paybacks[1]?.paybackMeses != null ? `${paybacks[1].paybackMeses} m.` : 'n/a'}
+                </p>
+                <p className="text-[9px]" style={{ color: '#b2b2b2' }}>meses estimados</p>
+              </div>
+            </div>
+          </div>
+
           {/* ── Escenarios en columnas ──────────────────────── */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
@@ -360,7 +489,7 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                 Tres escenarios — ajusta los parámetros de cada uno
               </label>
               <span className="text-[10px]" style={{ color: '#c0cfd8' }}>
-                Haz clic en una card para editar sus parámetros
+                Haz clic para editar parámetros
               </span>
             </div>
             <div className="flex gap-3">
@@ -372,20 +501,16 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                   expanded={expandedIdx === i}
                   onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)}
                   onUpdate={(field, value) => handleUpdateEscenario(i, field, value)}
+                  ebitdaPct={paybacks[i]?.ebitdaPct ?? 0}
+                  paybackMeses={paybacks[i]?.paybackMeses ?? null}
                 />
               ))}
             </div>
           </div>
 
           {/* ── Gráfico multi-curva ─────────────────────────── */}
-          <div
-            className="rounded-xl overflow-hidden mb-6"
-            style={{ border: '1px solid rgba(0,85,127,0.08)' }}
-          >
-            <div
-              className="px-4 py-2.5 flex items-center gap-4"
-              style={{ background: 'rgba(0,85,127,0.04)', borderBottom: '1px solid rgba(0,85,127,0.06)' }}
-            >
+          <div className="rounded-xl overflow-hidden mb-6" style={{ border: '1px solid rgba(0,85,127,0.08)' }}>
+            <div className="px-4 py-2.5 flex items-center gap-4" style={{ background: 'rgba(0,85,127,0.04)', borderBottom: '1px solid rgba(0,85,127,0.06)' }}>
               <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#8fa8b8' }}>
                 Curvas comparadas — 16 semanas
               </span>
@@ -402,42 +527,22 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,85,127,0.06)" />
-                  <XAxis
-                    dataKey="semana"
-                    tickFormatter={(v: number) => `S${v}`}
-                    tick={{ fontSize: 9, fill: '#b2b2b2' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 9, fill: '#b2b2b2' }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={30}
-                  />
+                  <XAxis dataKey="semana" tickFormatter={(v: number) => `S${v}`} tick={{ fontSize: 9, fill: '#b2b2b2' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: '#b2b2b2' }} axisLine={false} tickLine={false} width={30} />
                   <Tooltip
                     contentStyle={{ fontSize: 11, borderRadius: 8, boxShadow: '0 4px 12px rgba(0,32,60,0.12)', border: 'none' }}
                     labelFormatter={(v) => `Semana ${v}`}
                     formatter={(v) => `${Math.round(Number(v ?? 0))} uds`}
                   />
                   {ESC_CFG.map((cfg, i) => (
-                    <Line
-                      key={cfg.key}
-                      type="monotone"
-                      dataKey={cfg.key}
-                      stroke={cfg.color}
-                      strokeWidth={i === 1 ? 2.5 : 1.5}
-                      strokeDasharray={i === 1 ? undefined : undefined}
-                      dot={false}
-                      activeDot={{ r: 4, fill: cfg.color, strokeWidth: 0 }}
-                    />
+                    <Line key={cfg.key} type="monotone" dataKey={cfg.key} stroke={cfg.color} strokeWidth={i === 1 ? 2.5 : 1.5} dot={false} activeDot={{ r: 4, fill: cfg.color, strokeWidth: 0 }} />
                   ))}
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* ── Tabla comparativa resumida ──────────────────── */}
+          {/* ── Tabla comparativa ───────────────────────────── */}
           <div className="tq-table-wrap mb-6">
             <table className="tq-table">
               <thead>
@@ -452,34 +557,40 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                 {[
                   {
                     label: 'Uds. totales 16 sem.',
-                    vals: escenarios.map(e => e.kpis.unidades_total.toLocaleString('es-ES') + ' uds'),
-                    colors: escenarios.map(e => e.kpis.unidades_total),
-                    colorFn: (v: number) => v > 0 ? '#00264d' : '#8fa8b8',
+                    vals:    escenarios.map(e => e.kpis.unidades_total.toLocaleString('es-ES') + ' uds'),
+                    colorFn: () => '#00264d',
                   },
                   {
                     label: 'Ingresos proy.',
-                    vals: escenarios.map(e => fmtEur(e.kpis.ingresos)),
-                    colors: escenarios.map(e => e.kpis.ingresos),
+                    vals:    escenarios.map(e => fmtEur(e.kpis.ingresos)),
                     colorFn: () => '#00557f',
                   },
                   {
                     label: 'Margen bruto %',
-                    vals: escenarios.map(e => fmtPct(e.kpis.margen_pct, 0)),
-                    colors: escenarios.map(e => e.kpis.margen_pct),
-                    colorFn: (v: number) => mbColor(v),
+                    vals:    escenarios.map(e => fmtPct(e.kpis.margen_pct, 0)),
+                    colorFn: (_: string, i: number) => mbColor(escenarios[i].kpis.margen_pct),
                   },
                   {
-                    label: 'Break-even',
-                    vals: escenarios.map(e => e.kpis.breakeven_semanas < 99 ? `Sem. ${e.kpis.breakeven_semanas}` : 'No alc.'),
-                    colors: escenarios.map(e => e.kpis.breakeven_semanas),
-                    colorFn: (v: number) => v <= 8 ? '#3A9E6A' : v <= 16 ? '#C8842A' : '#C0392B',
+                    label: 'EBITDA %',
+                    vals:    paybacks.map(p => fmtPct(p.ebitdaPct, 0)),
+                    colorFn: (_: string, i: number) => ebitdaColor(paybacks[i].ebitdaPct),
+                  },
+                  {
+                    label: 'Break-even (stock)',
+                    vals:    escenarios.map(e => e.kpis.breakeven_semanas < 99 ? `Sem. ${e.kpis.breakeven_semanas}` : 'No alc.'),
+                    colorFn: (_: string, i: number) => escenarios[i].kpis.breakeven_semanas <= 8 ? '#3A9E6A' : '#C8842A',
+                  },
+                  {
+                    label: 'Payback inversión',
+                    vals:    paybacks.map(p => p.paybackMeses != null ? `${p.paybackMeses} meses` : 'n/a'),
+                    colorFn: (_: string, i: number) => paybackColor(paybacks[i].paybackMeses),
                   },
                 ].map(row => (
                   <tr key={row.label}>
                     <td className="font-medium text-[12px]" style={{ color: '#8fa8b8' }}>{row.label}</td>
                     {row.vals.map((v, i) => (
                       <td key={i} className="right font-bold font-mono text-[12px]"
-                        style={{ color: row.colorFn(row.colors[i]) }}>
+                        style={{ color: row.colorFn(v, i) }}>
                         {v}
                       </td>
                     ))}
@@ -502,7 +613,7 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                       ¿Listo para confirmar este lanzamiento?
                     </p>
                     <p className="text-[11px] mt-0.5" style={{ color: '#8fa8b8' }}>
-                      Descarga el briefing Excel antes de confirmar. Al confirmar el lanzamiento pasará al historial de confirmados.
+                      Descarga el briefing Excel antes de confirmar. Al confirmar el lanzamiento pasará al historial.
                     </p>
                   </div>
                   <button
@@ -517,10 +628,7 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                         Generando…
                       </>
                     ) : (
-                      <>
-                        <span>↓</span>
-                        Descargar briefing Excel
-                      </>
+                      <><span>↓</span> Descargar briefing Excel</>
                     )}
                   </button>
                 </div>
@@ -534,8 +642,9 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                   ⚠ Confirmación final — acción irreversible
                 </p>
                 <p className="text-[12px] mb-4 leading-relaxed" style={{ color: '#5c4019' }}>
-                  Al confirmar, el lanzamiento <strong>{lanzamiento.nombre ?? 'este lanzamiento'}</strong> pasará
-                  al historial de confirmados. Los KPIs del escenario Base quedarán como outputs.
+                  Al confirmar, <strong>{lanzamiento.nombre ?? 'este lanzamiento'}</strong> pasará al historial de confirmados.
+                  Los KPIs del escenario Base (incluido payback de{' '}
+                  <strong>{paybacks[1]?.paybackMeses != null ? `${paybacks[1].paybackMeses} meses` : 'n/a'}</strong>) quedarán como outputs.
                   Esta acción no se puede deshacer.
                 </p>
                 <div className="flex items-center gap-3">
