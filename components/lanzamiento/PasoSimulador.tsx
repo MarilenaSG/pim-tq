@@ -201,7 +201,7 @@ function paramsOf(e: LanzamientoEscenario): CalcularCurvaParams {
 function KpiMini({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>{label}</p>
+      <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>{label}</p>
       <p className="text-[13px] font-black leading-tight" style={{ color: color ?? '#00264d' }}>{value}</p>
     </div>
   )
@@ -306,10 +306,10 @@ function SliderRow({
           type="range"
           min={min} max={max} step={step} value={value}
           onChange={e => onChange(parseInt(e.target.value))}
-          className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-          style={{ accentColor: color }}
+          className="tq-slider w-full"
+          style={{ '--thumb-color': color } as React.CSSProperties}
         />
-        <div className="flex justify-between text-[9px] mt-0.5" style={{ color: '#c0cfd8' }}>
+        <div className="flex justify-between text-[9px] mt-1" style={{ color: '#8fa8b8' }}>
           {marks.map(m => <span key={m}>{m}</span>)}
         </div>
       </div>
@@ -380,18 +380,18 @@ function EscenarioCard({
       >
         {/* Uds vendidas */}
         <div className="pr-4">
-          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>
             Uds vendidas
           </p>
           <p className="text-[24px] font-bold leading-none" style={{ color: cfg.color }}>
             {k.unidades_total.toLocaleString('es-ES')}
           </p>
-          <p className="text-[9px] mt-1" style={{ color: '#c0cfd8' }}>en 16 semanas</p>
+          <p className="text-[9px] mt-1" style={{ color: '#8fa8b8' }}>en 16 semanas</p>
         </div>
 
         {/* Ingresos */}
         <div className="px-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
-          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>Ingresos</p>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>Ingresos</p>
           <p className="text-[18px] font-bold leading-none" style={{ color: '#00264d' }}>
             {fmtEur(k.ingresos)}
           </p>
@@ -399,7 +399,7 @@ function EscenarioCard({
 
         {/* MB */}
         <div className="px-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
-          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>Margen bruto</p>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>Margen bruto</p>
           <p className="text-[18px] font-bold leading-none" style={{ color: mbColor(k.margen_pct) }}>
             {fmtPct(k.margen_pct, 0)}
           </p>
@@ -407,7 +407,7 @@ function EscenarioCard({
 
         {/* Break-even */}
         <div className="px-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
-          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>Break-even</p>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>Break-even</p>
           <p className="text-[18px] font-bold leading-none" style={{ color: beOk ? '#3A9E6A' : '#C8842A' }}>
             {k.breakeven_semanas < 99 ? `Sem. ${k.breakeven_semanas}` : 'No alc.'}
           </p>
@@ -415,21 +415,21 @@ function EscenarioCard({
 
         {/* EBITDA */}
         <div className="px-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
-          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>EBITDA</p>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>EBITDA</p>
           <p className="text-[18px] font-bold leading-none" style={{ color: ebitdaColor(ebitdaPct) }}>
             {fmtPct(ebitdaPct, 0)}
           </p>
-          <p className="text-[9px] mt-1" style={{ color: '#c0cfd8' }}>MB − OPEX</p>
+          <p className="text-[9px] mt-1" style={{ color: '#8fa8b8' }}>MB − OPEX</p>
         </div>
 
         {/* Payback */}
         <div className="pl-4" style={{ borderLeft: `1px solid ${cfg.border}` }}>
-          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#c0cfd8' }}>Payback</p>
+          <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: '#8fa8b8' }}>Payback</p>
           <p className="text-[18px] font-bold leading-none" style={{ color: paybackColor(paybackMeses) }}>
             {fmtPayback(paybackMeses)}
           </p>
           {margenMensual != null && (
-            <p className="text-[9px] mt-1" style={{ color: '#c0cfd8' }}>
+            <p className="text-[9px] mt-1" style={{ color: '#8fa8b8' }}>
               {fmtEur(margenMensual)}/mes MB
             </p>
           )}
@@ -476,6 +476,48 @@ function EscenarioCard({
   )
 }
 
+// ── Render de la respuesta IA ─────────────────────────────────────
+// Convierte **negrita** y líneas con - en elementos con estilo
+
+function AiInsightsPanel({ text }: { text: string }) {
+  const lines = text.split('\n').filter(l => l.trim() !== '')
+  return (
+    <div className="space-y-3">
+      {lines.map((line, i) => {
+        const isBullet  = line.trim().startsWith('-')
+        const content   = isBullet ? line.trim().slice(1).trim() : line.trim()
+        // Bold: **texto**
+        const parts = content.split(/\*\*(.+?)\*\*/g)
+        const rendered = parts.map((part, j) =>
+          j % 2 === 1
+            ? <strong key={j} style={{ color: '#00264d', fontWeight: 700 }}>{part}</strong>
+            : <span key={j}>{part}</span>
+        )
+
+        if (isBullet) {
+          return (
+            <div key={i} className="flex gap-2.5 items-start">
+              <span className="mt-0.5 flex-shrink-0 w-1.5 h-1.5 rounded-full" style={{ background: '#00557f', marginTop: 7 }} />
+              <p className="text-[13px] leading-relaxed" style={{ color: '#3a5a72' }}>{rendered}</p>
+            </div>
+          )
+        }
+        // ¿Es un titular (línea corta con negrita al inicio)?
+        const isTitle = /^\*\*/.test(line.trim())
+        return (
+          <p
+            key={i}
+            className={`text-[13px] leading-relaxed ${isTitle ? 'mt-4 first:mt-0' : ''}`}
+            style={{ color: isTitle ? '#00264d' : '#3a5a72' }}
+          >
+            {rendered}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────────────
 
 export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
@@ -499,8 +541,10 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     }
     return esc
   })
-  const [exporting,    setExporting]    = useState(false)
-  const [confirming,   setConfirming]   = useState(false)
+  const [exporting,       setExporting]       = useState(false)
+  const [confirming,      setConfirming]      = useState(false)
+  const [aiInsights,      setAiInsights]      = useState<string | null>(null)
+  const [loadingInsights, setLoadingInsights] = useState(false)
 
   // ── OPEX ───────────────────────────────────────────────────────
   const [opexPersonalPct, setOpexPersonalPct] = useState(lanzamiento.opex_personal_pct ?? 12)
@@ -598,6 +642,32 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     save({ escenarios: updated })
   }
 
+  async function handleAiInsights() {
+    setLoadingInsights(true)
+    setAiInsights(null)
+    try {
+      const res = await fetch(`/api/lanzamiento/${lanzamiento.id}/insights`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          nombre:          lanzamiento.nombre,
+          tipo:            lanzamiento.tipo,
+          inversionTotal,
+          opexPersonalPct,
+          opexGastosPct,
+          escenarios,
+          paybacks,
+        }),
+      })
+      const data = await res.json() as { insights: string }
+      setAiInsights(data.insights ?? null)
+    } catch {
+      setAiInsights('Error generando conclusiones. Inténtalo de nuevo.')
+    } finally {
+      setLoadingInsights(false)
+    }
+  }
+
   async function handleExport() {
     setExporting(true)
     try {
@@ -687,16 +757,16 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                 <span style={{ color: '#8fa8b8' }}>
                   Compra stock: <strong style={{ color: '#00264d' }}>{fmtEur(presupuestoCompra)}</strong>
                 </span>
-                <span style={{ color: '#c0cfd8' }}>+</span>
+                <span style={{ color: '#8fa8b8' }}>+</span>
                 <span style={{ color: '#8fa8b8' }}>
                   Marketing: <strong style={{ color: '#00264d' }}>{fmtEur(presupuestoMarketing)}</strong>
                   {presupuestoMarketing === 0 && (
-                    <span className="ml-1 text-[9px]" style={{ color: '#c0cfd8' }}>
+                    <span className="ml-1 text-[9px]" style={{ color: '#8fa8b8' }}>
                       (añade en Paso 6)
                     </span>
                   )}
                 </span>
-                <span style={{ color: '#c0cfd8' }}>→</span>
+                <span style={{ color: '#8fa8b8' }}>→</span>
                 <span>
                   <span style={{ color: '#8fa8b8' }}>Inversión total: </span>
                   <strong style={{ color: '#00557f', fontSize: 13 }}>{fmtEur(inversionTotal)}</strong>
@@ -707,21 +777,21 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
             {/* KPIs del escenario Base */}
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center rounded-lg py-2" style={{ background: 'white', border: '1px solid rgba(0,85,127,0.08)' }}>
-                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>OPEX Total</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>OPEX Total</p>
                 <p className="text-[16px] font-black" style={{ color: '#00264d' }}>
                   {opexPersonalPct + opexGastosPct}%
                 </p>
                 <p className="text-[9px]" style={{ color: '#b2b2b2' }}>personal + gastos</p>
               </div>
               <div className="text-center rounded-lg py-2" style={{ background: 'white', border: '1px solid rgba(0,85,127,0.08)' }}>
-                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>EBITDA Base</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>EBITDA Base</p>
                 <p className="text-[16px] font-black" style={{ color: ebitdaColor(paybacks[1]?.ebitdaPct ?? 0) }}>
                   {fmtPct(paybacks[1]?.ebitdaPct ?? 0, 0)}
                 </p>
                 <p className="text-[9px]" style={{ color: '#b2b2b2' }}>MB − OPEX</p>
               </div>
               <div className="text-center rounded-lg py-2" style={{ background: 'white', border: '1px solid rgba(0,85,127,0.08)' }}>
-                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#c0cfd8' }}>Payback Base</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8fa8b8' }}>Payback Base</p>
                 <p className="text-[16px] font-black" style={{ color: paybackColor(paybacks[1]?.paybackMeses ?? null) }}>
                   {paybacks[1]?.paybackMeses != null ? `${paybacks[1].paybackMeses} m.` : 'n/a'}
                 </p>
@@ -906,6 +976,62 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                   </p>
                 </div>
               </>
+            )}
+          </div>
+
+          {/* ── Conclusiones IA ─────────────────────────── */}
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ border: '1.5px solid rgba(0,85,127,0.12)' }}
+          >
+            {/* Header */}
+            <div
+              className="px-5 py-3.5 flex items-center justify-between"
+              style={{ background: 'rgba(0,85,127,0.04)', borderBottom: '1px solid rgba(0,85,127,0.08)' }}
+            >
+              <div>
+                <p className="text-[12px] font-bold" style={{ color: '#00264d' }}>
+                  Conclusiones del simulador
+                </p>
+                <p className="text-[11px]" style={{ color: '#8fa8b8' }}>
+                  Análisis de viabilidad generado por IA sobre los tres escenarios
+                </p>
+              </div>
+              <button
+                onClick={handleAiInsights}
+                disabled={loadingInsights}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-60"
+                style={{
+                  background: loadingInsights ? 'rgba(0,85,127,0.08)' : '#00557f',
+                  color:      loadingInsights ? '#8fa8b8' : 'white',
+                  border:     '1.5px solid rgba(0,85,127,0.2)',
+                }}
+              >
+                {loadingInsights ? (
+                  <>
+                    <span
+                      className="inline-block w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin"
+                      style={{ borderColor: '#8fa8b8', borderTopColor: 'transparent' }}
+                    />
+                    Analizando…
+                  </>
+                ) : (
+                  <><span>✦</span> {aiInsights ? 'Regenerar' : 'Generar con IA'}</>
+                )}
+              </button>
+            </div>
+
+            {/* Resultado */}
+            {aiInsights ? (
+              <div className="px-5 py-5">
+                <AiInsightsPanel text={aiInsights} />
+              </div>
+            ) : (
+              <div className="px-5 py-8 text-center">
+                <p className="text-[13px]" style={{ color: '#8fa8b8' }}>
+                  Pulsa «Generar con IA» para obtener una valoración de los tres escenarios, identificar el más probable y recibir recomendaciones antes de confirmar.
+                </p>
+              </div>
             )}
           </div>
         </>

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { WizardStepper } from './WizardStepper'
+import { totalSteps } from '@/lib/wizardFlows'
 
 // ── Auto-save hook ─────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' | 'erro
 
 interface WizardLayoutProps {
   step:           number
+  tipo:           string | null
   lanzamientoId: string
   title:          string
   saveStatus:     'idle' | 'saving' | 'saved' | 'error'
@@ -80,18 +82,16 @@ interface WizardLayoutProps {
 }
 
 export function WizardLayout({
-  step, lanzamientoId, title, saveStatus, onNext, children,
+  step, tipo, lanzamientoId, title, saveStatus, onNext, children,
 }: WizardLayoutProps) {
-  const router   = useRouter()
-  const isFirst  = step === 1
-  const isLast   = step === 7
+  const router  = useRouter()
+  const nSteps  = totalSteps(tipo)
+  const isFirst = step === 1
+  const isLast  = step === nSteps
 
   async function handleNext() {
     await onNext?.()
-    if (isLast) {
-      // TODO sesión 4: confirmar lanzamiento
-      return
-    }
+    if (isLast) return   // el paso final maneja su propia confirmación
     router.push(`/lanzamiento/${lanzamientoId}/paso/${step + 1}`)
   }
 
@@ -105,8 +105,8 @@ export function WizardLayout({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Stepper */}
-      <WizardStepper currentStep={step} lanzamientoId={lanzamientoId} />
+      {/* Stepper — tipo-aware */}
+      <WizardStepper currentStep={step} lanzamientoId={lanzamientoId} tipo={tipo} />
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
@@ -114,7 +114,7 @@ export function WizardLayout({
           {/* Paso header */}
           <div className="mb-6">
             <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#0099f2' }}>
-              Paso {step} de 7
+              Paso {step} de {nSteps}
             </p>
             <h1 className="text-xl font-bold" style={{ color: '#00557f', fontFamily: 'inherit' }}>
               {title}

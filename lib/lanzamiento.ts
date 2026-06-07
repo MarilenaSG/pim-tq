@@ -4,55 +4,116 @@ import type { SemanaProyeccion, LanzamientoEscenario, Tienda } from '@/types'
 // Importable tanto en servidor como en cliente (paso 7).
 
 export interface CalcularCurvaParams {
-  unidadesPorTienda:     number
-  nTiendas:              number
+  unidadesTotalCompra:   number     // total de unidades pedidas al proveedor
   semanasRampa:          number     // 1–12 semanas hasta alcanzar el pico base
   crecimientoSemanalPct: number     // 0–30% de crecimiento semanal post-rampa
-  factorAjustePct:       number     // 50–150% ajuste sobre la referencia análoga
+  factorAjustePct:       number     // 50–150% ajuste para escenarios pesimista/optimista
   precioVenta:           number
   coste:                 number
   descuentoPct:          number     // % descuento en semanas de promo
   semanasPromo:          number     // cuántas semanas dura el descuento
 }
 
+// ── Pesos de distribución por cluster ────────────────────────
+// Un Flagship recibe más stock que una tienda Estándar, y esta más que una Pequeña.
+export const CLUSTER_WEIGHTS: Record<string, number> = {
+  A: 1.5,   // Flagship
+  B: 1.0,   // Estándar (referencia)
+  C: 0.5,   // Pequeña
+}
+
+/**
+ * Calcula cuántas unidades corresponden a cada cluster y a cada tienda
+ * dado un total de unidades a comprar y los clusters seleccionados.
+ */
+export function calcularDistribucionPorCluster(
+  unidadesTotalCompra: number,
+  tiendas: import('@/types').Tienda[],
+  clustersSeleccionados: string[],
+): {
+  clusterId:   string
+  nTiendas:    number
+  udsPorTienda: number   // valor exacto (con decimales) para cálculos
+  udsCluster:  number   // redondeado para mostrar
+}[] {
+  const tiendaActivas = tiendas.filter(
+    t => t.cluster != null && clustersSeleccionados.includes(t.cluster),
+  )
+  // Peso total ponderado
+  const pesoTotal = tiendaActivas.reduce(
+    (sum, t) => sum + (CLUSTER_WEIGHTS[t.cluster!] ?? 1),
+    0,
+  )
+  if (pesoTotal === 0) return []
+
+  // Una "unidad de peso" cuántas unidades reales vale
+  const udsPorPeso = unidadesTotalCompra / pesoTotal
+
+  return clustersSeleccionados.map(clusterId => {
+    const nTiendas    = tiendaActivas.filter(t => t.cluster === clusterId).length
+    const weight      = CLUSTER_WEIGHTS[clusterId] ?? 1
+    const udsPorTienda = udsPorPeso * weight
+    return {
+      clusterId,
+      nTiendas,
+      udsPorTienda,
+      udsCluster: Math.round(udsPorTienda * nTiendas),
+    }
+  }).filter(r => r.nTiendas > 0)
+}
+
 export function calcularCurva(params: CalcularCurvaParams): SemanaProyeccion[] {
   const {
-    unidadesPorTienda, nTiendas, semanasRampa,
+    unidadesTotalCompra, semanasRampa,
     crecimientoSemanalPct, factorAjustePct,
     precioVenta, coste, descuentoPct, semanasPromo,
   } = params
 
-  const factor        = factorAjustePct / 100
-  const baseTotal     = unidadesPorTienda * nTiendas * factor
-  const inversionInit = coste * baseTotal   // para calcular break-even
+  const factor = factorAjustePct / 100
+  // Stock total comprado (ajustado por factor del escenario) — nunca se puede vender más
+  const totalStock    = unidadesTotalCompra * factor
+  const inversionInit = coste * totalStock
   const SEMANAS       = 16
 
+  // ── Paso 1: generar pesos de distribución (forma de la curva) ──
+  // La curva define CÓMO se distribuyen las ventas a lo largo del tiempo,
+  // no cuántas unidades hay. Luego escalamos al totalStock.
+  const rawWeights: number[] = []
+  for (let s = 1; s <= SEMANAS; s++) {
+    let w: number
+    if (semanasRampa <= 1) {
+      // Sin rampa: distribución uniforme
+      w = 1
+    } else if (s <= semanasRampa) {
+      // Rampa lineal: empieza despacio, llega al pico al final de la rampa
+      w = s / semanasRampa
+    } else {
+      // Post-rampa: crecimiento compuesto sobre el pico (=1)
+      const semanasPost = s - semanasRampa
+      w = Math.pow(1 + crecimientoSemanalPct / 100, semanasPost)
+    }
+    rawWeights.push(w)
+  }
+
+  // ── Paso 2: escalar pesos para que sumen exactamente totalStock ──
+  const sumWeights = rawWeights.reduce((a, b) => a + b, 0)
+  const scale      = sumWeights > 0 ? totalStock / sumWeights : 0
+
+  // ── Paso 3: calcular proyección semana a semana ──
   const result: SemanaProyeccion[] = []
-  let margenAcumulado   = 0
+  let margenAcumulado    = 0
   let breakEvenAlcanzado = false
 
   for (let s = 1; s <= SEMANAS; s++) {
-    let uds: number
-
-    if (semanasRampa <= 1) {
-      // Sin rampa: arranca a pleno rendimiento
-      uds = baseTotal
-    } else if (s <= semanasRampa) {
-      // Rampa lineal: de 0 a baseTotal en semanasRampa semanas
-      uds = baseTotal * (s / semanasRampa)
-    } else {
-      // Post-rampa: crecimiento compuesto desde el pico base
-      const semanasPost = s - semanasRampa
-      uds = baseTotal * Math.pow(1 + crecimientoSemanalPct / 100, semanasPost)
-    }
+    const uds = rawWeights[s - 1] * scale
 
     // Descuento promocional en las primeras N semanas
     const enPromo     = semanasPromo > 0 && descuentoPct > 0 && s <= semanasPromo
     const pvpEfectivo = enPromo ? precioVenta * (1 - descuentoPct / 100) : precioVenta
 
-    const ingresos       = uds * pvpEfectivo
-    const margenSemana   = uds * (pvpEfectivo - coste)
-    margenAcumulado     += margenSemana
+    const ingresos     = uds * pvpEfectivo
+    const margenSemana = uds * (pvpEfectivo - coste)
+    margenAcumulado   += margenSemana
 
     if (!breakEvenAlcanzado && margenAcumulado >= inversionInit) {
       breakEvenAlcanzado = true
@@ -98,8 +159,7 @@ export function crearEscenario(
     id:        crypto.randomUUID(),
     nombre,
     params:    {
-      unidadesPorTienda:     params.unidadesPorTienda,
-      nTiendas:              params.nTiendas,
+      unidadesTotalCompra:   params.unidadesTotalCompra,
       semanasRampa:          params.semanasRampa,
       crecimientoSemanalPct: params.crecimientoSemanalPct,
       factorAjustePct:       params.factorAjustePct,

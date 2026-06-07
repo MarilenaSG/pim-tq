@@ -77,6 +77,52 @@ a {
 }
 a:hover { color: var(--tq-accent-hover); }
 
+/* ── Slider TQ ─────────────────────────────────────────────── */
+/* Thumb visible y draggable. Color se pasa con CSS var --thumb-color */
+.tq-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(0, 85, 127, 0.12);
+  outline: none;
+  cursor: pointer;
+}
+.tq-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--thumb-color, #00557f);
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 32, 60, 0.25);
+  cursor: grab;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+.tq-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 2px 8px rgba(0, 32, 60, 0.3);
+  transform: scale(1.15);
+}
+.tq-slider:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.05);
+}
+.tq-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--thumb-color, #00557f);
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 32, 60, 0.25);
+  cursor: grab;
+}
+.tq-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(0, 85, 127, 0.12);
+}
+
 /* ── Utilities ──────────────────────────────────────────────── */
 @layer utilities {
   .text-balance { text-wrap: balance; }

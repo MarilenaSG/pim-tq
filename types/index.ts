@@ -308,7 +308,8 @@ export interface Lanzamiento {
   margen_objetivo:            number | null
   clusters_objetivo:          string[] | null
   n_tiendas:                  number | null
-  unidades_por_tienda:        number | null
+  unidades_por_tienda:        number | null   // legacy — usar unidades_compra_total
+  unidades_compra_total:      number | null   // total del pedido al proveedor
   distribucion_personalizada: Record<string, number> | null
   semanas_rampa:              number | null
   crecimiento_semanal_pct:    number | null
@@ -334,8 +335,30 @@ export interface Lanzamiento {
   opex_gastos_pct:            number | null   // % ventas netas → gastos op., default 12
   output_ebitda_pct:          number | null   // EBITDA % del escenario Base al confirmar
   output_payback_meses:       number | null   // meses de payback del escenario Base al confirmar
+  // Drop-specific
+  familias_drop:              FamiliaDropItem[] | null
+  // Marca-specific
+  familias_marca:             string[] | null
+  posicionamiento_marca:      'premium' | 'media' | 'accesible' | null
+  arquitectura_precios:       Record<string, ArquitecturaPreciosFamilia> | null
+  descripcion_marca:          string | null
   created_at:                 string
   updated_at:                 string
+}
+
+/** Una familia dentro de un Drop (con cantidades y precio medio) */
+export interface FamiliaDropItem {
+  familia:      string
+  uds:          number
+  precio_medio: number | null
+  coste_medio:  number | null
+}
+
+/** Arquitectura de precios de una familia para un lanzamiento de Marca */
+export interface ArquitecturaPreciosFamilia {
+  min:   number | null
+  medio: number | null
+  max:   number | null
 }
 
 export interface LanzamientoEscenario {
