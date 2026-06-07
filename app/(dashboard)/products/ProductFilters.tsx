@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { FilterSelect } from '@/components/ui'
 
 interface Props {
   metals:     string[]
@@ -53,19 +54,20 @@ export function ProductFilters({ metals, categories, familias, karats, suppliers
   const supplier   = sp.get('supplier')   ?? ''
   const estado     = sp.get('estado')     ?? ''
   const campaign   = sp.get('campaign')   ?? ''
+  const completitud = sp.get('completitud') ?? ''
   const stockMin   = Number(sp.get('stock_min') ?? 0)
 
-  const hasFilters = searchValue || metal || category || familia || karat || abc || supplier ||
-                     estado || campaign || stockMin > 0 || sp.get('completitud')
+  const hasFilters = searchValue || metal || category || familia || karat || abc ||
+                     supplier || estado || campaign || completitud || stockMin > 0
 
   return (
     <div
-      className="bg-white rounded-xl px-4 py-3 space-y-3"
+      className="bg-white rounded-xl px-3 py-2.5"
       style={{ boxShadow: '0 2px 6px rgba(0,32,60,0.08)' }}
     >
-      {/* Row 1: search + dropdowns */}
+      {/* Fila principal: todos los filtros */}
       <div className="flex flex-wrap gap-2 items-center">
-        {/* Search */}
+        {/* Búsqueda */}
         <input
           type="search"
           placeholder="Buscar código o descripción…"
@@ -73,111 +75,120 @@ export function ProductFilters({ metals, categories, familias, karats, suppliers
           onChange={e => setSearchValue(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && commitSearch(searchValue)}
           onBlur={() => commitSearch(searchValue)}
-          className="flex-1 min-w-48 px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-1"
-          style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+          className="h-8 flex-1 min-w-44 px-3 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-[#00557f]"
+          style={{
+            borderColor: searchValue ? '#00557f' : 'rgba(0,85,127,0.18)',
+            color: '#00557f',
+          }}
         />
 
-        <FilterSelect value={metal}    onChange={v => setParam('metal', v)}    placeholder="Metal"      options={metals}     />
-        <FilterSelect value={category} onChange={v => setParam('category', v)} placeholder="Categoría"  options={categories} />
-        <FilterSelect value={familia}  onChange={v => setParam('familia', v)}  placeholder="Familia"    options={familias}   />
-        <FilterSelect value={karat}    onChange={v => setParam('karat', v)}    placeholder="Quilates"   options={karats}     />
+        <FilterSelect value={supplier}   onChange={v => setParam('supplier', v)}    placeholder="Marca"       options={suppliers}   maxWidth={150} />
+        <FilterSelect value={metal}      onChange={v => setParam('metal', v)}       placeholder="Metal"       options={metals}      />
+        <FilterSelect value={familia}    onChange={v => setParam('familia', v)}     placeholder="Familia"     options={familias}    />
+        <FilterSelect value={category}   onChange={v => setParam('category', v)}    placeholder="Categoría"   options={categories}  />
+        <FilterSelect value={karat}      onChange={v => setParam('karat', v)}       placeholder="Quilates"    options={karats}      />
 
         {/* ABC */}
         <select
           value={abc}
           onChange={e => setParam('abc', e.target.value)}
-          className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
-          style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
+          className="h-8 px-2.5 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-[#00557f] shrink-0 cursor-pointer"
+          style={{
+            borderColor: abc ? '#00557f' : 'rgba(0,85,127,0.18)',
+            color:       abc ? '#00557f' : '#8fa8b8',
+            background:  abc ? 'rgba(0,85,127,0.05)' : 'white',
+            fontWeight:  abc ? 500 : 400,
+          }}
         >
-          <option value="">ABC: todos</option>
+          <option value="">ABC</option>
           <option value="A">A — Alta rotación</option>
           <option value="B">B — Media rotación</option>
           <option value="C">C — Baja rotación</option>
         </select>
 
-        {/* Completitud */}
-        <select
-          value={sp.get('completitud') ?? ''}
-          onChange={e => setParam('completitud', e.target.value)}
-          className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
-          style={{ borderColor: 'rgba(0,85,127,0.2)', color: '#00557f' }}
-        >
-          <option value="">Completitud: todas</option>
-          <option value="alta">Alta (≥ 80%)</option>
-          <option value="media">Media (40–79%)</option>
-          <option value="baja">Baja (&lt; 40%)</option>
-        </select>
-
-        {hasFilters && (
-          <button
-            onClick={clearAll}
-            className="text-xs font-semibold px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
-            style={{ background: 'rgba(192,57,43,0.08)', color: '#992d22' }}
-          >
-            ✕ Limpiar
-          </button>
-        )}
-      </div>
-
-      {/* Row 2: new filters */}
-      <div className="flex flex-wrap gap-2 items-center pt-1 border-t" style={{ borderColor: 'rgba(0,85,127,0.06)' }}>
         {/* Estado */}
         <select
           value={estado}
           onChange={e => setParam('estado', e.target.value)}
-          className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+          className="h-8 px-2.5 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-[#00557f] shrink-0 cursor-pointer"
           style={{
-            borderColor: estado ? '#00557f' : 'rgba(0,85,127,0.2)',
-            color: '#00557f',
-            fontWeight: estado ? 600 : undefined,
+            borderColor: estado ? '#00557f' : 'rgba(0,85,127,0.18)',
+            color:       estado ? '#00557f' : '#8fa8b8',
+            background:  estado ? 'rgba(0,85,127,0.05)' : 'white',
+            fontWeight:  estado ? 500 : 400,
           }}
         >
-          <option value="">Estado: todos</option>
+          <option value="">Estado</option>
           <option value="catalogo">En catálogo</option>
           <option value="descatalogado">Descatalogado</option>
         </select>
 
-        {/* Proveedor */}
-        <FilterSelect value={supplier} onChange={v => setParam('supplier', v)} placeholder="Proveedor" options={suppliers} />
+        {/* Completitud */}
+        <select
+          value={completitud}
+          onChange={e => setParam('completitud', e.target.value)}
+          className="h-8 px-2.5 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-[#00557f] shrink-0 cursor-pointer"
+          style={{
+            borderColor: completitud ? '#00557f' : 'rgba(0,85,127,0.18)',
+            color:       completitud ? '#00557f' : '#8fa8b8',
+            background:  completitud ? 'rgba(0,85,127,0.05)' : 'white',
+            fontWeight:  completitud ? 500 : 400,
+          }}
+        >
+          <option value="">Completitud</option>
+          <option value="alta">Alta (≥ 80%)</option>
+          <option value="media">Media (40–79%)</option>
+          <option value="baja">Baja (&lt; 40%)</option>
+        </select>
 
         {/* Campaña */}
         {campaigns.length > 0 && (
           <select
             value={campaign}
             onChange={e => setParam('campaign', e.target.value)}
-            className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
+            className="h-8 px-2.5 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-[#00557f] shrink-0 cursor-pointer"
             style={{
-              borderColor: campaign ? '#00557f' : 'rgba(0,85,127,0.2)',
-              color: '#00557f',
-              fontWeight: campaign ? 600 : undefined,
+              borderColor: campaign ? '#00557f' : 'rgba(0,85,127,0.18)',
+              color:       campaign ? '#00557f' : '#8fa8b8',
+              background:  campaign ? 'rgba(0,85,127,0.05)' : 'white',
+              fontWeight:  campaign ? 500 : 400,
+              maxWidth: 160,
             }}
           >
-            <option value="">Campaña: todas</option>
+            <option value="">Campaña</option>
             {campaigns.map(c => (
               <option key={c.id} value={c.id}>{c.nombre}</option>
             ))}
           </select>
         )}
 
-        {/* Stock slider */}
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs font-semibold whitespace-nowrap" style={{ color: '#00557f' }}>
-            Stock mín:
+        {hasFilters && (
+          <button
+            onClick={clearAll}
+            className="h-8 px-2.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0"
+            style={{ background: 'rgba(192,57,43,0.08)', color: '#992d22' }}
+          >
+            ✕ Limpiar
+          </button>
+        )}
+
+        {/* Stock slider — al final, solo si tiene valor o siempre visible */}
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          <span className="text-xs font-medium whitespace-nowrap" style={{ color: '#8fa8b8' }}>
+            Stock mín
           </span>
           <input
             type="range"
-            min={0}
-            max={300}
-            step={5}
+            min={0} max={300} step={5}
             value={stockValue}
             onChange={e => setStockValue(Number(e.target.value))}
             onPointerUp={() => commitStock(stockValue)}
             onKeyUp={() => commitStock(stockValue)}
-            className="w-32 accent-tq-snorkel cursor-pointer"
+            className="w-24 cursor-pointer"
             style={{ accentColor: '#00557f' }}
           />
           <span
-            className="text-xs font-bold min-w-[3rem] text-center px-2 py-0.5 rounded"
+            className="text-xs font-semibold min-w-[3rem] text-center px-1.5 py-0.5 rounded"
             style={{
               background: stockValue > 0 ? 'rgba(0,85,127,0.08)' : 'transparent',
               color: '#00557f',
@@ -188,27 +199,5 @@ export function ProductFilters({ metals, categories, familias, karats, suppliers
         </div>
       </div>
     </div>
-  )
-}
-
-function FilterSelect({
-  value, onChange, placeholder, options,
-}: {
-  value: string; onChange: (v: string) => void; placeholder: string; options: string[]
-}) {
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className="px-3 py-2 rounded-lg text-sm border bg-white focus:outline-none"
-      style={{
-        borderColor: value ? '#00557f' : 'rgba(0,85,127,0.2)',
-        color: '#00557f',
-        fontWeight: value ? 600 : undefined,
-      }}
-    >
-      <option value="">{placeholder}: todos</option>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
   )
 }

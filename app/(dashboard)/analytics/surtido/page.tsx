@@ -10,9 +10,9 @@ export interface HeatmapData {
   cells:    Record<string, Record<string, { count: number; ingresos: number }>>
 }
 
-export default async function SurtidoPage({ searchParams }: { searchParams: { familia?: string; metal?: string } }) {
+export default async function SurtidoPage({ searchParams }: { searchParams: { familia?: string; metal?: string; supplier?: string } }) {
   const supabase = createServerClient()
-  const { familia, metal } = searchParams
+  const { familia, metal, supplier } = searchParams
 
   let query = supabase
     .from('products')
@@ -20,8 +20,9 @@ export default async function SurtidoPage({ searchParams }: { searchParams: { fa
     .neq('is_discontinued', true)
     .not('familia', 'is', null)
 
-  if (familia) query = query.eq('familia', familia)
-  if (metal)   query = query.eq('metal', metal)
+  if (familia)   query = query.eq('familia', familia)
+  if (metal)     query = query.eq('metal', metal)
+  if (supplier)  query = query.eq('supplier_name', supplier)
 
   const { data: products } = await query
 

@@ -13,16 +13,17 @@ function clasificarEtapa(meses: number | null, abc: string | null): CicloEtapa {
   return abc === 'A' || abc === 'B' ? 'Maduro' : 'Declive'
 }
 
-export default async function CicloVidaPage({ searchParams }: { searchParams: { familia?: string; metal?: string } }) {
+export default async function CicloVidaPage({ searchParams }: { searchParams: { familia?: string; metal?: string; supplier?: string } }) {
   const supabase = createServerClient()
-  const { familia, metal } = searchParams
+  const { familia, metal, supplier } = searchParams
 
   let query = supabase
     .from('products')
     .select('codigo_modelo, description, familia, metal, abc_ventas, ingresos_12m, primera_entrada, num_variantes, lifecycle_status')
     .neq('is_discontinued', true)
-  if (familia) query = query.eq('familia', familia)
-  if (metal)   query = query.eq('metal', metal)
+  if (familia)   query = query.eq('familia', familia)
+  if (metal)     query = query.eq('metal', metal)
+  if (supplier)  query = query.eq('supplier_name', supplier)
 
   const { data: products } = await query
 

@@ -4,16 +4,17 @@ import { RentabilidadCharts } from './RentabilidadCharts'
 
 export const dynamic = 'force-dynamic'
 
-export default async function RentabilidadPage({ searchParams }: { searchParams: { familia?: string; metal?: string } }) {
+export default async function RentabilidadPage({ searchParams }: { searchParams: { familia?: string; metal?: string; supplier?: string } }) {
   const supabase = createServerClient()
-  const { familia, metal } = searchParams
+  const { familia, metal, supplier } = searchParams
 
   let prodQuery = supabase
     .from('products')
     .select('codigo_modelo, description, familia, metal, supplier_name, abc_ventas, ingresos_12m')
     .neq('is_discontinued', true)
-  if (familia) prodQuery = prodQuery.eq('familia', familia)
-  if (metal)   prodQuery = prodQuery.eq('metal', metal)
+  if (familia)   prodQuery = prodQuery.eq('familia', familia)
+  if (metal)     prodQuery = prodQuery.eq('metal', metal)
+  if (supplier)  prodQuery = prodQuery.eq('supplier_name', supplier)
 
   const [productsRes, variantsRes] = await Promise.all([
     prodQuery,

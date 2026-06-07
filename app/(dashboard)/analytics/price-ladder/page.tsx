@@ -4,12 +4,13 @@ import { PriceLadderClient } from './PriceLadderClient'
 export default async function PriceLadderPage({
   searchParams,
 }: {
-  searchParams: { familia?: string; metal?: string }
+  searchParams: { familia?: string; metal?: string; supplier?: string }
 }) {
   const supabase = createServerClient()
+  const { supplier } = searchParams
 
   // Get all families with their top ingresos to set default
-  const { data: rawProducts } = await supabase
+  let baseQuery = supabase
     .from('products')
     .select(`
       codigo_modelo, description, familia, metal, karat, category,
@@ -20,6 +21,8 @@ export default async function PriceLadderPage({
       )
     `)
     .eq('is_discontinued', false)
+  if (supplier) baseQuery = baseQuery.eq('supplier_name', supplier)
+  const { data: rawProducts } = await baseQuery
 
   // Load ladder ranges from alert_settings
   const { data: settings } = await supabase

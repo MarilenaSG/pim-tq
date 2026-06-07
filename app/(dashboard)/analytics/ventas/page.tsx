@@ -15,6 +15,7 @@ function periodoAtras(curAnyo: number, curMes: number, meses: number) {
   return { anyo: a, mes: m }
 }
 
+// TODO: supplier filter — this page uses RPCs (ventas_evolucion, ventas_top_modelos, ventas_por_familia) that aggregate ventas_mensuales directly; adding a supplier filter would require joining products first to get supplier-filtered codes and passing them to the RPCs or a post-filter step.
 export default async function VentasAnalyticsPage() {
   const supabase = createServerClient()
 

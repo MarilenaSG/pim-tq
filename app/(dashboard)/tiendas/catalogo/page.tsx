@@ -6,11 +6,12 @@ import TiendasCatalogoClient from './TiendasCatalogoClient'
 export const revalidate = 3600
 
 interface SearchParams {
-  search?:   string
-  metal?:    string
-  familia?:  string
-  category?: string
-  estado?:   'catalogo' | 'descatalogado'
+  search?:    string
+  metal?:     string
+  familia?:   string
+  category?:  string
+  supplier?:  string
+  estado?:    'catalogo' | 'descatalogado'
 }
 
 async function loadData(params: SearchParams) {
@@ -21,23 +22,24 @@ async function loadData(params: SearchParams) {
     .from('products')
     .select(`
       codigo_modelo, description, category, familia, metal, karat,
-      num_variantes, lista_variantes, is_discontinued
+      num_variantes, lista_variantes, is_discontinued, supplier_name
     `)
     .order('familia',     { ascending: true,  nullsFirst: false })
     .order('description', { ascending: true,  nullsFirst: false })
 
-  if (params.search)   query = query.or(`description.ilike.%${params.search}%,codigo_modelo.ilike.%${params.search}%`)
-  if (params.metal)    query = query.eq('metal',    params.metal)
-  if (params.familia)  query = query.eq('familia',  params.familia)
-  if (params.category) query = query.eq('category', params.category)
+  if (params.search)    query = query.or(`description.ilike.%${params.search}%,codigo_modelo.ilike.%${params.search}%`)
+  if (params.metal)     query = query.eq('metal',         params.metal)
+  if (params.familia)   query = query.eq('familia',       params.familia)
+  if (params.category)  query = query.eq('category',      params.category)
+  if (params.supplier)  query = query.eq('supplier_name', params.supplier)
 
   const { data: products } = await query
   if (!products?.length) {
-    const filterRes = await supabase.from('products').select('metal, familia, category')
+    const filterRes = await supabase.from('products').select('metal, familia, category, supplier_name')
     const allOpts = filterRes.data ?? []
-    const uniq = (key: 'metal' | 'familia' | 'category') =>
+    const uniq = (key: 'metal' | 'familia' | 'category' | 'supplier_name') =>
       Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
-    return { products: [], filterOptions: { metals: uniq('metal'), familias: uniq('familia'), categories: uniq('category') } }
+    return { products: [], filterOptions: { metals: uniq('metal'), familias: uniq('familia'), categories: uniq('category'), suppliers: uniq('supplier_name') } }
   }
 
   const codes = products.map(p => p.codigo_modelo)
@@ -60,7 +62,7 @@ async function loadData(params: SearchParams) {
       .in('codigo_modelo', codes),
     supabase
       .from('products')
-      .select('metal, familia, category'),
+      .select('metal, familia, category, supplier_name'),
   ])
 
   const imageMap = Object.fromEntries(
@@ -78,7 +80,7 @@ async function loadData(params: SearchParams) {
   )
 
   const allOpts = filterRes.data ?? []
-  const uniq = (key: 'metal' | 'familia' | 'category') =>
+  const uniq = (key: 'metal' | 'familia' | 'category' | 'supplier_name') =>
     Array.from(new Set(allOpts.map(r => r[key]).filter((v): v is string => !!v))).sort()
 
   const enriched = products.map(p => {
@@ -122,6 +124,7 @@ async function loadData(params: SearchParams) {
       metals:     uniq('metal'),
       familias:   uniq('familia'),
       categories: uniq('category'),
+      suppliers:  uniq('supplier_name'),
     },
   }
 }
@@ -134,11 +137,12 @@ export default async function TiendasCatalogoPage({
   const sp = searchParams ?? {}
   const rawEstado = sp.estado ?? ''
   const params: SearchParams = {
-    search:   sp.search   || undefined,
-    metal:    sp.metal    || undefined,
-    familia:  sp.familia  || undefined,
-    category: sp.category || undefined,
-    estado:   (rawEstado === 'catalogo' || rawEstado === 'descatalogado') ? rawEstado : undefined,
+    search:    sp.search    || undefined,
+    metal:     sp.metal     || undefined,
+    familia:   sp.familia   || undefined,
+    category:  sp.category  || undefined,
+    supplier:  sp.supplier  || undefined,
+    estado:    (rawEstado === 'catalogo' || rawEstado === 'descatalogado') ? rawEstado : undefined,
   }
 
   const { products, filterOptions } = await loadData(params)

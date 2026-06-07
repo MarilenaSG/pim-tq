@@ -8,11 +8,12 @@ export default async function AnalyticsLayout({ children }: { children: ReactNod
 
   const { data: products } = await supabase
     .from('products')
-    .select('familia, metal')
+    .select('familia, metal, supplier_name')
     .not('familia', 'is', null)
 
-  const familias = Array.from(new Set((products ?? []).map(p => p.familia as string).filter(Boolean))).sort()
-  const metales  = Array.from(new Set((products ?? []).map(p => p.metal  as string).filter(Boolean))).sort()
+  const familias   = Array.from(new Set((products ?? []).map(p => p.familia       as string).filter(Boolean))).sort()
+  const metales    = Array.from(new Set((products ?? []).map(p => p.metal         as string).filter(Boolean))).sort()
+  const suppliers  = Array.from(new Set((products ?? []).map(p => p.supplier_name as string).filter(Boolean))).sort()
 
   return (
     <div className="min-h-screen bg-[var(--tq-bg)]">
@@ -20,7 +21,7 @@ export default async function AnalyticsLayout({ children }: { children: ReactNod
         <AnalyticsTabs />
       </div>
       <Suspense>
-        <FilterBar familias={familias} metales={metales} />
+        <FilterBar familias={familias} metales={metales} suppliers={suppliers} />
       </Suspense>
       <div className="p-8 max-w-7xl">
         {children}

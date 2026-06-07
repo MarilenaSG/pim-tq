@@ -4,16 +4,17 @@ import { StockCharts } from './StockCharts'
 
 export const dynamic = 'force-dynamic'
 
-export default async function StockPage({ searchParams }: { searchParams: { familia?: string; metal?: string } }) {
+export default async function StockPage({ searchParams }: { searchParams: { familia?: string; metal?: string; supplier?: string } }) {
   const supabase = createServerClient()
-  const { familia, metal } = searchParams
+  const { familia, metal, supplier } = searchParams
 
   let prodQuery = supabase
     .from('products')
     .select('codigo_modelo, description, familia, abc_ventas, metal')
     .neq('is_discontinued', true)
-  if (familia) prodQuery = prodQuery.eq('familia', familia)
-  if (metal)   prodQuery = prodQuery.eq('metal', metal)
+  if (familia)   prodQuery = prodQuery.eq('familia', familia)
+  if (metal)     prodQuery = prodQuery.eq('metal', metal)
+  if (supplier)  prodQuery = prodQuery.eq('supplier_name', supplier)
 
   const productsRes = await prodQuery
   const productCodes = (productsRes.data ?? []).map(p => p.codigo_modelo as string)

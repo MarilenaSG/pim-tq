@@ -2,64 +2,75 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useCallback } from 'react'
+import { FilterSelect } from '@/components/ui'
 
 interface Props {
-  familias: string[]
-  metales:  string[]
+  familias:  string[]
+  metales:   string[]
+  suppliers: string[]
 }
 
-export function FilterBar({ familias, metales }: Props) {
-  const router     = useRouter()
-  const pathname   = usePathname()
-  const params     = useSearchParams()
+export function FilterBar({ familias, metales, suppliers }: Props) {
+  const router   = useRouter()
+  const pathname = usePathname()
+  const params   = useSearchParams()
 
-  const familia = params.get('familia') ?? 'all'
-  const metal   = params.get('metal')   ?? 'all'
+  const familia  = params.get('familia')  ?? ''
+  const metal    = params.get('metal')    ?? ''
+  const supplier = params.get('supplier') ?? ''
 
   const update = useCallback((key: string, value: string) => {
     const next = new URLSearchParams(params.toString())
-    if (value === 'all') next.delete(key)
+    if (!value) next.delete(key)
     else next.set(key, value)
     router.push(`${pathname}?${next.toString()}`)
   }, [params, pathname, router])
 
-  const hasFilter = familia !== 'all' || metal !== 'all'
+  const hasFilter = !!(familia || metal || supplier)
 
   return (
-    <div className="flex items-center gap-2 px-8 py-2.5 border-b border-[#e2ddd9] bg-[#faf8f6]">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-[#b2b2b2] mr-1">Filtros</span>
+    <div
+      className="flex items-center gap-2 px-6 py-2 border-b"
+      style={{ borderColor: '#e2ddd9', background: '#faf8f6' }}
+    >
+      <span className="text-[10px] font-bold uppercase tracking-widest shrink-0" style={{ color: '#b2b2b2' }}>
+        Filtros
+      </span>
 
-      <select
+      <FilterSelect
+        placeholder="Marca"
+        value={supplier}
+        options={suppliers}
+        onChange={v => update('supplier', v)}
+        maxWidth={150}
+      />
+      <FilterSelect
+        placeholder="Familia"
         value={familia}
-        onChange={e => update('familia', e.target.value)}
-        className="text-xs border border-[#e0dbd6] rounded-lg px-2.5 py-1.5 bg-white text-[#1d1d1b] focus:outline-none focus:ring-1 focus:ring-[#00557f]"
-      >
-        <option value="all">Todas las familias</option>
-        {familias.map(f => <option key={f} value={f}>{f}</option>)}
-      </select>
-
-      <select
+        options={familias}
+        onChange={v => update('familia', v)}
+      />
+      <FilterSelect
+        placeholder="Metal"
         value={metal}
-        onChange={e => update('metal', e.target.value)}
-        className="text-xs border border-[#e0dbd6] rounded-lg px-2.5 py-1.5 bg-white text-[#1d1d1b] focus:outline-none focus:ring-1 focus:ring-[#00557f]"
-      >
-        <option value="all">Todos los metales</option>
-        {metales.map(m => <option key={m} value={m}>{m}</option>)}
-      </select>
+        options={metales}
+        onChange={v => update('metal', v)}
+      />
 
       {hasFilter && (
         <button
-          onClick={() => { update('familia', 'all'); update('metal', 'all') }}
-          className="text-[11px] text-[#C0392B] hover:underline ml-1"
+          onClick={() => { update('familia', ''); update('metal', ''); update('supplier', '') }}
+          className="h-8 px-2.5 text-xs font-semibold rounded-lg transition-colors"
+          style={{ background: 'rgba(192,57,43,0.08)', color: '#992d22' }}
         >
-          × Limpiar filtros
+          ✕ Limpiar
         </button>
       )}
 
       {hasFilter && (
-        <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full font-medium"
-          style={{ background: 'rgba(0,85,127,0.08)', color: '#00557f' }}>
-          {[familia !== 'all' && familia, metal !== 'all' && metal].filter(Boolean).join(' · ')}
+        <span className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ background: 'rgba(0,85,127,0.08)', color: '#00557f' }}>
+          {[supplier, familia, metal].filter(Boolean).join(' · ')}
         </span>
       )}
     </div>

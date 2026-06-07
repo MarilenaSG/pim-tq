@@ -2,7 +2,7 @@
 
 import { useState, useRef, useTransition, useMemo } from 'react'
 import Link from 'next/link'
-import { useToast } from '@/components/ui'
+import { useToast, FilterSelect } from '@/components/ui'
 import type { CustomFieldDefinition } from '@/types'
 
 type RowData = {
@@ -245,25 +245,25 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
         />
 
         {/* Selects — compact, label is the first option */}
-        <CompactSelect
+        <FilterSelect
           placeholder="Marca"
           value={filters.supplier}
           options={filterOptions.suppliers}
           onChange={v => setFilter('supplier', v)}
         />
-        <CompactSelect
+        <FilterSelect
           placeholder="Metal"
           value={filters.metal}
           options={filterOptions.metals}
           onChange={v => setFilter('metal', v)}
         />
-        <CompactSelect
+        <FilterSelect
           placeholder="Familia"
           value={filters.familia}
           options={filterOptions.familias}
           onChange={v => setFilter('familia', v)}
         />
-        <CompactSelect
+        <FilterSelect
           placeholder="Categoría"
           value={filters.category}
           options={filterOptions.categories}
@@ -471,36 +471,6 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
       </div>
 
     </div>
-  )
-}
-
-// ── Compact inline select (no external label) ─────────────────────
-
-function CompactSelect({
-  placeholder, value, options, onChange,
-}: {
-  placeholder: string
-  value:       string
-  options:     string[]
-  onChange:    (v: string) => void
-}) {
-  const active = !!value
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className="h-7 px-2 rounded-md text-xs border focus:outline-none focus:ring-1 focus:ring-tq-sky shrink-0"
-      style={{
-        borderColor: active ? '#00557f' : 'rgba(0,85,127,0.16)',
-        color:       active ? '#00557f' : '#8fa8b8',
-        background:  active ? 'rgba(0,85,127,0.05)' : 'white',
-        fontWeight:  active ? 500 : 400,
-        maxWidth:    140,
-      }}
-    >
-      <option value="">{placeholder}</option>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
   )
 }
 

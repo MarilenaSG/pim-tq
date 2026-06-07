@@ -5,11 +5,12 @@ import { useRouter, usePathname } from 'next/navigation'
 
 function buildExportUrl(base: string, filters: ActiveFilters): string {
   const p = new URLSearchParams()
-  if (filters.search)   p.set('search',   filters.search)
-  if (filters.metal)    p.set('metal',    filters.metal)
-  if (filters.familia)  p.set('familia',  filters.familia)
-  if (filters.category) p.set('category', filters.category)
-  if (filters.estado)   p.set('estado',   filters.estado)
+  if (filters.search)    p.set('search',   filters.search)
+  if (filters.metal)     p.set('metal',    filters.metal)
+  if (filters.familia)   p.set('familia',  filters.familia)
+  if (filters.category)  p.set('category', filters.category)
+  if (filters.supplier)  p.set('supplier', filters.supplier)
+  if (filters.estado)    p.set('estado',   filters.estado)
   return `${base}?${p.toString()}`
 }
 
@@ -53,14 +54,16 @@ interface FilterOptions {
   metals:     string[]
   familias:   string[]
   categories: string[]
+  suppliers:  string[]
 }
 
 interface ActiveFilters {
-  search?:   string
-  metal?:    string
-  familia?:  string
-  category?: string
-  estado?:   string
+  search?:    string
+  metal?:     string
+  familia?:   string
+  category?:  string
+  supplier?:  string
+  estado?:    string
 }
 
 function sortVariante(a: string | null, b: string | null): number {
@@ -283,26 +286,28 @@ export default function TiendasCatalogoClient({
 
   function applyFilter(key: string, value: string) {
     const params = new URLSearchParams()
-    if (search                                         ) params.set('search',   search)
-    if (key !== 'metal'    && activeFilters.metal     ) params.set('metal',    activeFilters.metal)
-    if (key !== 'familia'  && activeFilters.familia   ) params.set('familia',  activeFilters.familia)
-    if (key !== 'category' && activeFilters.category  ) params.set('category', activeFilters.category)
-    if (key !== 'estado'   && activeFilters.estado    ) params.set('estado',   activeFilters.estado)
+    if (search                                            ) params.set('search',   search)
+    if (key !== 'metal'      && activeFilters.metal      ) params.set('metal',    activeFilters.metal)
+    if (key !== 'familia'    && activeFilters.familia    ) params.set('familia',  activeFilters.familia)
+    if (key !== 'category'   && activeFilters.category   ) params.set('category', activeFilters.category)
+    if (key !== 'supplier'   && activeFilters.supplier   ) params.set('supplier', activeFilters.supplier)
+    if (key !== 'estado'     && activeFilters.estado     ) params.set('estado',   activeFilters.estado)
     if (value) params.set(key, value)
     startTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
   function applySearch(value: string) {
     const params = new URLSearchParams()
-    if (value)                  params.set('search',   value)
-    if (activeFilters.metal)    params.set('metal',    activeFilters.metal)
-    if (activeFilters.familia)  params.set('familia',  activeFilters.familia)
-    if (activeFilters.category) params.set('category', activeFilters.category)
-    if (activeFilters.estado)   params.set('estado',   activeFilters.estado)
+    if (value)                   params.set('search',   value)
+    if (activeFilters.metal)     params.set('metal',    activeFilters.metal)
+    if (activeFilters.familia)   params.set('familia',  activeFilters.familia)
+    if (activeFilters.category)  params.set('category', activeFilters.category)
+    if (activeFilters.supplier)  params.set('supplier', activeFilters.supplier)
+    if (activeFilters.estado)    params.set('estado',   activeFilters.estado)
     startTransition(() => router.push(`${pathname}?${params.toString()}`))
   }
 
-  const hasFilters = activeFilters.search || activeFilters.metal || activeFilters.familia || activeFilters.category || activeFilters.estado
+  const hasFilters = activeFilters.search || activeFilters.metal || activeFilters.familia || activeFilters.category || activeFilters.supplier || activeFilters.estado
 
   return (
     <>
@@ -331,6 +336,24 @@ export default function TiendasCatalogoClient({
 
       {/* Filters */}
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
+        {/* Marca */}
+        {filterOptions.suppliers.length > 0 && (
+          <select
+            value={activeFilters.supplier ?? ''}
+            onChange={e => applyFilter('supplier', e.target.value)}
+            className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold border-0 focus:outline-none"
+            style={{
+              background: activeFilters.supplier ? '#C8842A' : '#fff',
+              color:      activeFilters.supplier ? '#fff'    : '#C8842A',
+              boxShadow:  '0 1px 4px rgba(0,32,60,0.1)',
+              maxWidth: 180,
+            }}
+          >
+            <option value="">Marca</option>
+            {filterOptions.suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+
         {/* Metal */}
         <select
           value={activeFilters.metal ?? ''}

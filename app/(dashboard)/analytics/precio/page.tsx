@@ -16,14 +16,15 @@ interface FamiliaStats {
 
 interface BucketRow { rango: string; count: number; min: number; max: number }
 
-export default async function PrecioPage({ searchParams }: { searchParams: { familia?: string; metal?: string } }) {
+export default async function PrecioPage({ searchParams }: { searchParams: { familia?: string; metal?: string; supplier?: string } }) {
   const supabase = createServerClient()
-  const { familia, metal } = searchParams
+  const { familia, metal, supplier } = searchParams
 
   // Products for familia/metal mapping + filtering
   let prodQuery = supabase.from('products').select('codigo_modelo, familia, metal').neq('is_discontinued', true)
-  if (familia) prodQuery = prodQuery.eq('familia', familia)
-  if (metal)   prodQuery = prodQuery.eq('metal', metal)
+  if (familia)   prodQuery = prodQuery.eq('familia', familia)
+  if (metal)     prodQuery = prodQuery.eq('metal', metal)
+  if (supplier)  prodQuery = prodQuery.eq('supplier_name', supplier)
   const { data: products } = await prodQuery
 
   const allowedCodes = new Set((products ?? []).map(p => p.codigo_modelo as string))
