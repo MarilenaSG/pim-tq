@@ -140,19 +140,54 @@ function initEscenarios(lanz: Lanzamiento): LanzamientoEscenario[] {
     semanasPromo:          lanz.semanas_promo ?? 0,
   }
 
+  const rampa = base.semanasRampa          ?? 3
+  const crec  = base.crecimientoSemanalPct ?? 5
+
+  // ── Drop: ventana fija sin reposición ────────────────────────
+  // Pesimista: sell-through 50% · Base: 75% · Optimista: 100% (una semana antes)
+  if (lanz.tipo === 'drop') {
+    return [
+      crearEscenario('Pesimista', {
+        ...base,
+        factorAjustePct:       50,
+        semanasRampa:          Math.min(8, rampa + 2),
+        crecimientoSemanalPct: Math.max(0, crec - 2),
+      }),
+      crearEscenario('Base', { ...base, factorAjustePct: 75 }, true),
+      crearEscenario('Optimista', {
+        ...base,
+        factorAjustePct:       100,
+        semanasRampa:          Math.max(1, rampa - 1),
+        crecimientoSemanalPct: Math.min(25, crec + 4),
+      }),
+    ]
+  }
+
+  // ── Marca: hay reposición, ventana más amplia ─────────────────
+  // Pesimista: sell-through 50% · Base: 60% · Optimista: 75%
+  if (lanz.tipo === 'marca') {
+    return [
+      crearEscenario('Pesimista', { ...base, factorAjustePct: 50 }),
+      crearEscenario('Base',      { ...base, factorAjustePct: 60 }, true),
+      crearEscenario('Optimista', { ...base, factorAjustePct: 75 }),
+    ]
+  }
+
+  // ── SKU: relativo al factor configurado (default 80%) ─────────
+  const stBase = base.factorAjustePct ?? 80
   return [
     crearEscenario('Pesimista', {
       ...base,
-      factorAjustePct:       Math.max(50,  (base.factorAjustePct ?? 100) - 30),
-      semanasRampa:          Math.min(12,  (base.semanasRampa ?? 3) + 3),
-      crecimientoSemanalPct: Math.max(0,   (base.crecimientoSemanalPct ?? 5) - 3),
+      factorAjustePct:       Math.max(30, stBase - 25),
+      semanasRampa:          Math.min(12, rampa + 3),
+      crecimientoSemanalPct: Math.max(0,  crec - 3),
     }),
-    crearEscenario('Base', base, true),
+    crearEscenario('Base', { ...base, factorAjustePct: stBase }, true),
     crearEscenario('Optimista', {
       ...base,
-      factorAjustePct:       Math.min(150, (base.factorAjustePct ?? 100) + 30),
-      semanasRampa:          Math.max(1,   (base.semanasRampa ?? 3) - 1),
-      crecimientoSemanalPct: Math.min(30,  (base.crecimientoSemanalPct ?? 5) + 5),
+      factorAjustePct:       Math.min(110, stBase + 20),
+      semanasRampa:          Math.max(1,   rampa - 1),
+      crecimientoSemanalPct: Math.min(30,  crec + 5),
     }),
   ]
 }
@@ -241,9 +276,17 @@ function EscenarioCard({
         onClick={onToggle}
         style={{ background: `${cfg.color}0e`, borderBottom: `1px solid ${cfg.border}` }}
       >
-        <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: cfg.color }}>
-          {cfg.label}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: cfg.color }}>
+            {cfg.label}
+          </span>
+          <span
+            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+            style={{ background: `${cfg.color}20`, color: cfg.color }}
+          >
+            ST {p.factorAjustePct ?? 100}%
+          </span>
+        </div>
         <span className="text-[10px] font-semibold" style={{ color: cfg.color }}>
           {expanded ? '▲ Cerrar' : '▼ Editar'}
         </span>
@@ -310,7 +353,7 @@ function EscenarioCard({
       {/* ── Params badge strip ───────────────────────────── */}
       <div className="px-4 py-2.5 flex flex-wrap gap-1.5">
         {[
-          `Factor ${p.factorAjustePct ?? 100}%`,
+          `ST ${p.factorAjustePct ?? 100}%`,
           `Rampa ${p.semanasRampa ?? 3} sem.`,
           `+${p.crecimientoSemanalPct ?? 5}%/sem.`,
         ].map(label => (
@@ -323,17 +366,20 @@ function EscenarioCard({
       {/* ── Panel de edición expandible ─────────────────── */}
       {expanded && (
         <div className="px-4 pb-4 space-y-4" style={{ borderTop: `1px solid ${cfg.border}`, paddingTop: 16 }}>
-          {/* Factor */}
+          {/* Sell-through */}
           <div>
             <div className="flex justify-between mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Factor</span>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#8fa8b8' }}>Sell-through</span>
+                <span className="ml-1.5 text-[9px]" style={{ color: '#c0cfd8' }}>% del stock vendido</span>
+              </div>
               <span className="text-[12px] font-black" style={{ color: cfg.color }}>{p.factorAjustePct ?? 100}%</span>
             </div>
-            <input type="range" min={50} max={150} step={5} value={p.factorAjustePct ?? 100}
+            <input type="range" min={20} max={110} step={5} value={p.factorAjustePct ?? 100}
               onChange={e => onUpdate('factorAjustePct', parseInt(e.target.value))}
               className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ accentColor: cfg.color }} />
             <div className="flex justify-between text-[8px] mt-0.5" style={{ color: '#c0cfd8' }}>
-              <span>50%</span><span>100%</span><span>150%</span>
+              <span>20%</span><span>50%</span><span>75%</span><span>100%+</span>
             </div>
           </div>
           {/* Rampa */}
@@ -396,8 +442,8 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
   const [confirming,   setConfirming]   = useState(false)
 
   // ── OPEX ───────────────────────────────────────────────────────
-  const [opexPersonalPct, setOpexPersonalPct] = useState(lanzamiento.opex_personal_pct ?? 20)
-  const [opexGastosPct,   setOpexGastosPct]   = useState(lanzamiento.opex_gastos_pct   ?? 12)
+  const [opexPersonalPct, setOpexPersonalPct] = useState(lanzamiento.opex_personal_pct ?? 12)
+  const [opexGastosPct,   setOpexGastosPct]   = useState(lanzamiento.opex_gastos_pct   ?? 9)
 
   function handleOpexPersonal(v: number) {
     const safe = Math.max(0, Math.min(40, v))
@@ -543,8 +589,8 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
     >
       <CoachingPanel
         storageKey="wizard-coaching-paso-7"
-        concepto="El payback mide en cuántos meses el margen bruto generado cubre la inversión total (stock + marketing). Se usa el margen bruto —no el EBITDA— porque el OPEX es estructura que existe con o sin el lanzamiento. Lo que realmente «paga» la mercancía es el margen que genera cada venta. El objetivo del equipo es un payback entre 4 y 6 meses. El EBITDA% se muestra aparte como indicador de eficiencia operativa global."
-        ejemplo="Drop de San Valentín: 3.800€ inversión, MB 63%, ingresos proyectados 2.400€/mes → margen mensual 1.512€ → payback 2,5 meses ✓. Si el payback supera 6 meses, revisar el stock inicial o el mix de familias antes de confirmar."
+        concepto="Los escenarios están definidos por sell-through (% del stock vendido en la ventana). Drop — Pesimista: 50% ST · Base: 75% ST · Optimista: 100% ST (todo vendido una semana antes). Marca — Base: 60% ST · Optimista: 75% ST (hay reposición, ventana más amplia). El payback usa el margen bruto mensual —no el EBITDA— porque el OPEX es estructura que existe con o sin el lanzamiento. Objetivo del equipo: payback entre 4 y 6 meses."
+        ejemplo="Drop de San Valentín: 65 uds compradas, ST base 75% → 49 uds vendidas en 16 semanas. 3.800€ inversión, MB 63%, margen mensual ~1.500€ → payback 2,5 meses ✓. Si el payback supera 6 meses, reducir el stock inicial o revisar el mix."
         consecuencia="Confirmar es irreversible — el lanzamiento pasa al historial. Descarga el briefing antes si lo necesitas."
       />
 

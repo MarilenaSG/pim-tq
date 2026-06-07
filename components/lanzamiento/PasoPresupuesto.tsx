@@ -63,10 +63,10 @@ export function PasoPresupuesto({ lanzamiento, step = 6 }: { lanzamiento: Lanzam
     lanzamiento.presupuesto_marketing ?? 0,
   )
   const [opexPersonalPct, setOpexPersonalPct] = useState<number>(
-    lanzamiento.opex_personal_pct ?? 20,
+    lanzamiento.opex_personal_pct ?? 12,
   )
   const [opexGastosPct, setOpexGastosPct] = useState<number>(
-    lanzamiento.opex_gastos_pct ?? 12,
+    lanzamiento.opex_gastos_pct ?? 9,
   )
 
   // Métricas derivadas del simulador base
