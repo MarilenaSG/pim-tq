@@ -5,6 +5,10 @@ import type { CustomFieldDefinition } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
+function uniq<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr)).filter(Boolean).sort() as T[]
+}
+
 export default async function BatchCustomFieldsPage() {
   const supabase = createServerClient()
 
@@ -16,8 +20,7 @@ export default async function BatchCustomFieldsPage() {
       .order('field_key'),
     supabase
       .from('products')
-      .select('codigo_modelo, description')
-      .eq('is_discontinued', false)
+      .select('codigo_modelo, description, supplier_name, metal, familia, category, is_discontinued')
       .order('codigo_modelo'),
   ])
 
@@ -32,7 +35,6 @@ export default async function BatchCustomFieldsPage() {
         .in('codigo_modelo', codes)
     : { data: [] }
 
-  // Build value map: codigo_modelo → { field_key → value }
   const valueMap: Record<string, Record<string, string>> = {}
   for (const cf of customFields ?? []) {
     if (!valueMap[cf.codigo_modelo]) valueMap[cf.codigo_modelo] = {}
@@ -40,10 +42,21 @@ export default async function BatchCustomFieldsPage() {
   }
 
   const initialRows = products.map(p => ({
-    codigo_modelo: p.codigo_modelo,
-    description:   p.description ?? '',
+    codigo_modelo:   p.codigo_modelo,
+    description:     p.description ?? '',
+    supplier_name:   p.supplier_name ?? '',
+    metal:           p.metal ?? '',
+    familia:         p.familia ?? '',
+    category:        p.category ?? '',
+    is_discontinued: p.is_discontinued ? '1' : '0',
     ...(valueMap[p.codigo_modelo] ?? {}),
   }))
+
+  // Filter options
+  const suppliers  = uniq(products.map(p => p.supplier_name as string))
+  const metals     = uniq(products.map(p => p.metal as string))
+  const familias   = uniq(products.map(p => p.familia as string))
+  const categories = uniq(products.map(p => p.category as string))
 
   return (
     <div className="h-full flex flex-col">
@@ -57,6 +70,7 @@ export default async function BatchCustomFieldsPage() {
       <BatchCustomFieldsTable
         fieldDefs={fieldDefs}
         initialRows={initialRows}
+        filterOptions={{ suppliers, metals, familias, categories }}
       />
     </div>
   )
