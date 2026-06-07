@@ -315,7 +315,11 @@ export function PasoDistribucion({
                 <p className="text-[9px] leading-relaxed" style={{ color: active ? '#5a7a8a' : '#8fa8b8' }}>
                   {tiendas
                     .filter(t => t.cluster === cl.id)
-                    .map(t => t.nombre_corto ?? t.nombre)
+                    .map(t => {
+                      const nombre = t.nombre_corto ?? t.nombre
+                      const isla   = t.isla && t.isla !== 'Tenerife' ? ` (${t.isla})` : ''
+                      return nombre + isla
+                    })
                     .join(' · ')}
                 </p>
               </button>
@@ -489,11 +493,12 @@ export function PasoDistribucion({
                           <span className="text-[12px] font-medium" style={{ color: '#00264d' }}>
                             {tienda.nombre_corto ?? tienda.nombre}
                           </span>
-                          {tienda.zona && (
-                            <span className="ml-1.5 text-[10px]" style={{ color: '#6b8a9a' }}>
-                              {tienda.zona}
-                            </span>
-                          )}
+                          <span className="ml-1.5 text-[10px]" style={{ color: '#6b8a9a' }}>
+                            {[
+                              tienda.zona,
+                              tienda.isla && tienda.isla !== 'Tenerife' ? tienda.isla : null,
+                            ].filter(Boolean).join(' · ')}
+                          </span>
                         </div>
                         <div className="flex items-center gap-0 rounded-lg overflow-hidden shrink-0" style={{ border: '1px solid rgba(0,85,127,0.12)' }}>
                           <button

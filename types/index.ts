@@ -432,6 +432,7 @@ export interface Tienda {
   zona:         TiendaZona | null
   tipo:         TiendaTipo | null
   cluster:      TiendaCluster | null
+  isla:         string | null    // isla canaria — default 'Tenerife', preparado para expansión
   activo:       boolean
   es_almacen:   boolean
   created_at:   string
