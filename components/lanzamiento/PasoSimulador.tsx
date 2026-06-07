@@ -644,7 +644,7 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
 
   async function handleAiInsights() {
     setLoadingInsights(true)
-    setAiInsights(null)
+    setAiInsights('')
     try {
       const res = await fetch(`/api/lanzamiento/${lanzamiento.id}/insights`, {
         method:  'POST',
@@ -659,8 +659,23 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
           paybacks,
         }),
       })
-      const data = await res.json() as { insights: string }
-      setAiInsights(data.insights ?? null)
+      if (!res.ok || !res.body) {
+        setAiInsights('Error generando conclusiones. Inténtalo de nuevo.')
+        return
+      }
+      // Streaming: mostrar texto a medida que llega
+      const reader  = res.body.getReader()
+      const decoder = new TextDecoder()
+      let text = ''
+      // Ocultar el spinner en cuanto llega el primer chunk
+      let firstChunk = true
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (firstChunk) { setLoadingInsights(false); firstChunk = false }
+        text += decoder.decode(value, { stream: true })
+        setAiInsights(text)
+      }
     } catch {
       setAiInsights('Error generando conclusiones. Inténtalo de nuevo.')
     } finally {
@@ -1016,15 +1031,26 @@ export function PasoSimulador({ lanzamiento }: { lanzamiento: Lanzamiento }) {
                     Analizando…
                   </>
                 ) : (
-                  <><span>✦</span> {aiInsights ? 'Regenerar' : 'Generar con IA'}</>
+                  <><span>✦</span> {aiInsights !== null ? 'Regenerar' : 'Generar con IA'}</>
                 )}
               </button>
             </div>
 
-            {/* Resultado */}
-            {aiInsights ? (
+            {/* Resultado — visible desde el primer chunk */}
+            {aiInsights !== null ? (
               <div className="px-5 py-5">
-                <AiInsightsPanel text={aiInsights} />
+                {aiInsights === '' ? (
+                  // Primer token aún no llegó: spinner inline dentro del panel
+                  <div className="flex items-center gap-2" style={{ color: '#8fa8b8' }}>
+                    <span
+                      className="inline-block w-3.5 h-3.5 rounded-full border-2 animate-spin"
+                      style={{ borderColor: '#8fa8b8', borderTopColor: 'transparent' }}
+                    />
+                    <span className="text-[12px]">Generando conclusiones…</span>
+                  </div>
+                ) : (
+                  <AiInsightsPanel text={aiInsights} />
+                )}
               </div>
             ) : (
               <div className="px-5 py-8 text-center">

@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import type { LanzamientoEscenario } from '@/types'
+
+export const maxDuration = 30  // Vercel: extender timeout a 30s
 
 const client = new Anthropic()
 
@@ -26,64 +27,78 @@ export async function POST(req: NextRequest) {
       inversionTotal:  number
       opexPersonalPct: number
       opexGastosPct:   number
-      escenarios:      LanzamientoEscenario[]
+      escenarios:      { params?: Record<string, unknown>; kpis?: Record<string, unknown> }[]
       paybacks:        PaybackInfo[]
     }
 
     const LABELS = ['Pesimista', 'Base', 'Optimista']
 
     const escResumen = escenarios.map((e, i) => {
-      const p  = e.params  as { factorAjustePct?: number; semanasRampa?: number; crecimientoSemanalPct?: number }
-      const k  = e.kpis
+      const p  = e.params  as { factorAjustePct?: number } | undefined
+      const k  = e.kpis   as { unidades_total?: number; ingresos?: number; margen_pct?: number; breakeven_semanas?: number } | undefined
       const pb = paybacks[i]
-      return `
-Escenario ${LABELS[i]}:
-  Sell-through: ${p?.factorAjustePct ?? '—'}% del stock
-  Unidades vendidas (16 sem.): ${k?.unidades_total ?? '—'} uds
-  Ingresos: ${k?.ingresos ? k.ingresos.toLocaleString('es-ES') + '€' : '—'}
-  Margen bruto: ${k?.margen_pct ?? '—'}%
-  Break-even: semana ${k?.breakeven_semanas ?? '—'}
-  EBITDA: ${pb?.ebitdaPct != null ? pb.ebitdaPct.toFixed(1) + '%' : '—'}
-  Payback: ${pb?.paybackMeses != null ? pb.paybackMeses + ' meses' : 'no calculable'}
-  Margen mensual: ${pb?.margenMensual != null ? pb.margenMensual.toLocaleString('es-ES') + '€/mes' : '—'}`
+      return `Escenario ${LABELS[i]}: ST ${p?.factorAjustePct ?? '—'}% · ${k?.unidades_total ?? '—'} uds · ${k?.ingresos ? Math.round(k.ingresos).toLocaleString('es-ES') + '€' : '—'} · MB ${k?.margen_pct ?? '—'}% · break-even sem.${k?.breakeven_semanas ?? '—'} · EBITDA ${pb?.ebitdaPct != null ? pb.ebitdaPct.toFixed(1) + '%' : '—'} · payback ${pb?.paybackMeses != null ? pb.paybackMeses + 'm' : 'n/a'}`
     }).join('\n')
 
     const tipoLabel = { sku: 'SKU nuevo', drop: 'Drop / Edición limitada', marca: 'Marca nueva' }[tipo ?? ''] ?? tipo ?? 'Lanzamiento'
 
-    const prompt = `Eres el asesor de category management de Te Quiero, una cadena de 19 joyerías en Canarias. Analiza este lanzamiento y da conclusiones concretas y directas. El equipo considera viable un payback entre 4 y 6 meses.
+    const prompt = `Eres el asesor de category management de Te Quiero, cadena de 19 joyerías en Canarias. El equipo considera viable un payback entre 4 y 6 meses.
 
 Lanzamiento: "${nombre ?? 'Sin nombre'}" (${tipoLabel})
-Inversión total: ${inversionTotal ? inversionTotal.toLocaleString('es-ES') + '€' : '—'}
-OPEX: personal ${opexPersonalPct}% + gastos ${opexGastosPct}% = ${opexPersonalPct + opexGastosPct}% sobre ventas
+Inversión: ${inversionTotal ? Math.round(inversionTotal).toLocaleString('es-ES') + '€' : '—'} · OPEX: ${opexPersonalPct + opexGastosPct}%
 
 ${escResumen}
 
-Responde en español, de forma directa y accionable. Usa exactamente esta estructura:
+Responde en español, directo y accionable. Estructura exacta (sin introducción):
 
 **¿Vale la pena lanzarlo?**
-Una o dos frases directas sobre la viabilidad basándote en el escenario base y el payback.
+Una o dos frases directas sobre viabilidad basadas en el escenario base y el payback.
 
 **Escenario más probable**
-Cuál de los tres es más realista para joyería en Canarias y por qué. 2-3 frases.
+Cuál de los tres es más realista para joyería en Canarias y por qué.
 
 **Riesgos principales**
-- Riesgo 1 concreto
-- Riesgo 2 concreto
-- Riesgo 3 si aplica
+- Riesgo concreto 1
+- Riesgo concreto 2
+- Riesgo concreto 3 (si aplica)
 
 **Recomendación antes de confirmar**
-Una o dos acciones concretas que el equipo debería revisar o ajustar.`
+Una acción concreta que el equipo debe revisar o ajustar.`
 
-    const message = await client.messages.create({
+    // Streaming: el texto llega al cliente word-by-word
+    const stream = client.messages.stream({
       model:      'claude-haiku-4-5',
-      max_tokens: 700,
+      max_tokens: 500,
       messages:   [{ role: 'user', content: prompt }],
     })
 
-    const insights = message.content[0].type === 'text' ? message.content[0].text : ''
-    return NextResponse.json({ insights })
+    const readable = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        try {
+          for await (const chunk of stream) {
+            if (
+              chunk.type === 'content_block_delta' &&
+              chunk.delta.type === 'text_delta'
+            ) {
+              controller.enqueue(encoder.encode(chunk.delta.text))
+            }
+          }
+        } finally {
+          controller.close()
+        }
+      },
+    })
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type':  'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+      },
+    })
   } catch (err) {
     console.error('[insights] error:', err)
-    return NextResponse.json({ insights: 'Error al generar conclusiones. Inténtalo de nuevo.' }, { status: 500 })
+    return new Response('Error al generar conclusiones. Inténtalo de nuevo.', { status: 500 })
   }
 }
