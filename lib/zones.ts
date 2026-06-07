@@ -53,6 +53,7 @@ export const ZONES: ZoneConfig[] = [
           { label: 'Ciclo de vida',    href: '/analytics/ciclo-vida',    icon: '▣' },
           { label: 'Rentabilidad',     href: '/analytics/rentabilidad',  icon: '▧' },
           { label: 'Stock',            href: '/analytics/stock',         icon: '▥' },
+          { label: 'Red de tiendas',   href: '/tiendas',                 icon: '◫' },
         ],
       },
       {
@@ -92,6 +93,7 @@ export const ZONES: ZoneConfig[] = [
         items: [
           { label: 'Sell-out tiendas', href: '/ventas/sell-out',         icon: '▨' },
           { label: 'Ventas',           href: '/analytics/ventas',        icon: '▧' },
+          { label: 'Red de tiendas',   href: '/tiendas',                 icon: '◫' },
         ],
       },
     ],
@@ -122,6 +124,7 @@ export const ZONES: ZoneConfig[] = [
         label: 'Analítica',
         items: [
           { label: 'Cobertura',        href: '/analytics/stock',         icon: '▥' },
+          { label: 'Red de tiendas',   href: '/tiendas',                 icon: '◫' },
         ],
       },
       {

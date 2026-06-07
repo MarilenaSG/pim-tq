@@ -7,7 +7,7 @@ import {
   BarChart, Bar, Cell,
   PieChart, Pie, Legend,
 } from 'recharts'
-import type { Tienda, TiendaTendencia, TiendaFamilia, TiendaMetal, TiendaTopProducto, TiendaCluster } from '@/types'
+import type { Tienda, TiendaTendencia, TiendaFamilia, TiendaMetal, TiendaTopPorMetal, TiendaCluster } from '@/types'
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -119,21 +119,22 @@ function TendenciaTooltip({ active, payload, label }: {
 // ── Main component ────────────────────────────────────────────
 
 interface Props {
-  tienda:       Tienda
-  tendencia:    TiendaTendencia[]
-  familias:     TiendaFamilia[]
-  metales:      TiendaMetal[]
-  topProductos: TiendaTopProducto[]
+  tienda:    Tienda
+  tendencia: TiendaTendencia[]
+  familias:  TiendaFamilia[]
+  metales:   TiendaMetal[]
+  topOro:    TiendaTopPorMetal[]
+  topPlata:  TiendaTopPorMetal[]
 }
 
-export function TiendaDetailClient({ tienda, tendencia, familias, metales, topProductos }: Props) {
+export function TiendaDetailClient({ tienda, tendencia, familias, metales, topOro, topPlata }: Props) {
   // ── Derived KPIs ──────────────────────────────────────────
   const ingresos12m = tendencia.reduce((s, r) => s + r.ingresos, 0)
   const uds12m      = tendencia.reduce((s, r) => s + r.uds,      0)
   const coste12m    = tendencia.reduce((s, r) => s + r.coste,    0)
   const mb          = ingresos12m > 0 ? (ingresos12m - coste12m) / ingresos12m * 100 : null
   const ticket      = uds12m > 0 ? ingresos12m / uds12m : null
-  const nModelos    = new Set(topProductos.map(p => p.codigo_modelo)).size
+  const nModelos    = new Set([...topOro, ...topPlata].map(p => p.codigo_modelo)).size
 
   // Chart data
   const tendenciaData = tendencia.map(r => ({
@@ -381,70 +382,113 @@ export function TiendaDetailClient({ tienda, tendencia, familias, metales, topPr
         </section>
       </div>
 
-      {/* ── TOP PRODUCTOS ── */}
-      <section>
-        <h2
-          className="text-base font-semibold mb-4"
-          style={{ color: '#00557f', fontFamily: 'inherit' }}
-        >
-          Top productos
-        </h2>
-        {topProductos.length === 0 ? (
-          <div className="tq-table-wrap p-8 text-center" style={{ color: '#8fa8b8' }}>
-            Sin datos de ventas
-          </div>
-        ) : (
-          <div className="tq-table-wrap">
-            <table className="tq-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 36 }}>#</th>
-                  <th>Código</th>
-                  <th>Descripción</th>
-                  <th>Familia</th>
-                  <th>Metal</th>
-                  <th>ABC</th>
-                  <th className="right">Ingresos 12m</th>
-                  <th className="right">Uds</th>
-                  <th className="right">MB%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topProductos.map((p, idx) => (
-                  <tr key={p.codigo_modelo}>
-                    <td style={{ color: '#8fa8b8', fontWeight: 700, fontSize: 12 }}>{idx + 1}</td>
-                    <td>
-                      <Link
-                        href={`/products/${p.codigo_modelo}`}
-                        className="font-mono text-[12px] font-semibold"
-                        style={{ color: '#0099f2' }}
-                      >
-                        {p.codigo_modelo}
-                      </Link>
-                    </td>
-                    <td style={{ color: '#00264d', maxWidth: 200 }}>
-                      <span className="line-clamp-2">{p.description ?? '—'}</span>
-                    </td>
-                    <td style={{ color: '#5a7a8a' }}>{p.familia ?? '—'}</td>
-                    <td style={{ color: '#5a7a8a' }}>{p.metal ?? '—'}</td>
-                    <td><AbcBadge abc={p.abc_ventas} /></td>
-                    <td className="text-right font-mono tabular-nums" style={{ color: '#00264d' }}>
-                      {fmtEuro(p.ingresos)}
-                    </td>
-                    <td className="text-right font-mono tabular-nums" style={{ color: '#5a7a8a' }}>
-                      {p.uds.toLocaleString('es-ES')}
-                    </td>
-                    <td className="text-right font-semibold" style={{ color: mbColor(p.mb_pct) }}>
-                      {p.mb_pct != null ? `${p.mb_pct.toFixed(1)}%` : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      {/* ── TOP ORO / TOP PLATA ── */}
+      <div className="grid grid-cols-2 gap-6">
+        <TopMetalTable
+          titulo="Top Oro"
+          color="#c8a164"
+          bgColor="rgba(200,161,100,0.08)"
+          productos={topOro}
+        />
+        <TopMetalTable
+          titulo="Top Plata"
+          color="#5a7a8a"
+          bgColor="rgba(90,122,138,0.08)"
+          productos={topPlata}
+        />
+      </div>
 
     </div>
+  )
+}
+
+// ── Top por metal: tabla reutilizable ─────────────────────────
+
+function TopMetalTable({
+  titulo,
+  color,
+  bgColor,
+  productos,
+}: {
+  titulo:   string
+  color:    string
+  bgColor:  string
+  productos: TiendaTopPorMetal[]
+}) {
+  return (
+    <section>
+      <div className="flex items-center gap-2 mb-4">
+        <span
+          className="w-2.5 h-2.5 rounded-full shrink-0"
+          style={{ background: color }}
+        />
+        <h2 className="text-base font-semibold" style={{ color: '#00557f' }}>
+          {titulo}
+        </h2>
+        <span
+          className="text-[10px] font-semibold px-2 py-0.5 rounded-full ml-auto"
+          style={{ background: bgColor, color }}
+        >
+          por unidades
+        </span>
+      </div>
+
+      {productos.length === 0 ? (
+        <div
+          className="rounded-xl p-8 text-center text-sm"
+          style={{ background: bgColor, color: '#8fa8b8' }}
+        >
+          Sin ventas en los últimos 12 meses
+        </div>
+      ) : (
+        <div className="tq-table-wrap">
+          <table className="tq-table">
+            <thead>
+              <tr>
+                <th style={{ width: 28 }}>#</th>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th>Familia</th>
+                <th>Kt</th>
+                <th>ABC</th>
+                <th className="right">Uds</th>
+                <th className="right">MB%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productos.map((p, idx) => (
+                <tr key={p.codigo_modelo}>
+                  <td style={{ color: '#8fa8b8', fontWeight: 700, fontSize: 11 }}>{idx + 1}</td>
+                  <td>
+                    <Link
+                      href={`/products/${p.codigo_modelo}`}
+                      className="font-mono text-[12px] font-semibold"
+                      style={{ color: '#0099f2' }}
+                    >
+                      {p.codigo_modelo}
+                    </Link>
+                  </td>
+                  <td style={{ color: '#00264d', maxWidth: 160 }}>
+                    <span className="line-clamp-2 text-[12px]">{p.description ?? '—'}</span>
+                  </td>
+                  <td style={{ color: '#5a7a8a', fontSize: 12 }}>{p.familia ?? '—'}</td>
+                  <td style={{ color: '#8fa8b8', fontSize: 11 }}>{p.karat ?? '—'}</td>
+                  <td><AbcBadge abc={p.abc_ventas} /></td>
+                  <td
+                    className="text-right font-mono tabular-nums font-semibold"
+                    style={{ color }}
+                  >
+                    {p.uds.toLocaleString('es-ES')}
+                  </td>
+                  <td className="text-right font-semibold" style={{ color: mbColor(p.mb_pct) }}>
+                    {p.mb_pct != null ? `${p.mb_pct.toFixed(1)}%` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   )
 }

@@ -482,3 +482,15 @@ export interface TiendaTopProducto {
   coste:         number
   mb_pct:        number | null
 }
+
+export interface TiendaTopPorMetal {
+  codigo_modelo: string
+  description:   string | null
+  familia:       string | null
+  karat:         string | null
+  abc_ventas:    string | null
+  uds:           number
+  ingresos:      number
+  coste:         number
+  mb_pct:        number | null
+}
