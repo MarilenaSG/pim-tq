@@ -6,6 +6,7 @@ import { PasoDistribucion } from '@/components/lanzamiento/PasoDistribucion'
 import { PasoReferencia }   from '@/components/lanzamiento/PasoReferencia'
 import { PasoCurva }        from '@/components/lanzamiento/PasoCurva'
 import { PasoCampana }      from '@/components/lanzamiento/PasoCampana'
+import { PasoSimulador }    from '@/components/lanzamiento/PasoSimulador'
 import type { Lanzamiento } from '@/types'
 
 export default async function WizardStepPage({
@@ -60,20 +61,6 @@ export default async function WizardStepPage({
     return <PasoCampana lanzamiento={lanzamiento} />
   }
 
-  // Paso 7 — se construye en sesión 4
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-      <div className="text-4xl opacity-30">🚧</div>
-      <p className="text-sm font-semibold" style={{ color: '#8fa8b8' }}>
-        Paso 7 — Simulador final · próximamente en sesión 4
-      </p>
-      <a
-        href={`/lanzamiento/${params.id}/paso/6`}
-        className="text-sm underline"
-        style={{ color: '#0099f2' }}
-      >
-        ← Volver al paso 6
-      </a>
-    </div>
-  )
+  // Paso 7 — Simulador final
+  return <PasoSimulador lanzamiento={lanzamiento} />
 }
