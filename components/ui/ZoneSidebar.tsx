@@ -39,6 +39,7 @@ const NAV = [
     label: 'Stock',
     items: [
       { label: 'Stock',             href: '/stock',               icon: '▥' },
+      { label: 'Proveedores',       href: '/suppliers',           icon: '◇' },
     ],
   },
   {
