@@ -368,16 +368,26 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
           </div>
         ) : (
           <table className="text-sm border-collapse" style={{ minWidth: '100%' }}>
-            <thead className="sticky top-0 z-10">
-              <tr style={{ background: '#00557f' }}>
+            {/*
+              Sticky header: z-index en cada <th>, NO en <thead>.
+              Si se pone z-index en <thead> se crea un stacking context aislado
+              que impide que los <th> queden por encima de las <td> sticky del body.
+              Jerarquía:
+                body td sticky-left  → z-[10]
+                thead th normal       → z-[20]  (top-0 + explicit bg)
+                thead th sticky-left  → z-[30]  (top-0 + left + explicit bg)
+            */}
+            <thead>
+              <tr>
+                {/* Esquina: sticky top + left → z más alto */}
                 <th
-                  className="text-left px-3 py-2.5 text-xs font-semibold text-white whitespace-nowrap sticky left-0 z-20"
+                  className="text-left px-3 py-2.5 text-xs font-semibold text-white whitespace-nowrap sticky top-0 left-0 z-[30]"
                   style={{ background: '#00557f', minWidth: 110 }}
                 >
                   Modelo
                 </th>
                 <th
-                  className="text-left px-3 py-2.5 text-xs font-semibold text-white sticky z-20"
+                  className="text-left px-3 py-2.5 text-xs font-semibold text-white sticky top-0 z-[30]"
                   style={{
                     background: '#00557f',
                     minWidth: 240,
@@ -390,8 +400,8 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
                 {fieldDefs.map(f => (
                   <th
                     key={f.field_key}
-                    className="text-left px-3 py-2.5 text-xs font-semibold text-white whitespace-nowrap"
-                    style={{ minWidth: 190 }}
+                    className="text-left px-3 py-2.5 text-xs font-semibold text-white whitespace-nowrap sticky top-0 z-[20]"
+                    style={{ background: '#00557f', minWidth: 190 }}
                   >
                     {f.label}
                     <span className="ml-1.5 text-[9px] font-normal opacity-50">{f.field_type}</span>
@@ -400,15 +410,17 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
               </tr>
             </thead>
             <tbody>
-              {visibleRows.map((row, i) => (
+              {visibleRows.map((row, i) => {
+                const rowBg = i % 2 === 0 ? '#ffffff' : 'rgba(0,85,127,0.025)'
+                return (
                 <tr
                   key={row.codigo_modelo}
-                  style={{ background: i % 2 === 0 ? 'white' : 'rgba(0,85,127,0.025)' }}
+                  style={{ background: rowBg }}
                   className="hover:bg-sky-50/50 group"
                 >
                   <td
-                    className="px-3 py-1.5 sticky left-0 z-10 whitespace-nowrap"
-                    style={{ background: 'inherit', minWidth: 110 }}
+                    className="px-3 py-1.5 sticky left-0 z-[10] whitespace-nowrap"
+                    style={{ background: rowBg, minWidth: 110 }}
                   >
                     <div className="flex flex-col gap-0.5">
                       <Link
@@ -428,9 +440,9 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
                     </div>
                   </td>
                   <td
-                    className="px-3 py-1.5 sticky z-10"
+                    className="px-3 py-1.5 sticky z-[10]"
                     style={{
-                      background: 'inherit',
+                      background: rowBg,
                       minWidth: 240,
                       left: 110,
                       borderRight: '1px solid rgba(0,85,127,0.08)',
@@ -452,7 +464,7 @@ export function BatchCustomFieldsTable({ fieldDefs, initialRows, filterOptions }
                     )
                   })}
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         )}
