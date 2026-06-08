@@ -1,6 +1,8 @@
 -- Migración 034: añade coste_total a ventas_evolucion
 -- Necesario para calcular MB% acumulado en el dashboard de ventas.
 
+DROP FUNCTION IF EXISTS ventas_evolucion(integer, integer, integer, integer);
+
 CREATE OR REPLACE FUNCTION ventas_evolucion(
   p_anyo_desde integer, p_mes_desde integer,
   p_anyo_hasta integer, p_mes_hasta integer
