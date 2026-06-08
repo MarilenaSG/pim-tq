@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
+  LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts'
-import type { VentasSummary } from '@/app/api/ventas/summary/route'
+import type { VentasSummary, Periodo } from '@/app/api/ventas/summary/route'
 import type { VentasPorModelo } from '@/app/api/ventas/por-modelo/route'
 
 const TQ_BLUE  = '#00557f'
@@ -27,6 +28,111 @@ function fmtPrecio(n: number) {
 function pctChange(curr: number, prev: number) {
   if (!prev) return null
   return Math.round(((curr - prev) / prev) * 100)
+}
+
+// ── Periodo config ────────────────────────────────────────────────────────────
+
+const PERIODOS: { key: Periodo; label: string; short: string }[] = [
+  { key: '12m', label: 'Últimos 12M', short: 'últ. 12m' },
+  { key: 'ytd', label: 'YTD',         short: 'YTD'      },
+  { key: 'mtd', label: 'MTD',         short: 'MTD'      },
+]
+
+function filterEvolucion(evolucion: VentasSummary['evolucion'], periodo: Periodo) {
+  const now    = new Date()
+  const curAnyo = now.getFullYear()
+  const curMes  = now.getMonth() + 1
+  switch (periodo) {
+    case 'ytd': return evolucion.filter(p => p.anyo === curAnyo)
+    case 'mtd': return evolucion.slice(-6)  // últimos 6 meses de contexto
+    default:    return evolucion.slice(-12) // 12m
+  }
+}
+
+function periodoTotals(evolucion: VentasSummary['evolucion'], periodo: Periodo) {
+  const now     = new Date()
+  const curAnyo = now.getFullYear()
+  const curMes  = now.getMonth() + 1
+  let rows: typeof evolucion
+  switch (periodo) {
+    case 'ytd': rows = evolucion.filter(p => p.anyo === curAnyo); break
+    case 'mtd': rows = evolucion.filter(p => p.anyo === curAnyo && p.mes === curMes); break
+    default:    rows = evolucion.slice(-12)
+  }
+  const ing = rows.reduce((s, r) => s + r.ingresos, 0)
+  const uds = rows.reduce((s, r) => s + r.unidades, 0)
+  return { ingresos: ing, unidades: uds, ticket: uds > 0 ? ing / uds : 0 }
+}
+
+type CumulMetric = 'ingresos' | 'margen' | 'ticket' | 'unidades'
+
+const CUMUL_CONFIG: Record<CumulMetric, { label: string; color: string; fmt: (v: number) => string }> = {
+  ingresos: { label: '€ Ingresos',   color: TQ_BLUE,    fmt: fmtEur     },
+  margen:   { label: 'MB%',          color: '#7B5EA7',  fmt: v => `${v.toFixed(1)}%` },
+  ticket:   { label: 'Ticket medio', color: TQ_GREEN,   fmt: fmtPrecio  },
+  unidades: { label: 'Unidades',     color: TQ_GOLD,    fmt: v => v.toLocaleString('es-ES') },
+}
+
+// Calcula series acumuladas + % crecimiento vs año anterior
+function buildCumulativeData(
+  evolucion: VentasSummary['evolucion'],
+  periodo:   Periodo,
+  metric:    CumulMetric,
+) {
+  const now     = new Date()
+  const curAnyo = now.getFullYear()
+  const curMes  = now.getMonth() + 1
+
+  let currentRows: typeof evolucion
+  switch (periodo) {
+    case 'ytd': currentRows = evolucion.filter(p => p.anyo === curAnyo); break
+    case 'mtd': currentRows = evolucion.filter(p => p.anyo === curAnyo && p.mes === curMes); break
+    default:    currentRows = evolucion.slice(-12)
+  }
+
+  const prevRows = currentRows.map(r =>
+    evolucion.find(e => e.anyo === r.anyo - 1 && e.mes === r.mes) ?? null
+  )
+
+  let cumActIng = 0, cumActUds = 0, cumActCost = 0
+  let cumAntIng = 0, cumAntUds = 0, cumAntCost = 0
+
+  return currentRows.map((r, i) => {
+    cumActIng  += r.ingresos
+    cumActUds  += r.unidades
+    cumActCost += r.coste
+    const prev  = prevRows[i]
+    cumAntIng  += prev?.ingresos ?? 0
+    cumAntUds  += prev?.unidades ?? 0
+    cumAntCost += prev?.coste    ?? 0
+
+    let actual: number
+    let anterior: number
+    switch (metric) {
+      case 'margen':
+        actual   = cumActIng > 0 ? Math.round((cumActIng - cumActCost) / cumActIng * 1000) / 10 : 0
+        anterior = cumAntIng > 0 ? Math.round((cumAntIng - cumAntCost) / cumAntIng * 1000) / 10 : 0
+        break
+      case 'ticket':
+        actual   = cumActUds > 0 ? Math.round(cumActIng / cumActUds * 100) / 100 : 0
+        anterior = cumAntUds > 0 ? Math.round(cumAntIng / cumAntUds * 100) / 100 : 0
+        break
+      case 'unidades':
+        actual   = cumActUds
+        anterior = cumAntUds
+        break
+      default: // ingresos
+        actual   = cumActIng
+        anterior = cumAntIng
+    }
+
+    // Crecimiento %: variación relativa vs año anterior
+    const crecimiento = anterior > 0
+      ? Math.round((actual - anterior) / Math.abs(anterior) * 1000) / 10
+      : null
+
+    return { label: r.label, actual, anterior, crecimiento }
+  })
 }
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -95,14 +201,233 @@ function Empty({ text }: { text: string }) {
   )
 }
 
+// ── Cumulative line chart ─────────────────────────────────────────────────────
+
+const GROWTH_COLOR = '#C0392B'  // rojo si negativo, verde si positivo — se aplica en tooltip
+const GROWTH_LINE  = '#8fa8b8'  // línea neutra para el crecimiento %
+
+function CumulativeChart({
+  evolucion, periodo, curAnyo,
+}: {
+  evolucion: VentasSummary['evolucion']
+  periodo:   Periodo
+  curAnyo:   number
+}) {
+  const [metric, setMetric] = useState<CumulMetric>('ingresos')
+
+  const data = useMemo(
+    () => buildCumulativeData(evolucion, periodo, metric),
+    [evolucion, periodo, metric],
+  )
+
+  const hasData = data.some(d => d.actual > 0 || d.anterior > 0)
+  if (!hasData) return null
+
+  const cc           = CUMUL_CONFIG[metric]
+  const periodoShort = PERIODOS.find(p => p.key === periodo)?.short ?? periodo
+
+  const leftFmt = (v: number) => {
+    if (metric === 'ingresos') return v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)
+    if (metric === 'margen' || metric === 'ticket') return `${v.toFixed(0)}`
+    return v.toLocaleString('es-ES')
+  }
+
+  return (
+    <div className="tq-card p-5">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: TQ_BLUE }}>
+            Acumulado — {periodoShort}
+            <span className="ml-2 normal-case font-normal text-[#b2b2b2]">vs año anterior</span>
+          </h2>
+          {/* Leyenda inline */}
+          <div className="flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-4 h-[2.5px] rounded" style={{ background: cc.color }} />
+              <span style={{ color: '#5a7a8a' }}>{curAnyo}</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <svg width="16" height="3" viewBox="0 0 16 3">
+                <line x1="0" y1="1.5" x2="3" y2="1.5" stroke="#b2b2b2" strokeWidth="1.5"/>
+                <line x1="5" y1="1.5" x2="8" y2="1.5" stroke="#b2b2b2" strokeWidth="1.5"/>
+                <line x1="10" y1="1.5" x2="13" y2="1.5" stroke="#b2b2b2" strokeWidth="1.5"/>
+              </svg>
+              <span style={{ color: '#b2b2b2' }}>{curAnyo - 1}</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-4 h-[1.5px]" style={{ background: GROWTH_LINE }} />
+              <span style={{ color: '#8fa8b8' }}>var.%</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Metric toggle */}
+        <div className="flex border border-[#e8e3df] rounded-lg overflow-hidden text-xs">
+          {(Object.keys(CUMUL_CONFIG) as CumulMetric[]).map(m => {
+            const cfg    = CUMUL_CONFIG[m]
+            const active = metric === m
+            return (
+              <button key={m} onClick={() => setMetric(m)}
+                className="px-3 py-1.5 transition-colors"
+                style={{
+                  background: active ? `${cfg.color}14` : 'white',
+                  color:      active ? cfg.color : '#b2b2b2',
+                  fontWeight: active ? 700 : 400,
+                }}
+              >
+                {cfg.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Chart */}
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={data} margin={{ top: 4, right: 48, left: 8, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0ece8" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 10, fill: '#b2b2b2' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          {/* Eje izquierdo: valores acumulados */}
+          <YAxis
+            yAxisId="left"
+            tick={{ fontSize: 10, fill: '#b2b2b2' }}
+            axisLine={false}
+            tickLine={false}
+            width={metric === 'unidades' ? 36 : 48}
+            tickFormatter={leftFmt}
+          />
+          {/* Eje derecho: crecimiento % */}
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tick={{ fontSize: 10, fill: '#8fa8b8' }}
+            axisLine={false}
+            tickLine={false}
+            width={36}
+            tickFormatter={v => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`}
+          />
+          <Tooltip
+            contentStyle={{ fontSize: 12, border: '1px solid #e8e3df', borderRadius: 8 }}
+            formatter={(v: unknown, name?: string | number) => {
+              const n    = Number(v ?? 0)
+              const sKey = String(name ?? '')
+              if (sKey === 'crecimiento') {
+                const color = n >= 0 ? '#3A9E6A' : '#C0392B'
+                return [
+                  <span key="g" style={{ color }}>{n > 0 ? '+' : ''}{n.toFixed(1)}%</span>,
+                  'Crecimiento',
+                ]
+              }
+              return [cc.fmt(n), sKey === 'actual' ? String(curAnyo) : String(curAnyo - 1)]
+            }}
+          />
+          {/* Línea año actual */}
+          <Line
+            yAxisId="left"
+            type="monotone"
+            dataKey="actual"
+            stroke={cc.color}
+            strokeWidth={2.5}
+            dot={false}
+            activeDot={{ r: 4, fill: cc.color }}
+            isAnimationActive={false}
+          />
+          {/* Línea año anterior */}
+          <Line
+            yAxisId="left"
+            type="monotone"
+            dataKey="anterior"
+            stroke="#c8c0b8"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            dot={false}
+            activeDot={{ r: 3, fill: '#c8c0b8' }}
+            isAnimationActive={false}
+          />
+          {/* Línea crecimiento % (eje derecho) */}
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="crecimiento"
+            stroke={GROWTH_LINE}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: GROWTH_LINE }}
+            isAnimationActive={false}
+            connectNulls={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ── Periodo selector ──────────────────────────────────────────────────────────
+
+function PeriodoSelector({ value, onChange, loading }: {
+  value: Periodo; onChange: (p: Periodo) => void; loading: boolean
+}) {
+  return (
+    <div className="flex gap-1 rounded-lg p-1 w-fit" style={{ background: 'rgba(0,85,127,0.06)' }}>
+      {PERIODOS.map(p => (
+        <button
+          key={p.key}
+          onClick={() => onChange(p.key)}
+          disabled={loading}
+          className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+          style={{
+            background: value === p.key ? 'white' : 'transparent',
+            color:      value === p.key ? TQ_BLUE : '#8fa8b8',
+            boxShadow:  value === p.key ? '0 1px 3px rgba(0,85,127,0.12)' : 'none',
+            opacity:    loading ? 0.6 : 1,
+          }}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ── Tab: Resumen ──────────────────────────────────────────────────────────────
 
-function TabResumen({ data }: { data: VentasSummary }) {
-  const [metric, setMetric] = useState<'ingresos' | 'unidades'>('ingresos')
+type Metric = 'ingresos' | 'unidades' | 'ticket'
+
+const METRIC_CONFIG: Record<Metric, { label: string; color: string; gradId: string; fmt: (v: number) => string }> = {
+  ingresos: { label: '€ Ingresos',    color: TQ_BLUE,  gradId: 'vg-ing', fmt: fmtEur   },
+  unidades: { label: 'Unidades',      color: TQ_GOLD,  gradId: 'vg-uds', fmt: v => v.toLocaleString('es-ES') },
+  ticket:   { label: 'Ticket medio',  color: TQ_GREEN, gradId: 'vg-tkt', fmt: fmtPrecio },
+}
+
+function TabResumen({
+  data, periodo, onPeriodo, loading,
+}: {
+  data: VentasSummary
+  periodo: Periodo
+  onPeriodo: (p: Periodo) => void
+  loading: boolean
+}) {
+  const [metric, setMetric] = useState<Metric>('ingresos')
+
   const MESES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
   const ytdChange   = pctChange(data.ytd_ingresos, data.prev_ingresos / 12 * data.ytd_meses)
   const lastMChange = pctChange(data.last_ingresos, data.lm_prev_ingresos)
+
+  const now     = new Date()
+  const curAnyo = now.getFullYear()
+
+  const chartData = useMemo(() => filterEvolucion(data.evolucion, periodo), [data.evolucion, periodo])
+  const totals    = useMemo(() => periodoTotals(data.evolucion, periodo),   [data.evolucion, periodo])
+
+  const periodoShort = PERIODOS.find(p => p.key === periodo)?.short ?? periodo
+  const mc = METRIC_CONFIG[metric]
 
   return (
     <div className="space-y-5">
@@ -137,63 +462,124 @@ function TabResumen({ data }: { data: VentasSummary }) {
         />
       </div>
 
-      {/* Evolución mensual */}
+      {/* ── Selector de periodo + totals del periodo ── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <PeriodoSelector value={periodo} onChange={onPeriodo} loading={loading} />
+        <div className="flex items-center gap-4 text-xs">
+          <span style={{ color: '#8fa8b8' }}>
+            <span className="font-semibold" style={{ color: TQ_BLUE }}>{fmtEur(totals.ingresos)}</span>
+            {' '}ingresos
+          </span>
+          <span style={{ color: '#8fa8b8' }}>
+            <span className="font-semibold" style={{ color: TQ_GOLD }}>{totals.unidades.toLocaleString('es-ES')}</span>
+            {' '}uds
+          </span>
+          <span style={{ color: '#8fa8b8' }}>
+            ticket{' '}
+            <span className="font-semibold" style={{ color: TQ_GREEN }}>
+              {totals.ticket > 0 ? fmtPrecio(totals.ticket) : '—'}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      {/* Evolución */}
       <div className="tq-card p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-[#00557f]">
-            Evolución mensual — últimos 18 meses
+          <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: TQ_BLUE }}>
+            Evolución — {periodoShort}
+            {periodo === 'mtd' && (
+              <span className="ml-2 normal-case font-normal text-[#b2b2b2]">
+                (datos mensuales · últimos 6 meses)
+              </span>
+            )}
           </h2>
+          {/* Metric selector */}
           <div className="flex border border-[#e8e3df] rounded-lg overflow-hidden text-xs">
-            {(['ingresos', 'unidades'] as const).map(m => (
-              <button key={m} onClick={() => setMetric(m)}
-                className="px-3 py-1.5 transition-colors"
-                style={{
-                  background: metric === m ? (m === 'ingresos' ? '#e8f4fb' : '#fdf3e4') : 'white',
-                  color:      metric === m ? (m === 'ingresos' ? TQ_BLUE : TQ_GOLD) : '#b2b2b2',
-                  fontWeight: metric === m ? 700 : 400,
-                }}
-              >
-                {m === 'ingresos' ? '€ Ingresos' : 'Uds.'}
-              </button>
-            ))}
+            {(Object.keys(METRIC_CONFIG) as Metric[]).map(m => {
+              const cfg = METRIC_CONFIG[m]
+              const active = metric === m
+              return (
+                <button key={m} onClick={() => setMetric(m)}
+                  className="px-3 py-1.5 transition-colors"
+                  style={{
+                    background: active ? `${cfg.color}14` : 'white',
+                    color:      active ? cfg.color : '#b2b2b2',
+                    fontWeight: active ? 700 : 400,
+                  }}
+                >
+                  {cfg.label}
+                </button>
+              )
+            })}
           </div>
         </div>
+
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={data.evolucion} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
             <defs>
               <linearGradient id="vg-ing" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor={TQ_BLUE} stopOpacity={0.15} />
-                <stop offset="95%" stopColor={TQ_BLUE} stopOpacity={0} />
+                <stop offset="5%"  stopColor={TQ_BLUE}  stopOpacity={0.15} />
+                <stop offset="95%" stopColor={TQ_BLUE}  stopOpacity={0}    />
               </linearGradient>
               <linearGradient id="vg-uds" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor={TQ_GOLD} stopOpacity={0.15} />
-                <stop offset="95%" stopColor={TQ_GOLD} stopOpacity={0} />
+                <stop offset="5%"  stopColor={TQ_GOLD}  stopOpacity={0.15} />
+                <stop offset="95%" stopColor={TQ_GOLD}  stopOpacity={0}    />
+              </linearGradient>
+              <linearGradient id="vg-tkt" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor={TQ_GREEN} stopOpacity={0.15} />
+                <stop offset="95%" stopColor={TQ_GREEN} stopOpacity={0}    />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0ece8" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#b2b2b2' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#b2b2b2' }} axisLine={false} tickLine={false} width={42}
-              tickFormatter={v => metric === 'ingresos' ? `${(v / 1000).toFixed(0)}K` : String(v)} />
-            <Tooltip
-              contentStyle={{ fontSize: 12, border: '1px solid #e8e3df', borderRadius: 8 }}
-              formatter={(v) => {
-                const n = Number(v ?? 0)
-                return metric === 'ingresos'
-                  ? [n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }), 'Ingresos']
-                  : [n.toLocaleString('es-ES'), 'Unidades']
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 10, fill: '#b2b2b2' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 10, fill: '#b2b2b2' }}
+              axisLine={false}
+              tickLine={false}
+              width={metric === 'unidades' ? 36 : 48}
+              tickFormatter={v => {
+                if (metric === 'ingresos') return `${(v / 1000).toFixed(0)}K`
+                if (metric === 'ticket')   return `${v.toFixed(0)}€`
+                return String(v)
               }}
             />
-            <Area type="monotone" dataKey={metric} stroke={metric === 'ingresos' ? TQ_BLUE : TQ_GOLD}
-              strokeWidth={2} fill={`url(#vg-${metric === 'ingresos' ? 'ing' : 'uds'})`}
-              dot={false} activeDot={{ r: 4 }} />
+            <Tooltip
+              contentStyle={{ fontSize: 12, border: '1px solid #e8e3df', borderRadius: 8 }}
+              formatter={(v) => [mc.fmt(Number(v ?? 0)), mc.label]}
+            />
+            <Area
+              type="monotone"
+              dataKey={metric}
+              stroke={mc.color}
+              strokeWidth={2}
+              fill={`url(#${mc.gradId})`}
+              dot={false}
+              activeDot={{ r: 4 }}
+              isAnimationActive={false}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
+      {/* Acumulado con comparativa año anterior */}
+      <CumulativeChart
+        evolucion={data.evolucion}
+        periodo={periodo}
+        curAnyo={curAnyo}
+      />
+
       {/* Top modelos + Familias */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="tq-card p-5">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-[#00557f] mb-3">Top 10 referencias · 12m</h2>
+          <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: TQ_BLUE }}>
+            Top 10 referencias · {periodoShort}
+          </h2>
           <div className="space-y-2">
             {data.top_modelos.map((m, i) => {
               const maxIng = data.top_modelos[0]?.ingresos_12m ?? 1
@@ -203,11 +589,17 @@ function TabResumen({ data }: { data: VentasSummary }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="text-xs font-semibold text-[#1d1d1b] truncate">{m.description ?? m.codigo_modelo}</p>
-                      <p className="text-xs font-bold text-[#00557f] flex-shrink-0">{fmtEur(m.ingresos_12m)}</p>
+                      <p className="text-xs font-bold flex-shrink-0" style={{ color: TQ_BLUE }}>{fmtEur(m.ingresos_12m)}</p>
                     </div>
                     <div className="h-1 rounded-full mt-1 bg-[#f0ece8]">
-                      <div className="h-1 rounded-full"
-                        style={{ width: `${Math.round((m.ingresos_12m / maxIng) * 100)}%`, background: TQ_BLUE, opacity: 0.55 + i * -0.04 }} />
+                      <div
+                        className="h-1 rounded-full"
+                        style={{
+                          width:      `${Math.round((m.ingresos_12m / maxIng) * 100)}%`,
+                          background: TQ_BLUE,
+                          opacity:    0.55 - i * 0.03,
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -217,7 +609,9 @@ function TabResumen({ data }: { data: VentasSummary }) {
         </div>
 
         <div className="tq-card p-5">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-[#00557f] mb-3">Ingresos por familia · 12m</h2>
+          <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: TQ_BLUE }}>
+            Ingresos por familia · {periodoShort}
+          </h2>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={data.por_familia} layout="vertical" margin={{ top: 0, right: 60, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0ece8" horizontal={false} />
@@ -247,13 +641,13 @@ function TabResumen({ data }: { data: VentasSummary }) {
 // ── Tab: Por modelo ───────────────────────────────────────────────────────────
 
 function TabPorModelo() {
-  const [rows, setRows]       = useState<VentasPorModelo[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
-  const [familia, setFamilia] = useState('all')
-  const [metal, setMetal]     = useState('all')
-  const [order, setOrder]     = useState<'ingresos' | 'unidades' | 'variacion'>('ingresos')
-  const [search, setSearch]   = useState('')
+  const [rows, setRows]         = useState<VentasPorModelo[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [familia, setFamilia]   = useState('all')
+  const [metal, setMetal]       = useState('all')
+  const [order, setOrder]       = useState<'ingresos' | 'unidades' | 'variacion'>('ingresos')
+  const [search, setSearch]     = useState('')
   const [familias, setFamilias] = useState<string[]>([])
   const [metales,  setMetales]  = useState<string[]>([])
   const firstLoad = useRef(true)
@@ -297,7 +691,6 @@ function TabPorModelo() {
 
   return (
     <div className="space-y-4">
-      {/* Filters + totals */}
       <div className="flex flex-wrap items-center gap-3">
         <input type="text" placeholder="Buscar modelo…" value={search} onChange={e => setSearch(e.target.value)}
           className="border border-[#e8e3df] rounded-lg px-3 py-2 text-sm bg-white w-48" />
@@ -319,9 +712,9 @@ function TabPorModelo() {
         </select>
         {!loading && !error && (
           <span className="ml-auto text-xs text-[#b2b2b2]">
-            <b className="text-[#00557f]">{fmtEur(totalIngresos)}</b>
+            <b style={{ color: TQ_BLUE }}>{fmtEur(totalIngresos)}</b>
             {' · '}
-            <b className="text-[#C8842A]">{totalUnidades.toLocaleString('es-ES')} uds</b>
+            <b style={{ color: TQ_GOLD }}>{totalUnidades.toLocaleString('es-ES')} uds</b>
             {' · '}
             {filtered.length} referencias
           </span>
@@ -405,22 +798,25 @@ function TabPorModelo() {
 type Tab = 'resumen' | 'modelos'
 
 export default function VentasDashboardClient() {
-  const [tab, setTab]       = useState<Tab>('resumen')
-  const [summary, setSummary]   = useState<VentasSummary | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
+  const [tab,     setTab]     = useState<Tab>('resumen')
+  const [periodo, setPeriodo] = useState<Periodo>('12m')
+  const [summary, setSummary] = useState<VentasSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/ventas/summary')
+    setLoading(true)
+    setError(null)
+    fetch(`/api/ventas/summary?periodo=${periodo}`)
       .then(r => r.ok ? r.json() : r.json().then((e: { error: string }) => Promise.reject(e.error)))
       .then(setSummary)
       .catch(e => setError(typeof e === 'string' ? e : 'Error cargando datos'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [periodo])
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'resumen',  label: 'Resumen' },
-    { key: 'modelos',  label: 'Por modelo' },
+    { key: 'resumen', label: 'Resumen'    },
+    { key: 'modelos', label: 'Por modelo' },
   ]
 
   return (
@@ -443,14 +839,18 @@ export default function VentasDashboardClient() {
         ))}
       </div>
 
-      {/* Tab content */}
       {tab === 'resumen' && (
-        loading ? (
+        loading && !summary ? (
           <div className="flex items-center justify-center py-24 text-[#b2b2b2] text-sm">Cargando…</div>
         ) : error ? (
           <ErrorBox msg={error} />
         ) : summary ? (
-          <TabResumen data={summary} />
+          <TabResumen
+            data={summary}
+            periodo={periodo}
+            onPeriodo={setPeriodo}
+            loading={loading}
+          />
         ) : null
       )}
 

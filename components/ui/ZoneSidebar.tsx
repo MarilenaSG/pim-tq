@@ -46,6 +46,7 @@ const NAV = [
   {
     label: 'Tiendas',
     items: [
+      { label: 'Red de tiendas',    href: '/tiendas',             icon: '◫' },
       { label: 'Boletín',           href: '/tiendas/boletin',     icon: '◫' },
       { label: 'Catálogo',          href: '/tiendas/catalogo',    icon: '◻' },
     ],

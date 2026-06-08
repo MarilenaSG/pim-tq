@@ -1,19 +1,30 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 
+export type Periodo = '12m' | 'ytd' | 'mtd'
+
 export interface VentasSummary {
-  ytd_ingresos:    number
-  ytd_unidades:    number
-  ytd_meses:       number
-  prev_ingresos:   number
-  prev_unidades:   number
-  last_anyo:       number
-  last_mes:        number
-  last_ingresos:   number
-  last_unidades:   number
+  periodo:          Periodo
+  ytd_ingresos:     number
+  ytd_unidades:     number
+  ytd_meses:        number
+  prev_ingresos:    number
+  prev_unidades:    number
+  last_anyo:        number
+  last_mes:         number
+  last_ingresos:    number
+  last_unidades:    number
   lm_prev_ingresos: number
   lm_prev_unidades: number
-  evolucion: { label: string; anyo: number; mes: number; ingresos: number; unidades: number }[]
+  evolucion: {
+    label:    string
+    anyo:     number
+    mes:      number
+    ingresos: number
+    unidades: number
+    coste:    number
+    ticket:   number
+  }[]
   top_modelos: { codigo_modelo: string; description: string | null; ingresos_12m: number; unidades_12m: number }[]
   por_familia: { familia: string; ingresos: number; unidades: number; pct_ingresos: number }[]
 }
@@ -26,7 +37,18 @@ function periodoAtras(curAnyo: number, curMes: number, meses: number) {
   return { anyo: a, mes: m }
 }
 
-export async function GET() {
+function cutFromPeriodo(periodo: Periodo, curAnyo: number, curMes: number) {
+  switch (periodo) {
+    case 'ytd': return { anyo: curAnyo, mes: 1 }
+    case 'mtd': return { anyo: curAnyo, mes: curMes }
+    default:    return periodoAtras(curAnyo, curMes, 11) // 12m
+  }
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const periodo = (searchParams.get('periodo') ?? '12m') as Periodo
+
   const supabase = createServerClient()
 
   const now      = new Date()
@@ -34,13 +56,12 @@ export async function GET() {
   const curMes   = now.getMonth() + 1
   const prevAnyo = curAnyo - 1
 
-  // Ventana de 18 meses hacia atrás desde hoy
-  const evo18start = periodoAtras(curAnyo, curMes, 17)  // 18 meses incl. el actual
+  const cutFrom  = cutFromPeriodo(periodo, curAnyo, curMes)
+  const cutTo    = { anyo: curAnyo, mes: curMes }
 
-  // Ventana 12m para top modelos y familias
-  const cut12 = periodoAtras(curAnyo, curMes, 11)
+  // Evolucion 30 meses — 12 meses extra para la línea comparativa año anterior
+  const evo30start = periodoAtras(curAnyo, curMes, 29)
 
-  // ── Llamadas RPC en paralelo ────────────────────────────────────────────
   const [kpisRes, evoRes, topRes, famRes] = await Promise.all([
     supabase.rpc('ventas_kpis', {
       p_cur_anyo:  curAnyo,
@@ -48,23 +69,23 @@ export async function GET() {
       p_prev_anyo: prevAnyo,
     }),
     supabase.rpc('ventas_evolucion', {
-      p_anyo_desde: evo18start.anyo,
-      p_mes_desde:  evo18start.mes,
+      p_anyo_desde: evo30start.anyo,
+      p_mes_desde:  evo30start.mes,
       p_anyo_hasta: curAnyo,
       p_mes_hasta:  curMes,
     }),
     supabase.rpc('ventas_top_modelos', {
-      p_anyo_desde: cut12.anyo,
-      p_mes_desde:  cut12.mes,
-      p_anyo_hasta: curAnyo,
-      p_mes_hasta:  curMes,
+      p_anyo_desde: cutFrom.anyo,
+      p_mes_desde:  cutFrom.mes,
+      p_anyo_hasta: cutTo.anyo,
+      p_mes_hasta:  cutTo.mes,
       p_limit:      10,
     }),
     supabase.rpc('ventas_por_familia', {
-      p_anyo_desde: cut12.anyo,
-      p_mes_desde:  cut12.mes,
-      p_anyo_hasta: curAnyo,
-      p_mes_hasta:  curMes,
+      p_anyo_desde: cutFrom.anyo,
+      p_mes_desde:  cutFrom.mes,
+      p_anyo_hasta: cutTo.anyo,
+      p_mes_hasta:  cutTo.mes,
       p_limit:      8,
     }),
   ])
@@ -76,30 +97,32 @@ export async function GET() {
 
   const kpis = kpisRes.data?.[0] ?? {}
 
-  // ── Evolución: rellenar los 18 meses aunque no haya datos ──────────────
-  const evoByPeriod = new Map<number, { ingresos: number; unidades: number }>()
+  // Evolucion: 18 meses con ticket medio por mes
+  const evoByPeriod = new Map<number, { ingresos: number; unidades: number; coste: number }>()
   for (const r of evoRes.data ?? []) {
     evoByPeriod.set(r.anyo * 100 + r.mes, {
-      ingresos:  Math.round(Number(r.ingresos_netos ?? 0)),
-      unidades:  Number(r.unidades_vendidas ?? 0),
+      ingresos: Math.round(Number(r.ingresos_netos  ?? 0)),
+      unidades: Number(r.unidades_vendidas ?? 0),
+      coste:    Math.round(Number(r.coste_total     ?? 0)),
     })
   }
 
   const evolucion: VentasSummary['evolucion'] = []
-  for (let i = 17; i >= 0; i--) {
-    const p = periodoAtras(curAnyo, curMes, i)
-    const period = p.anyo * 100 + p.mes
-    const slot = evoByPeriod.get(period) ?? { ingresos: 0, unidades: 0 }
+  for (let i = 29; i >= 0; i--) {
+    const p    = periodoAtras(curAnyo, curMes, i)
+    const slot = evoByPeriod.get(p.anyo * 100 + p.mes) ?? { ingresos: 0, unidades: 0, coste: 0 }
     evolucion.push({
       label:    `${MESES_ES[p.mes]} ${String(p.anyo).slice(2)}`,
       anyo:     p.anyo,
       mes:      p.mes,
       ingresos: slot.ingresos,
       unidades: slot.unidades,
+      coste:    slot.coste,
+      ticket:   slot.unidades > 0 ? Math.round(slot.ingresos / slot.unidades * 100) / 100 : 0,
     })
   }
 
-  // ── Top modelos: añadir descripción ────────────────────────────────────
+  // Top modelos: descripción desde products
   const topCodes = (topRes.data ?? []).map((r: { codigo_modelo: string }) => r.codigo_modelo)
   let descMap: Record<string, string | null> = {}
   if (topCodes.length > 0) {
@@ -125,23 +148,24 @@ export async function GET() {
   }))
 
   const summary: VentasSummary = {
-    ytd_ingresos:     Math.round(Number(kpis.ytd_ingresos  ?? 0)),
-    ytd_unidades:     Number(kpis.ytd_unidades  ?? 0),
-    ytd_meses:        Number(kpis.ytd_meses     ?? 0),
-    prev_ingresos:    Math.round(Number(kpis.prev_ingresos ?? 0)),
-    prev_unidades:    Number(kpis.prev_unidades ?? 0),
-    last_anyo:        Number(kpis.last_anyo     ?? curAnyo),
-    last_mes:         Number(kpis.last_mes      ?? curMes),
-    last_ingresos:    Math.round(Number(kpis.last_ingresos    ?? 0)),
-    last_unidades:    Number(kpis.last_unidades    ?? 0),
-    lm_prev_ingresos: Math.round(Number(kpis.lm_prev_ingresos ?? 0)),
-    lm_prev_unidades: Number(kpis.lm_prev_unidades ?? 0),
+    periodo,
+    ytd_ingresos:     Math.round(Number(kpis.ytd_ingresos      ?? 0)),
+    ytd_unidades:     Number(kpis.ytd_unidades      ?? 0),
+    ytd_meses:        Number(kpis.ytd_meses          ?? 0),
+    prev_ingresos:    Math.round(Number(kpis.prev_ingresos      ?? 0)),
+    prev_unidades:    Number(kpis.prev_unidades      ?? 0),
+    last_anyo:        Number(kpis.last_anyo           ?? curAnyo),
+    last_mes:         Number(kpis.last_mes            ?? curMes),
+    last_ingresos:    Math.round(Number(kpis.last_ingresos      ?? 0)),
+    last_unidades:    Number(kpis.last_unidades      ?? 0),
+    lm_prev_ingresos: Math.round(Number(kpis.lm_prev_ingresos   ?? 0)),
+    lm_prev_unidades: Number(kpis.lm_prev_unidades   ?? 0),
     evolucion,
     top_modelos,
     por_familia,
   }
 
   return NextResponse.json(summary, {
-    headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=120' },
+    headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60' },
   })
 }
