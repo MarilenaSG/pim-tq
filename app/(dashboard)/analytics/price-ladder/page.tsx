@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { createServerClient } from '@/lib/supabase/server'
 import { PriceLadderClient } from './PriceLadderClient'
 
@@ -160,13 +161,15 @@ export default async function PriceLadderPage({
   const uniqMetals = Array.from(new Set(products.filter(p => (p.familia ?? 'Sin familia') === selectedFamilia).map(p => p.metal).filter(Boolean) as string[])).sort()
 
   return (
-    <PriceLadderClient
-      familias={familias}
-      selectedFamilia={selectedFamilia}
-      selectedMetal={selectedMetal}
-      ladderData={ladderData}
-      allProducts={allProductsInFamilia}
-      uniqMetals={uniqMetals}
-    />
+    <Suspense fallback={<div className="p-8 text-center" style={{ color: '#8fa8b8' }}>Cargando escalera de precios…</div>}>
+      <PriceLadderClient
+        familias={familias}
+        selectedFamilia={selectedFamilia}
+        selectedMetal={selectedMetal}
+        ladderData={ladderData}
+        allProducts={allProductsInFamilia}
+        uniqMetals={uniqMetals}
+      />
+    </Suspense>
   )
 }

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import type { Tienda, TiendaKpi } from '@/types'
 
+export const dynamic = 'force-dynamic'
+
 export interface TiendaWithKpi extends Tienda {
   kpi: TiendaKpi | null
 }
