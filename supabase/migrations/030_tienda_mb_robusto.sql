@@ -1,8 +1,14 @@
 -- Migración 030: MB% robusto en tienda_tendencia y tiendas_kpis_listing
 --
+-- NOTA: tienda_tendencia añade columna mb_pct nueva → necesita DROP previo
+-- (CREATE OR REPLACE no permite cambiar la firma de retorno en PostgreSQL)
+--
 -- Lógica de prioridad para coste:
 --   1. Si coste_total > 0 en ventas_mensuales → usa el real
 --   2. Si pct_margen_bruto en product_variants > 0 → estima coste
+
+-- Drop necesario por cambio de firma (nueva columna mb_pct en returns table)
+drop function if exists tienda_tendencia(text);
 --   3. Si ninguno → devuelve coste NULL (frontend mostrará "—")
 --
 -- Esto evita tanto el 100% (coste_total=0 con COALESCE a 0)
@@ -11,7 +17,7 @@
 -- ── tienda_tendencia ──────────────────────────────────────────────────────────
 -- Añade mb_pct calculado en servidor para que el frontend solo lo muestre.
 
-create or replace function tienda_tendencia(p_tienda text)
+create function tienda_tendencia(p_tienda text)
 returns table (
   anyo     int,
   mes      int,
