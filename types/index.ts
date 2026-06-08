@@ -454,7 +454,8 @@ export interface TiendaTendencia {
   mes:      number
   ingresos: number
   uds:      number
-  coste:    number
+  coste:    number | null
+  mb_pct:   number | null   // calculado en servidor; null si sin datos de coste
 }
 
 export interface TiendaFamilia {

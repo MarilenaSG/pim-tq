@@ -131,8 +131,12 @@ export function TiendaDetailClient({ tienda, tendencia, familias, metales, topOr
   // ── Derived KPIs ──────────────────────────────────────────
   const ingresos12m = tendencia.reduce((s, r) => s + r.ingresos, 0)
   const uds12m      = tendencia.reduce((s, r) => s + r.uds,      0)
-  const coste12m    = tendencia.reduce((s, r) => s + r.coste,    0)
-  const mb          = ingresos12m > 0 ? (ingresos12m - coste12m) / ingresos12m * 100 : null
+  // MB%: media ponderada de mb_pct por mes (calculado en servidor)
+  // Evita que JS convierta null→0 y arruine el cálculo
+  const mbRows      = tendencia.filter(r => r.mb_pct != null && r.ingresos > 0)
+  const mb          = mbRows.length > 0
+    ? mbRows.reduce((s, r) => s + r.mb_pct! * r.ingresos, 0) / mbRows.reduce((s, r) => s + r.ingresos, 0)
+    : null
   const ticket      = uds12m > 0 ? ingresos12m / uds12m : null
   const nModelos    = new Set([...topOro, ...topPlata].map(p => p.codigo_modelo)).size
 
