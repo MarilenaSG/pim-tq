@@ -18,9 +18,11 @@ export default async function AnalyticsLayout({ children }: { children: ReactNod
   return (
     <div className="min-h-screen bg-[var(--tq-bg)]">
       <div className="bg-white border-b border-[#e2ddd9] px-8 overflow-x-auto">
-        <AnalyticsTabs />
+        <Suspense fallback={<div className="h-[52px]" />}>
+          <AnalyticsTabs />
+        </Suspense>
       </div>
-      <Suspense>
+      <Suspense fallback={<div className="h-[44px] border-b border-[#e2ddd9] bg-[#faf8f6]" />}>
         <FilterBar familias={familias} metales={metales} suppliers={suppliers} />
       </Suspense>
       <div className="p-8 max-w-7xl">
