@@ -166,6 +166,7 @@ export default async function PriceLadderPage({
         familias={familias}
         selectedFamilia={selectedFamilia}
         selectedMetal={selectedMetal}
+        selectedSupplier={supplier}
         ladderData={ladderData}
         allProducts={allProductsInFamilia}
         uniqMetals={uniqMetals}

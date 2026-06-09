@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, Legend,
@@ -79,26 +79,34 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function PriceLadderClient({
-  familias, selectedFamilia, selectedMetal, ladderData, allProducts, uniqMetals,
+  familias, selectedFamilia, selectedMetal, selectedSupplier, ladderData, allProducts, uniqMetals,
 }: {
   familias: string[]
   selectedFamilia: string
   selectedMetal: string
+  selectedSupplier?: string
   ladderData: LadderBucket[]
   allProducts: ProductRow[]
   uniqMetals: string[]
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const sp = useSearchParams()
 
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null)
   const [insights, setInsights] = useState<string[]>([])
   const [insightsLoading, setInsightsLoading] = useState(false)
 
   function setParam(k: string, v: string) {
-    const p = new URLSearchParams(sp.toString())
-    if (v) p.set(k, v); else p.delete(k)
+    const p = new URLSearchParams()
+    const current: Record<string, string> = {
+      familia: selectedFamilia,
+      metal: selectedMetal,
+      ...(selectedSupplier ? { supplier: selectedSupplier } : {}),
+    }
+    for (const [key, val] of Object.entries(current)) {
+      if (key !== k && val) p.set(key, val)
+    }
+    if (v) p.set(k, v)
     router.replace(`${pathname}?${p.toString()}`, { scroll: false })
   }
 
