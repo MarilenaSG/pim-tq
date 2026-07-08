@@ -193,7 +193,7 @@ La zona activa se guarda en `localStorage` y el `ZoneSidebar` la muestra con nav
 ├── types/
 │   └── index.ts                       ← Todos los tipos TypeScript
 ├── supabase/
-│   └── migrations/                    ← 19 migraciones (001–019)
+│   └── migrations/                    ← 001–035 (035 = matriz de surtido)
 ├── public/
 │   └── brand/
 │       ├── icon_cream.png             ← Logo para fondos oscuros (PDF, etc.)
@@ -293,6 +293,14 @@ APP_URL=                      # Para callbacks internos
 ### Vistas y RPCs
 - `product_stock_summary` — vista: stock total por modelo
 - RPCs de ventas: `ventas_por_modelo_v2`, otras funciones de agregación
+
+### Matriz de Surtido (migración 035)
+Framework de clasificación de catálogo derivado del Excel "Matriz_Surtido_TQ" (fuente de verdad).
+- **Vista `v_matriz_surtido`** (un registro por modelo activo) calcula al vuelo: `margen_abc` (terciles `ntile(3)` sobre margen de variante líder), `abc_cruzado` (9 celdas + "Sin venta 12M"/"Sin dato de margen"), `rol_surtido` (Test/Local ≤90d → Revisar sin venta → Core [ABC=A y ≥15 tiendas] → Extendido [A/B] → Cola larga [C]), `escalon_precio` (escaleras fijas Oro/Plata), `ciclo_vida`. Reutiliza `abc_unidades`/`pct_margen_bruto` del sync (no recalcula Pareto).
+- **Tablas de referencia** editables (patrón pricing, en `/settings/surtido`): `stores` (cluster A/B/C por tienda, 18 tiendas, edición manual) y `rol_categoria_familia` (Destino/Rutina/Ocasional/Conveniencia). **Son ejes descriptivos: NO alimentan la clasificación** (fiel al Excel).
+- `es_basico` (flag manual curado, semilla del Excel) en `products`.
+- UI: matriz 3×3 en `/analytics/rentabilidad`, barras de rol en `/analytics/surtido`.
+- Nota: el Excel tiene 964 modelos activos; validar que el universo de la BD coincide tras aplicar 035 + sync.
 
 ### Migraciones aplicadas
 - 001–018: schema base, variantes, imágenes, campañas, alertas, boletin_overrides, variant description

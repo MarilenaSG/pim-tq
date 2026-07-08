@@ -1,8 +1,17 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader, KpiCard } from '@/components/ui'
 import { SurtidoCharts } from './SurtidoCharts'
+import { RolSurtidoBars, type RolSurtidoDatum } from './RolSurtidoBars'
 
 export const dynamic = 'force-dynamic'
+
+const ROL_ORDER: RolSurtidoDatum[] = [
+  { rol: 'Core',             count: 0, color: '#3A9E6A' },
+  { rol: 'Extendido',        count: 0, color: '#0099f2' },
+  { rol: 'Cola larga (C)',   count: 0, color: '#C8842A' },
+  { rol: 'Test/Local',       count: 0, color: '#00557f' },
+  { rol: 'Revisar (sin venta 12M)', count: 0, color: '#C0392B' },
+]
 
 export interface HeatmapData {
   familias: string[]
@@ -27,6 +36,26 @@ export default async function SurtidoPage({ searchParams }: { searchParams: { fa
   const { data: products } = await query
 
   const rows = products ?? []
+
+  // ── Distribución rol de surtido (vista v_matriz_surtido) ──────
+  const rolCounts = new Map<string, number>()
+  for (let from = 0; ; from += 1000) {
+    let rq = supabase
+      .from('v_matriz_surtido')
+      .select('rol_surtido')
+      .range(from, from + 999)
+    if (familia)  rq = rq.eq('familia', familia)
+    if (metal)    rq = rq.eq('metal', metal)
+    if (supplier) rq = rq.eq('marca', supplier)
+    const { data } = await rq
+    if (!data || data.length === 0) break
+    for (const r of data) {
+      const k = (r.rol_surtido as string | null) ?? '—'
+      rolCounts.set(k, (rolCounts.get(k) ?? 0) + 1)
+    }
+    if (data.length < 1000) break
+  }
+  const rolSurtidoData: RolSurtidoDatum[] = ROL_ORDER.map(d => ({ ...d, count: rolCounts.get(d.rol) ?? 0 }))
 
   // ── KPIs ──────────────────────────────────────────────────────
   const totalModelos   = rows.length
@@ -151,6 +180,8 @@ export default async function SurtidoPage({ searchParams }: { searchParams: { fa
           color="green"
         />
       </div>
+
+      <RolSurtidoBars data={rolSurtidoData} />
 
       <SurtidoCharts
         amplitudData={amplitudData}

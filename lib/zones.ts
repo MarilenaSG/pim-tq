@@ -60,6 +60,7 @@ export const ZONES: ZoneConfig[] = [
         label: 'Configuración',
         items: [
           { label: 'Reglas de precio', href: '/settings/pricing',        icon: '⊞' },
+          { label: 'Ejes de surtido',  href: '/settings/surtido',        icon: '◱' },
           { label: 'Sincronización',   href: '/settings/sync',           icon: '↻' },
           { label: 'Ayuda',            href: '/help',                    icon: '?' },
         ],

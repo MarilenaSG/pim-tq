@@ -495,3 +495,59 @@ export interface TiendaTopPorMetal {
   coste:         number
   mb_pct:        number | null
 }
+
+// ── Matriz de Surtido ─────────────────────────────────────────
+
+export type MargenAbc  = 'A' | 'B' | 'C'
+export type ClaseAbc   = 'A' | 'B' | 'C' | 'Sin venta'
+export type RolSurtido =
+  | 'Core' | 'Extendido' | 'Cola larga (C)' | 'Test/Local' | 'Revisar (sin venta 12M)'
+export type AbcCruzado =
+  | 'Estrella' | 'Motor de tráfico' | 'Gancho bajo margen'
+  | 'Joya oculta' | 'Núcleo estable' | 'Revisar precio/coste'
+  | 'Nicho rentable' | 'Cola larga aceptable' | 'Candidato a descatalogar'
+  | 'Sin venta 12M' | 'Sin dato de margen'
+export type RolCategoria = 'Destino' | 'Rutina' | 'Ocasional' | 'Conveniencia'
+
+/** Fila de la vista `v_matriz_surtido` (un registro por modelo activo). */
+export interface MatrizSurtidoRow {
+  codigo_modelo:      string
+  description:        string | null
+  familia:            string | null
+  metal:             string | null
+  marca:             string | null
+  unidades_12m:      number | null
+  ingresos_12m:      number | null
+  abc_unidades:      string | null
+  es_basico:         boolean
+  precio_venta:      number | null
+  pct_margen_bruto:  number | null
+  num_tiendas_activo: number | null
+  dias_desde_alta:   number | null
+  clase_abc:         ClaseAbc | null
+  margen_abc:        MargenAbc | null
+  escalon_precio:    string | null
+  ciclo_vida:        'Nuevo' | 'Vigente'
+  rol_surtido:       RolSurtido | null
+  rol_categoria:     RolCategoria | null
+  abc_cruzado:       AbcCruzado | null
+}
+
+/** Tabla de referencia editable `stores` (cluster de tienda). */
+export interface Store {
+  tienda:            string
+  tamano_m2:         string | null
+  tipo_localizacion: 'Urbana' | 'Periferia' | 'Turistica' | null
+  cluster:           'A' | 'B' | 'C' | null
+  ingresos_12m:      number | null
+  unidades_12m:      number | null
+  updated_at:        string | null
+}
+
+/** Tabla de referencia editable `rol_categoria_familia`. */
+export interface RolCategoriaFamilia {
+  familia:       string
+  rol_categoria: RolCategoria | null
+  justificacion: string | null
+  updated_at:    string | null
+}

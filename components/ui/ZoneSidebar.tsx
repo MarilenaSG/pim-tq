@@ -56,6 +56,7 @@ const NAV = [
     items: [
       { label: 'Sincronización',    href: '/settings/sync',       icon: '↻' },
       { label: 'Reglas de precio',  href: '/settings/pricing',    icon: '⊞' },
+      { label: 'Ejes de surtido',   href: '/settings/surtido',    icon: '◱' },
       { label: 'Ayuda',             href: '/help',                icon: '?' },
     ],
   },

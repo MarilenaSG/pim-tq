@@ -1,8 +1,17 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader, KpiCard } from '@/components/ui'
 import { RentabilidadCharts } from './RentabilidadCharts'
+import { MatrizSurtido, type MatrizCell, type BorderGroup, type MatrizItem } from './MatrizSurtido'
+import type { AbcCruzado } from '@/types'
 
 export const dynamic = 'force-dynamic'
+
+// Etiqueta ABC cruzado por (volumen, margen) — espejo de la vista SQL
+const CRUZADO: Record<string, AbcCruzado> = {
+  AA: 'Estrella',      AB: 'Motor de tráfico',     AC: 'Gancho bajo margen',
+  BA: 'Joya oculta',   BB: 'Núcleo estable',       BC: 'Revisar precio/coste',
+  CA: 'Nicho rentable', CB: 'Cola larga aceptable', CC: 'Candidato a descatalogar',
+}
 
 export default async function RentabilidadPage({ searchParams }: { searchParams: { familia?: string; metal?: string; supplier?: string } }) {
   const supabase = createServerClient()
@@ -26,6 +35,52 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
 
   const products = productsRes.data ?? []
   const variants = variantsRes.data ?? []
+
+  // ── Matriz de surtido (vista v_matriz_surtido) ────────────────
+  // Lectura paginada para no toparse con el límite de 1000 filas de Supabase.
+  const matrizRows: {
+    codigo_modelo: string; description: string | null; familia: string | null
+    ingresos_12m: number | null; unidades_12m: number | null
+    clase_abc: string | null; margen_abc: string | null
+    pct_margen_bruto: number | null; abc_cruzado: string | null
+  }[] = []
+  for (let from = 0; ; from += 1000) {
+    let mq = supabase
+      .from('v_matriz_surtido')
+      .select('codigo_modelo, description, familia, ingresos_12m, unidades_12m, clase_abc, margen_abc, pct_margen_bruto, abc_cruzado')
+      .range(from, from + 999)
+    if (familia)  mq = mq.eq('familia', familia)
+    if (metal)    mq = mq.eq('metal', metal)
+    if (supplier) mq = mq.eq('marca', supplier)
+    const { data } = await mq
+    if (!data || data.length === 0) break
+    matrizRows.push(...data)
+    if (data.length < 1000) break
+  }
+
+  const toItem = (r: (typeof matrizRows)[number]): MatrizItem => ({
+    codigo:   r.codigo_modelo,
+    desc:     r.description,
+    familia:  r.familia,
+    ingresos: Number(r.ingresos_12m ?? 0),
+    margen:   r.pct_margen_bruto != null ? Number(r.pct_margen_bruto) : null,
+    uds:      r.unidades_12m != null ? Number(r.unidades_12m) : null,
+  })
+
+  const cells: MatrizCell[] = (['A', 'B', 'C'] as const).flatMap(vol =>
+    (['A', 'B', 'C'] as const).map(mgn => ({
+      vol, mgn,
+      label: CRUZADO[`${vol}${mgn}`],
+      items: matrizRows.filter(r => r.clase_abc === vol && r.margen_abc === mgn).map(toItem),
+    }))
+  )
+  const borderCases: BorderGroup[] = ([
+    ['Sin venta 12M', (r: (typeof matrizRows)[number]) => r.clase_abc === 'Sin venta'],
+    ['Sin dato de margen', (r: (typeof matrizRows)[number]) => r.clase_abc !== 'Sin venta' && r.margen_abc == null],
+  ] as const).map(([label, pred]) => ({
+    label: label as BorderGroup['label'],
+    items: matrizRows.filter(pred).map(toItem),
+  }))
 
   const margenByCode = new Map<string, number>(
     variants
@@ -158,6 +213,8 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
           color="blue"
         />
       </div>
+
+      <MatrizSurtido cells={cells} borderCases={borderCases} />
 
       <RentabilidadCharts
         familiaData={familiaData}
