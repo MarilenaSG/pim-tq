@@ -186,6 +186,24 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
         eyebrow="Analítica"
         title="Rentabilidad"
         subtitle="Ingresos y márgenes por familia, metal y modelo · Top 10 contribuidores"
+        actions={
+          <a
+            href={`/api/analytics/matriz-excel${
+              (() => {
+                const p = new URLSearchParams()
+                if (familia)  p.set('familia', familia)
+                if (metal)    p.set('metal', metal)
+                if (supplier) p.set('supplier', supplier)
+                const qs = p.toString()
+                return qs ? `?${qs}` : ''
+              })()
+            }`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-85"
+            style={{ background: '#00557f' }}
+          >
+            ↓ Excel {(familia || metal || supplier) ? '(filtrado)' : '(completo)'}
+          </a>
+        }
       />
 
       <div className="grid grid-cols-4 gap-4 mb-8">
