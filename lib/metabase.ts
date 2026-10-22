@@ -1,6 +1,6 @@
 import { createServiceClient } from './supabase/server'
 import type { AbcRating } from '@/types'
-import { parseNumber } from './parse-number'
+import { detectNumberFormat, parseNumber } from './parse-number'
 
 // ── CSV columns from Metabase ─────────────────────────────────
 // slug, codigo_modelo, codigo_interno, variante, description,
@@ -61,8 +61,12 @@ export interface SyncResult {
 
 // ── Parsers ───────────────────────────────────────────────────
 
-/** Acepta formato europeo ("162.010,03") y punto decimal ("263.99") — ver lib/parse-number.ts */
-const parseEuNum = parseNumber
+const NUMERIC_COLUMNS = [
+  'num_variantes', 'ingresos_variante_lider_12m', 'stock_variante', 'precio_venta', 'precio_tachado',
+  'descuento_aplicado', 'cost_price_medio', 'ultimo_coste_compra', 'ultimo_precio_venta', 'margen_bruto',
+  'pct_margen_bruto', 'ingresos_12m', 'unidades_12m', 'ingresos_slug_12m', 'unidades_mes_anterior',
+  'num_tiendas_activo',
+]
 
 function parseAbcRating(val: string | undefined): AbcRating {
   const letter = val?.trim().toUpperCase().charAt(0)
@@ -123,12 +127,20 @@ export function parseCsv(text: string): MetabaseRow[] {
   if (nonEmpty.length < 2) return []
 
   const headers = parseCsvRow(nonEmpty[0]).map(h => h.trim())
-  const rows: MetabaseRow[] = []
-
-  for (let i = 1; i < nonEmpty.length; i++) {
-    const vals = parseCsvRow(nonEmpty[i])
+  const raws: Record<string, string>[] = nonEmpty.slice(1).map(line => {
+    const vals = parseCsvRow(line)
     const raw: Record<string, string> = {}
     headers.forEach((h, idx) => { raw[h] = vals[idx] ?? '' })
+    return raw
+  })
+
+  // Formato numérico del CSV completo (con o sin formato europeo) — ver lib/parse-number.ts
+  const numberFormat = detectNumberFormat(raws.flatMap(r => NUMERIC_COLUMNS.map(c => r[c])))
+  const parseEuNum = (v: string | undefined) => parseNumber(v, numberFormat)
+
+  const rows: MetabaseRow[] = []
+
+  for (const raw of raws) {
 
     const codigoModelo = parseStr(raw['codigo_modelo'])
     const codigoInterno = parseStr(raw['codigo_interno'])

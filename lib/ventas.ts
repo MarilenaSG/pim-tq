@@ -1,7 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
-import { parseNumber } from '@/lib/parse-number'
-
-const parseEuNum = parseNumber
+import { detectNumberFormat, parseNumber } from '@/lib/parse-number'
 
 function parseAnyo(s: string): number {
   return parseInt(s.trim().replace(/\./g, ''), 10)
@@ -60,8 +58,15 @@ export async function syncVentas(): Promise<SyncVentasResult> {
   let rowsDropped = 0
   const now = new Date().toISOString()
 
+  const allCols = lines.map(parseCSVLine)
+  // Formato numérico del CSV completo (con o sin formato europeo) — ver lib/parse-number.ts
+  const numberFormat = detectNumberFormat(
+    allCols.slice(1).flatMap(c => [c[idx.ingresos_netos], c[idx.coste_total], c[idx.unidades_vendidas]])
+  )
+  const parseEuNum = (v: string) => parseNumber(v, numberFormat)
+
   for (let i = 1; i < lines.length; i++) {
-    const cols = parseCSVLine(lines[i])
+    const cols = allCols[i]
     if (cols.length < 4) { rowsDropped++; continue }
 
     const slug = cols[idx.codigo_interno]?.trim()
