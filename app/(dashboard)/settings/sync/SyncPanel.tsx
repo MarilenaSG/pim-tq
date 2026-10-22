@@ -157,7 +157,15 @@ export function SyncPanel({
                 {recentLogs.map((log, i) => (
                   <tr key={log.id} style={{ borderBottom: i < recentLogs.length - 1 ? '1px solid rgba(0,85,127,0.06)' : 'none' }}>
                     <td className="px-4 py-3 font-medium text-tq-snorkel capitalize">{log.source}</td>
-                    <td className="px-4 py-3"><LogStatusBadge status={log.status} /></td>
+                    <td className="px-4 py-3">
+                      <LogStatusBadge status={log.status} />
+                      {log.status === 'error' && log.error_message && (
+                        <p className="mt-1 max-w-[420px] text-[11px] leading-snug whitespace-pre-line break-words"
+                          style={{ color: '#992d22' }} title={log.error_message}>
+                          {log.error_message.length > 300 ? `${log.error_message.slice(0, 300)}…` : log.error_message}
+                        </p>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-tq-snorkel">{log.records_updated ?? '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs" style={{ color: '#b2b2b2' }}>
                       {formatDuration(log.started_at, log.finished_at)}
