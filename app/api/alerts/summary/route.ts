@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { fetchAlerts, summarizeAlerts } from '@/lib/alerts'
 
+// Sin esto Next 14 genera la respuesta una sola vez en el build y la sirve congelada
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const alerts  = await fetchAlerts()

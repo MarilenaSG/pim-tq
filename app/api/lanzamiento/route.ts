@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, createServiceClient } from '@/lib/supabase/server'
 
+// Sin esto Next 14 genera la respuesta una sola vez en el build y la sirve congelada
+export const dynamic = 'force-dynamic'
+
 // GET /api/lanzamiento — listado de borradores y confirmados
 export async function GET() {
   const supabase = createServerClient()
