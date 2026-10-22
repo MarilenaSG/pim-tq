@@ -1,17 +1,31 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { parseNumber } from '@/lib/parse-number'
 
 const MESES: Record<string, number> = {
   enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
   julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
 }
 
-// "abril 21, 2026" → "2026-04-21"
+const pad = (n: number | string) => String(n).padStart(2, '0')
+
+// Metabase ha enviado la fecha en varios formatos según la configuración del export:
+//   "2026-10-22" / "2026-10-22T00:00:00" → "2026-10-22"
+//   "22/10/2026"                         → "2026-10-22"
+//   "abril 21, 2026"                     → "2026-04-21"
 function parseSpanishDate(s: string): string | null {
-  const m = s.trim().match(/^(\w+)\s+(\d{1,2}),\s+(\d{4})$/)
+  const v = s.trim()
+
+  const iso = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/)
+  if (iso) return `${iso[1]}-${pad(iso[2])}-${pad(iso[3])}`
+
+  const dmy = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (dmy) return `${dmy[3]}-${pad(dmy[2])}-${pad(dmy[1])}`
+
+  const m = v.match(/^(\w+)\s+(\d{1,2}),\s+(\d{4})$/)
   if (!m) return null
   const month = MESES[m[1].toLowerCase()]
   if (!month) return null
-  return `${m[3]}-${String(month).padStart(2, '0')}-${String(parseInt(m[2], 10)).padStart(2, '0')}`
+  return `${m[3]}-${pad(month)}-${pad(parseInt(m[2], 10))}`
 }
 
 export interface SyncReservasResult {
@@ -66,8 +80,8 @@ export async function syncReservas(): Promise<SyncReservasResult> {
     rows.push({
       slug,
       fecha_snapshot:      fechaISO,
-      reservas_count:      parseInt((cols[idx.reservas_count] ?? '').trim(), 10) || null,
-      unidades_reservadas: parseInt((cols[idx.unidades_reservadas] ?? '').trim(), 10) || null,
+      reservas_count:      parseNumber(cols[idx.reservas_count]),
+      unidades_reservadas: parseNumber(cols[idx.unidades_reservadas]),
       synced_at:           now,
     })
   }
@@ -91,7 +105,14 @@ export async function syncReservas(): Promise<SyncReservasResult> {
     for (const v of data ?? []) if (v.slug) validSlugs.add(v.slug)
   }
 
-  const validRows = rows.filter(r => validSlugs.has(r.slug))
+  // Una fila por slug (es la clave de reservas_activas): si el CSV repite variante, gana el snapshot más reciente
+  const bySlug = new Map<string, (typeof rows)[number]>()
+  for (const r of rows) {
+    if (!validSlugs.has(r.slug)) continue
+    const prev = bySlug.get(r.slug)
+    if (!prev || (r.fecha_snapshot ?? '') > (prev.fecha_snapshot ?? '')) bySlug.set(r.slug, r)
+  }
+  const validRows = Array.from(bySlug.values())
   // skipped rows are descatalogued variants — omit silently
 
   if (validRows.length === 0) {
