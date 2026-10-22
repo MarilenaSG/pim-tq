@@ -1,10 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { parseNumber } from '@/lib/parse-number'
 
-function parseEuNum(s: string): number | null {
-  const clean = s.trim().replace(/\./g, '').replace(',', '.')
-  const n = parseFloat(clean)
-  return isNaN(n) ? null : n
-}
+const parseEuNum = parseNumber
 
 function parseAnyo(s: string): number {
   return parseInt(s.trim().replace(/\./g, ''), 10)
@@ -89,7 +86,7 @@ export async function syncVentas(): Promise<SyncVentasResult> {
       tienda,
       anyo,
       mes,
-      unidades_vendidas: parseInt((cols[idx.unidades_vendidas] ?? '').trim(), 10) || null,
+      unidades_vendidas: parseEuNum(cols[idx.unidades_vendidas] ?? ''),
       ingresos_netos:    parseEuNum(cols[idx.ingresos_netos] ?? ''),
       coste_total:       parseEuNum(cols[idx.coste_total] ?? ''),
       synced_at:         now,

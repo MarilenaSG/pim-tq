@@ -1,5 +1,6 @@
 import { createServiceClient } from './supabase/server'
 import type { AbcRating } from '@/types'
+import { parseNumber } from './parse-number'
 
 // ── CSV columns from Metabase ─────────────────────────────────
 // slug, codigo_modelo, codigo_interno, variante, description,
@@ -60,13 +61,8 @@ export interface SyncResult {
 
 // ── Parsers ───────────────────────────────────────────────────
 
-/** European number format: "162.010,03" → 162010.03 */
-function parseEuNum(val: string | undefined): number | null {
-  if (!val || val.trim() === '' || val.trim() === '-') return null
-  const cleaned = val.trim().replace(/\./g, '').replace(',', '.')
-  const n = parseFloat(cleaned)
-  return isNaN(n) ? null : n
-}
+/** Acepta formato europeo ("162.010,03") y punto decimal ("263.99") — ver lib/parse-number.ts */
+const parseEuNum = parseNumber
 
 function parseAbcRating(val: string | undefined): AbcRating {
   const letter = val?.trim().toUpperCase().charAt(0)

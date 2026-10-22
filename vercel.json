@@ -1,8 +1,8 @@
 {
   "crons": [
-    {
-      "path": "/api/sync/run",
-      "schedule": "0 5 * * *"
-    }
+    { "path": "/api/sync/run?source=metabase", "schedule": "0 4 * * *" },
+    { "path": "/api/sync/run?source=shopify",  "schedule": "0 5 * * *" },
+    { "path": "/api/sync/run?source=ventas",   "schedule": "0 5 * * *" },
+    { "path": "/api/sync/run?source=reservas", "schedule": "0 5 * * *" }
   ]
 }

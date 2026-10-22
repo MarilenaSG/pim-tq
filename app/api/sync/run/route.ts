@@ -41,21 +41,47 @@ async function runSync(
   }
 }
 
-export async function POST(req: NextRequest) {
-  const key = req.headers.get('x-api-key')
-  if (!key || key !== process.env.CRON_SECRET) {
+// Una fuente por invocación: las cuatro seguidas superan los 60 s de maxDuration.
+// vercel.json programa un cron por fuente (Metabase primero, el resto una hora después).
+const SYNC_FNS = {
+  metabase: syncMetabase,
+  shopify:  syncShopify,
+  ventas:   syncVentas,
+  reservas: syncReservas,
+} as const
+
+type SyncSource = keyof typeof SYNC_FNS
+
+function isAuthorized(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+  // Vercel Cron envía GET con "Authorization: Bearer <CRON_SECRET>"
+  if (req.headers.get('authorization') === `Bearer ${secret}`) return true
+  // Llamadas manuales con header x-api-key
+  return req.headers.get('x-api-key') === secret
+}
+
+async function handle(req: NextRequest) {
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const source = req.nextUrl.searchParams.get('source')
+  if (!source || !(source in SYNC_FNS)) {
+    return NextResponse.json(
+      { error: `Parámetro "source" obligatorio: ${Object.keys(SYNC_FNS).join(' | ')}` },
+      { status: 400 }
+    )
+  }
+
   const supabase = createServiceClient()
+  const result = await runSync(supabase, source, SYNC_FNS[source as SyncSource])
 
-  const metabaseResult = await runSync(supabase, 'metabase', syncMetabase)
-  const ventasResult   = await runSync(supabase, 'ventas', syncVentas)
-  const reservasResult = await runSync(supabase, 'reservas', syncReservas)
-  const shopifyResult  = await runSync(supabase, 'shopify', syncShopify)
-
-  return NextResponse.json({
-    ok: true,
-    results: { metabase: metabaseResult, ventas: ventasResult, reservas: reservasResult, shopify: shopifyResult },
-  })
+  return NextResponse.json(
+    { ok: result.errors.length === 0, source, result },
+    { status: result.errors.length === 0 ? 200 : 500 }
+  )
 }
+
+export const GET  = handle
+export const POST = handle

@@ -7,6 +7,8 @@ import { ProductsTable } from './ProductsTable'
 import { calcularCompletitud } from '@/lib/completitud'
 
 const PAGE_SIZE = 60
+const SUPABASE_PAGE = 1000 // límite por defecto de filas de Supabase
+const IN_CHUNK = 200       // códigos por .in() para no generar URLs demasiado largas
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -59,25 +61,62 @@ export default async function ProductsPage({
 
   const supabase = createServerClient()
 
-  let productsQuery = supabase
-    .from('products')
-    .select(
-      'codigo_modelo, description, category, familia, metal, karat, num_variantes, ingresos_12m, abc_ventas, metabase_synced_at, is_discontinued, lifecycle_status',
-      { count: 'exact' }
-    )
+  // Base query. Se construye con una función porque los builders de postgrest-js
+  // son mutables: reutilizar la query principal con otro .select() le cambia las columnas.
+  function buildProductsQuery(columns: string, withCount = false) {
+    let q = supabase.from('products').select(columns, withCount ? { count: 'exact' } : undefined)
+    if (search)    q = q.or(`description.ilike.%${search}%,codigo_modelo.ilike.%${search}%`)
+    if (metal)     q = q.eq('metal', metal)
+    if (category)  q = q.eq('category', category)
+    if (familia)   q = q.eq('familia', familia)
+    if (karat)     q = q.eq('karat', karat)
+    if (abc)       q = q.eq('abc_ventas', abc)
+    if (supplier)  q = q.eq('shopify_vendor',  supplier)
+    if (proveedor) q = q.eq('supplier_name',   proveedor)
+    if (estado === 'catalogo')      q = q.eq('is_discontinued', false)
+    if (estado === 'descatalogado') q = q.eq('is_discontinued', true)
+    return q
+  }
 
-  if (search)   productsQuery = productsQuery.or(`description.ilike.%${search}%,codigo_modelo.ilike.%${search}%`)
-  if (metal)    productsQuery = productsQuery.eq('metal', metal)
-  if (category) productsQuery = productsQuery.eq('category', category)
-  if (familia)  productsQuery = productsQuery.eq('familia', familia)
-  if (karat)    productsQuery = productsQuery.eq('karat', karat)
-  if (abc)      productsQuery = productsQuery.eq('abc_ventas', abc)
-  if (supplier)  productsQuery = productsQuery.eq('shopify_vendor',  supplier)
-  if (proveedor) productsQuery = productsQuery.eq('supplier_name',   proveedor)
-  if (estado === 'catalogo')      productsQuery = productsQuery.eq('is_discontinued', false)
-  if (estado === 'descatalogado') productsQuery = productsQuery.eq('is_discontinued', true)
+  // Todos los códigos que cumplen los filtros base, paginando para no cortar en 1000 filas
+  async function fetchFilteredCodes(): Promise<string[]> {
+    const codes: string[] = []
+    for (let from = 0; ; from += SUPABASE_PAGE) {
+      const { data, error } = await buildProductsQuery('codigo_modelo')
+        .order('codigo_modelo')
+        .range(from, from + SUPABASE_PAGE - 1)
+      if (error) throw new Error(`Error filtrando productos: ${error.message}`)
+      const rows = (data ?? []) as unknown as { codigo_modelo: string }[]
+      codes.push(...rows.map(r => r.codigo_modelo))
+      if (rows.length < SUPABASE_PAGE) return codes
+    }
+  }
 
-  productsQuery = productsQuery
+  // Filas de una tabla para un conjunto de modelos, troceando el .in() y paginando cada trozo
+  async function fetchByCodes<T>(table: string, columns: string, codes: string[]): Promise<T[]> {
+    const out: T[] = []
+    for (let i = 0; i < codes.length; i += IN_CHUNK) {
+      const chunk = codes.slice(i, i + IN_CHUNK)
+      for (let from = 0; ; from += SUPABASE_PAGE) {
+        const { data, error } = await supabase
+          .from(table)
+          .select(columns)
+          .in('codigo_modelo', chunk)
+          .order('codigo_modelo')
+          .range(from, from + SUPABASE_PAGE - 1)
+        if (error) throw new Error(`Error leyendo ${table}: ${error.message}`)
+        const rows = (data ?? []) as unknown as T[]
+        out.push(...rows)
+        if (rows.length < SUPABASE_PAGE) break
+      }
+    }
+    return out
+  }
+
+  let productsQuery = buildProductsQuery(
+    'codigo_modelo, description, category, familia, metal, karat, num_variantes, ingresos_12m, abc_ventas, metabase_synced_at, is_discontinued, lifecycle_status',
+    true
+  )
     .order('abc_ventas',   { ascending: true,  nullsFirst: false })
     .order('ingresos_12m', { ascending: false, nullsFirst: false })
 
@@ -101,18 +140,18 @@ export default async function ProductsPage({
 
   // Completitud filter
   if (completitud) {
-    const { data: allProds } = await (productsQuery as typeof productsQuery).select('codigo_modelo')
-    const baseCodes = (allProds ?? []).map((p: { codigo_modelo: string }) => p.codigo_modelo)
+    const baseCodes = await fetchFilteredCodes()
     const effectiveCodes = allowedCodes ? baseCodes.filter(c => allowedCodes!.has(c)) : baseCodes
 
     let compCodes: string[] = []
     if (effectiveCodes.length > 0) {
-      const [imgRes, fieldRes] = await Promise.all([
-        supabase.from('product_images').select('codigo_modelo, is_primary').in('codigo_modelo', effectiveCodes),
+      const [imgRows, fieldRes] = await Promise.all([
+        fetchByCodes<{ codigo_modelo: string; is_primary: boolean }>(
+          'product_images', 'codigo_modelo, is_primary', effectiveCodes),
         supabase.from('custom_field_definitions').select('field_key').eq('is_active', true),
       ])
-      const primarySet    = new Set((imgRes.data ?? []).filter(r => r.is_primary).map(r => r.codigo_modelo))
-      const additionalSet = new Set((imgRes.data ?? []).filter(r => !r.is_primary).map(r => r.codigo_modelo))
+      const primarySet    = new Set(imgRows.filter(r => r.is_primary).map(r => r.codigo_modelo))
+      const additionalSet = new Set(imgRows.filter(r => !r.is_primary).map(r => r.codigo_modelo))
       const totalDefs     = (fieldRes.data ?? []).length
       compCodes = effectiveCodes.filter(code =>
         calcularCompletitud({
@@ -129,21 +168,20 @@ export default async function ProductsPage({
 
   // Stock min filter
   if (stockMin > 0) {
-    const { data: allProds } = await (productsQuery as typeof productsQuery).select('codigo_modelo')
-    const baseCodes = (allProds ?? []).map((p: { codigo_modelo: string }) => p.codigo_modelo)
+    const baseCodes = await fetchFilteredCodes()
     const effectiveCodes = allowedCodes ? baseCodes.filter(c => allowedCodes!.has(c)) : baseCodes
 
+    let stockCodes: string[] = []
     if (effectiveCodes.length > 0) {
-      const { data: stockData } = await supabase
-        .from('product_variants')
-        .select('codigo_modelo, stock_variante')
-        .in('codigo_modelo', effectiveCodes)
+      const stockData = await fetchByCodes<{ codigo_modelo: string; stock_variante: number | null }>(
+        'product_variants', 'codigo_modelo, stock_variante', effectiveCodes)
       const stockByModel: Record<string, number> = {}
-      for (const v of stockData ?? []) {
+      for (const v of stockData) {
         stockByModel[v.codigo_modelo] = (stockByModel[v.codigo_modelo] ?? 0) + (v.stock_variante ?? 0)
       }
-      allowedCodes = new Set(effectiveCodes.filter(c => (stockByModel[c] ?? 0) >= stockMin))
+      stockCodes = effectiveCodes.filter(c => (stockByModel[c] ?? 0) >= stockMin)
     }
+    allowedCodes = new Set(stockCodes)
   }
 
   // Apply intersection
@@ -182,7 +220,7 @@ export default async function ProductsPage({
     supabase.from('campaigns').select('id, nombre').eq('estado', 'activa').order('nombre'),
   ])
 
-  const products   = (productsResult.data ?? []) as ProductRow[]
+  const products   = (productsResult.data ?? []) as unknown as ProductRow[]
   const total      = allowedCodes ? (allowedCodes as Set<string>).size : (productsResult.count ?? 0)
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
